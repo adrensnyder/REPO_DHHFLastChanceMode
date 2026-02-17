@@ -17,6 +17,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
+    <Compile Remove="bin\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="BepInEx">
       <HintPath>..\00Libs\BepInEx\core\BepInEx.dll</HintPath>
       <Private>false</Private>
@@ -38,6 +43,18 @@
       <HintPath>..\00Libs\Unity\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>..\00Libs\Unity\UnityEngine.AssetBundleModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>..\00Libs\Unity\UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>..\00Libs\Unity\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>..\00Libs\GameAssemblies\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
@@ -45,6 +62,18 @@
 
     <Reference Include="DeathHeadHopper">
       <HintPath>..\00Libs\OriginalMod\DeathHeadHopper.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Photon.Pun">
+      <HintPath>..\00Libs\GameAssemblies\PhotonUnityNetworking.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PhotonRealtime">
+      <HintPath>..\00Libs\GameAssemblies\PhotonRealtime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Photon3Unity3D">
+      <HintPath>..\00Libs\GameAssemblies\Photon3Unity3D.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
@@ -60,9 +89,18 @@
     <Message Text="Copied $(TargetFileName) to Thunderstore manifest folder" Importance="high" />
   </Target>
 
+  <Target Name="PostBuildThunderstoreAssets" AfterTargets="PostBuildEvent" Condition="Exists('..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\plugins\') and Exists('Assets\DHHFLastChanceMode')">
+    <RemoveDir Directories="..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\plugins\DHHFLastChanceMode"
+               Condition="Exists('..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\plugins\DHHFLastChanceMode\')" />
+    <Copy SourceFiles="Assets\DHHFLastChanceMode"
+          DestinationFolder="..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\plugins"
+          SkipUnchangedFiles="true" />
+    <Message Text="Copied DHHFLastChanceMode bundle file to Thunderstore plugins folder" Importance="high" />
+  </Target>
+
   <Target Name="PostBuildThunderstoreZip" AfterTargets="Build" Condition="Exists('..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode')">
-    <MakeDir Directories="..\00ThunderstoreUpload\_zips" />
-    <Exec Command="powershell -NoProfile -Command &quot;Compress-Archive -Path '..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\*' -DestinationPath '..\00ThunderstoreUpload\_zips\$(ThunderstoreZipFileName)' -Force&quot;" />
-    <Message Text="Created ..\00ThunderstoreUpload\_zips\$(ThunderstoreZipFileName)" Importance="high" />
+    <MakeDir Directories="..\00ThunderstoreUpload\Zip" />
+    <Exec Command="powershell -NoProfile -Command &quot;Compress-Archive -Path '..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\*' -DestinationPath '..\00ThunderstoreUpload\Zip\$(ThunderstoreZipFileName)' -Force&quot;" />
+    <Message Text="Created ..\00ThunderstoreUpload\Zip\$(ThunderstoreZipFileName)" Importance="high" />
   </Target>
 </Project>
