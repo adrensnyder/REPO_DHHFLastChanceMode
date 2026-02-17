@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>DHHFLastChanceMode</AssemblyName>
+    <RootNamespace>DHHFLastChanceMode</RootNamespace>
+    <Version>0.1.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Deterministic>false</Deterministic>
+    <ThunderstoreZipFileName>AdrenSnyder-DHHFLastChanceMode-$(Version).zip</ThunderstoreZipFileName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>..\00Libs\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx.Harmony">
+      <HintPath>..\00Libs\BepInEx\core\BepInEx.Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>..\00Libs\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <Reference Include="UnityEngine">
+      <HintPath>..\00Libs\Unity\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\00Libs\Unity\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\00Libs\GameAssemblies\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <Reference Include="DeathHeadHopper">
+      <HintPath>..\00Libs\OriginalMod\DeathHeadHopper.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+  </ItemGroup>
+
+  <Target Name="PostBuildThunderstoreManifest" AfterTargets="PostBuildEvent" Condition="Exists('..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\plugins\')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\plugins" />
+    <Message Text="Copied $(TargetFileName) to Thunderstore manifest folder" Importance="high" />
+  </Target>
+
+  <Target Name="PostBuildThunderstoreZip" AfterTargets="Build" Condition="Exists('..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode')">
+    <MakeDir Directories="..\00ThunderstoreUpload\_zips" />
+    <Exec Command="powershell -NoProfile -Command &quot;Compress-Archive -Path '..\00ThunderstoreUpload\AdrenSnyder-DHHFLastChanceMode\*' -DestinationPath '..\00ThunderstoreUpload\_zips\$(ThunderstoreZipFileName)' -Force&quot;" />
+    <Message Text="Created ..\00ThunderstoreUpload\_zips\$(ThunderstoreZipFileName)" Importance="high" />
+  </Target>
+</Project>
