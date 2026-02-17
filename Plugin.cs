@@ -98,10 +98,7 @@ namespace DHHFLastChanceMode
             _deferredBootstrapRoutine = null;
 
             ConfigManager.Initialize(Config);
-            CompatibilityGate.EnsureCreated();
-            ConfigSyncManager.EnsureCreated();
             AllPlayersDeadGuard.EnsureEnabled();
-            LastChanceTimerController.PrewarmGlobalAssetsAtBoot();
 
             var harmony = _harmony;
             if (harmony == null)
@@ -129,6 +126,13 @@ namespace DHHFLastChanceMode
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            if (!ShouldHandleRuntimeScene())
+            {
+                return;
+            }
+
+            CompatibilityGate.EnsureCreated();
+            ConfigSyncManager.EnsureCreated();
             LastChanceTimerController.OnLevelLoaded();
             ConfigSyncManager.RequestHostSnapshotBroadcast();
             ReconcileConditionalMonsterPatches();
@@ -143,6 +147,26 @@ namespace DHHFLastChanceMode
         private void OnLastChanceActiveStateChanged()
         {
             ReconcileConditionalMonsterPatches();
+        }
+
+        private static bool ShouldHandleRuntimeScene()
+        {
+            if (RunManager.instance == null)
+            {
+                return false;
+            }
+
+            if (SemiFunc.RunIsLobbyMenu() ||
+                SemiFunc.RunIsLobby() ||
+                SemiFunc.RunIsShop() ||
+                SemiFunc.RunIsArena() ||
+                SemiFunc.RunIsTutorial() ||
+                SemiFunc.MenuLevel())
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private void TryPatchIfTargetAssembly(Assembly asm)
