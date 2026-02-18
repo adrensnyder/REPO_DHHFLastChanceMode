@@ -47,12 +47,6 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static readonly FieldInfo? s_normalAimHorizontalField = AccessTools.Field(typeof(SpectateCamera), "normalAimHorizontal");
         private static readonly FieldInfo? s_normalAimVerticalField = AccessTools.Field(typeof(SpectateCamera), "normalAimVertical");
 
-        [HarmonyPrepare]
-        private static bool Prepare()
-        {
-            return false;
-        }
-
         internal static void Apply()
         {
             if (s_harmony != null)
@@ -249,13 +243,13 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
-                return true;
+                return false;
             }
 
             var local = PlayerAvatar.instance;
             if (!LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(local))
             {
-                return true;
+                return false;
             }
 
             var now = Time.unscaledTime;

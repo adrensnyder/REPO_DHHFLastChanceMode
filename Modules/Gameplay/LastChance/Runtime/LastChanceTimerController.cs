@@ -32,8 +32,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
     {
         private const string LogKey = "LastChance.Timer";
         private const string TimerSecondAudioFileName = "TimerSecond.mp3";
-        private const string TimerWarningAudioPrimaryFileName = "TimeWarning.mp3";
-        private const string TimerWarningAudioFallbackFileName = "TimerWarning.mp3";
+        private const string TimerWarningAudioPrimaryFileName = "TimerWarning.mp3";
         private static float s_timerRemaining;
         private static bool s_active;
         private static int s_baseCurrency;
@@ -1376,7 +1375,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
                     {
                         var baseDir = AudioAssetLoader.GetDefaultAssetsDirectory();
                         Debug.LogWarning(
-                            $"[LastChance] Failed to load timer warning audio. files={TimerWarningAudioPrimaryFileName},{TimerWarningAudioFallbackFileName} baseDir={baseDir}");
+                            $"[LastChance] Failed to load timer warning audio. files={TimerWarningAudioPrimaryFileName} baseDir={baseDir}");
                     }
 
                     return false;
@@ -1420,17 +1419,8 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
             clip = null;
             resolvedPath = string.Empty;
 
-            if (AudioAssetLoader.TryLoadAudioClip(
-                TimerWarningAudioPrimaryFileName,
-                AudioAssetLoader.GetDefaultAssetsDirectory(),
-                out clip,
-                out resolvedPath))
-            {
-                return true;
-            }
-
             return AudioAssetLoader.TryLoadAudioClip(
-                TimerWarningAudioFallbackFileName,
+                TimerWarningAudioPrimaryFileName,
                 AudioAssetLoader.GetDefaultAssetsDirectory(),
                 out clip,
                 out resolvedPath);

@@ -205,9 +205,11 @@ namespace DHHFLastChanceMode
             {
                 LastChanceMonstersSearchModule.Apply(harmony, asm);
                 LastChanceMonstersNoiseAggroModule.Apply(harmony, asm);
+                LastChanceMonstersCameraForceLockModule.Apply();
                 return;
             }
 
+            LastChanceMonstersCameraForceLockModule.Unapply();
             LastChanceMonstersNoiseAggroModule.Unapply();
             LastChanceMonstersSearchModule.Unapply();
         }
