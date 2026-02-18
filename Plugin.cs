@@ -45,7 +45,6 @@ namespace DHHFLastChanceMode
             AppDomain.CurrentDomain.AssemblyLoad -= OnAssemblyLoad;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             ConfigManager.HostControlledChanged -= OnHostControlledChanged;
-            LastChanceTimerController.ActiveStateChanged -= OnLastChanceActiveStateChanged;
 
             if (_deferredBootstrapRoutine != null)
             {
@@ -99,6 +98,10 @@ namespace DHHFLastChanceMode
 
             ConfigManager.Initialize(Config);
             AllPlayersDeadGuard.EnsureEnabled();
+            if (FeatureFlags.LastChangeMode)
+            {
+                LastChanceTimerController.PrewarmGlobalAssetsAtBoot();
+            }
 
             var harmony = _harmony;
             if (harmony == null)
@@ -111,7 +114,6 @@ namespace DHHFLastChanceMode
             AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
             SceneManager.sceneLoaded += OnSceneLoaded;
             ConfigManager.HostControlledChanged += OnHostControlledChanged;
-            LastChanceTimerController.ActiveStateChanged += OnLastChanceActiveStateChanged;
 
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -141,11 +143,10 @@ namespace DHHFLastChanceMode
         private void OnHostControlledChanged()
         {
             LastChanceTimerController.OnHostControlledConfigChanged();
-            ReconcileConditionalMonsterPatches();
-        }
-
-        private void OnLastChanceActiveStateChanged()
-        {
+            if (FeatureFlags.LastChangeMode)
+            {
+                LastChanceTimerController.PrewarmGlobalAssetsAtBoot();
+            }
             ReconcileConditionalMonsterPatches();
         }
 
@@ -198,22 +199,17 @@ namespace DHHFLastChanceMode
 
             var enableMonsterPipelinePatches =
                 FeatureFlags.LastChangeMode &&
-                FeatureFlags.LastChanceMonstersSearchEnabled &&
-                LastChanceTimerController.IsActive;
+                FeatureFlags.LastChanceMonstersSearchEnabled;
 
             if (enableMonsterPipelinePatches)
             {
                 LastChanceMonstersSearchModule.Apply(harmony, asm);
                 LastChanceMonstersNoiseAggroModule.Apply(harmony, asm);
-                LastChanceMonstersCameraForceLockModule.Apply();
-                LastChanceMonstersPlayerVisionCheckModule.Apply();
                 return;
             }
 
             LastChanceMonstersNoiseAggroModule.Unapply();
             LastChanceMonstersSearchModule.Unapply();
-            LastChanceMonstersCameraForceLockModule.Unapply();
-            LastChanceMonstersPlayerVisionCheckModule.Unapply();
         }
     }
 }

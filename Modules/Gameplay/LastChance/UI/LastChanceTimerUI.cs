@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using DHHFLastChanceMode.Modules.Config;
 using DeathHeadHopperFix.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
@@ -77,6 +78,8 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.UI
         private static Sprite? s_semibotSurrenderedSprite;
         private static Sprite? s_semibotSafeSprite;
         private static bool s_assetLoadAttempted;
+        private static float s_nextAssetRetryAt;
+        private const float AssetRetryIntervalSeconds = 2f;
 
         private const float VisibilityRefreshIntervalSeconds = 0.5f;
 
@@ -496,17 +499,51 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.UI
 
         private static void EnsureSpritesLoaded()
         {
-            if (s_assetLoadAttempted)
+            if (HasAllSprites())
+            {
+                return;
+            }
+
+            var now = Time.unscaledTime;
+            if (s_assetLoadAttempted && now < s_nextAssetRetryAt)
             {
                 return;
             }
 
             s_assetLoadAttempted = true;
+            s_nextAssetRetryAt = now + AssetRetryIntervalSeconds;
             var baseDir = ImageAssetLoader.GetDefaultAssetsDirectory();
-            ImageAssetLoader.TryLoadSprite(SemibotWhiteFileName, baseDir, out s_semibotWhiteSprite, out _);
-            ImageAssetLoader.TryLoadSprite(TruckWhiteFileName, baseDir, out s_truckWhiteSprite, out _);
-            ImageAssetLoader.TryLoadSprite(SemibotSurrenderedFileName, baseDir, out s_semibotSurrenderedSprite, out _);
-            ImageAssetLoader.TryLoadSprite(SemibotSafeFileName, baseDir, out s_semibotSafeSprite, out _);
+            if (s_semibotWhiteSprite == null)
+            {
+                ImageAssetLoader.TryLoadSprite(SemibotWhiteFileName, baseDir, out s_semibotWhiteSprite, out _);
+            }
+            if (s_truckWhiteSprite == null)
+            {
+                ImageAssetLoader.TryLoadSprite(TruckWhiteFileName, baseDir, out s_truckWhiteSprite, out _);
+            }
+            if (s_semibotSurrenderedSprite == null)
+            {
+                ImageAssetLoader.TryLoadSprite(SemibotSurrenderedFileName, baseDir, out s_semibotSurrenderedSprite, out _);
+            }
+            if (s_semibotSafeSprite == null)
+            {
+                ImageAssetLoader.TryLoadSprite(SemibotSafeFileName, baseDir, out s_semibotSafeSprite, out _);
+            }
+
+            if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.UI.Sprites", 30))
+            {
+                Debug.Log(
+                    $"[LastChance] UI sprites status: semibot={(s_semibotWhiteSprite != null)} truck={(s_truckWhiteSprite != null)} " +
+                    $"surrendered={(s_semibotSurrenderedSprite != null)} safe={(s_semibotSafeSprite != null)}");
+            }
+        }
+
+        private static bool HasAllSprites()
+        {
+            return s_semibotWhiteSprite != null &&
+                   s_truckWhiteSprite != null &&
+                   s_semibotSurrenderedSprite != null &&
+                   s_semibotSafeSprite != null;
         }
 
         private static void RefreshVisibility(bool force)

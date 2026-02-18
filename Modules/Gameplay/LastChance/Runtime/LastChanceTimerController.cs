@@ -104,10 +104,12 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
         private static AudioSource? s_timerSecondAudioSource;
         private static AudioClip? s_timerSecondAudioClip;
         private static bool s_timerSecondAudioLoadAttempted;
+        private static float s_nextTimerSecondAudioRetryAt;
         private static int s_lastTimerSecondAudioPlayed = -1;
         private static AudioSource? s_timerWarningAudioSource;
         private static AudioClip? s_timerWarningAudioClip;
         private static bool s_timerWarningAudioLoadAttempted;
+        private static float s_nextTimerWarningAudioRetryAt;
         private static int s_lastTimerWarningAudioPlayed = -1;
         private static int s_lastNetworkTimerBroadcastSecond = -1;
         private static bool s_timerSyncedFromHost;
@@ -131,6 +133,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
         private static ActivationStartPhaseProfileSnapshot s_lastActivationStartPhaseProfile;
         private static bool s_hasActivationStartPhaseProfile;
         private static bool s_assetsPrewarmedForSession;
+        private const float AssetAudioRetryIntervalSeconds = 2f;
 
         private readonly struct NetworkUiPlayerState
         {
@@ -277,7 +280,6 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
 
         internal static bool IsActive => s_active;
         internal static bool IsSuppressedForRoom => s_suppressedForRoom;
-        internal static event Action? ActiveStateChanged;
         internal static bool IsDirectionIndicatorUiVisible =>
             s_active &&
             AllPlayersDeadGuard.AllPlayersDisabled() &&
@@ -349,6 +351,9 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
             ClearActivationProfileState();
             s_assetsPrewarmedForSession = false;
             LastChanceTimerUI.DestroyUi();
+
+            // Preload UI/audio assets on scene load to avoid activation hitch when LastChance starts.
+            PrewarmGlobalAssetsAtBoot();
 
             if (!s_active)
             {
@@ -1304,9 +1309,13 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
 
         private static bool TryEnsureTimerSecondAudioReady()
         {
-            if (s_timerSecondAudioClip == null && !s_timerSecondAudioLoadAttempted)
+            if (s_timerSecondAudioClip == null)
             {
-                s_timerSecondAudioLoadAttempted = true;
+                var now = Time.unscaledTime;
+                if (!s_timerSecondAudioLoadAttempted || now >= s_nextTimerSecondAudioRetryAt)
+                {
+                    s_timerSecondAudioLoadAttempted = true;
+                    s_nextTimerSecondAudioRetryAt = now + AssetAudioRetryIntervalSeconds;
                 if (!AudioAssetLoader.TryLoadAudioClip(
                         TimerSecondAudioFileName,
                         AudioAssetLoader.GetDefaultAssetsDirectory(),
@@ -1326,6 +1335,11 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerSecond.Loaded", 30))
                 {
                     Debug.Log($"[LastChance] Loaded timer tick audio from: {resolvedPath}");
+                }
+                }
+                else
+                {
+                    return false;
                 }
             }
 
@@ -1349,9 +1363,13 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
 
         private static bool TryEnsureTimerWarningAudioReady()
         {
-            if (s_timerWarningAudioClip == null && !s_timerWarningAudioLoadAttempted)
+            if (s_timerWarningAudioClip == null)
             {
-                s_timerWarningAudioLoadAttempted = true;
+                var now = Time.unscaledTime;
+                if (!s_timerWarningAudioLoadAttempted || now >= s_nextTimerWarningAudioRetryAt)
+                {
+                    s_timerWarningAudioLoadAttempted = true;
+                    s_nextTimerWarningAudioRetryAt = now + AssetAudioRetryIntervalSeconds;
                 if (!TryLoadTimerWarningClip(out var clip, out var resolvedPath) || clip == null)
                 {
                     if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerWarning.LoadFail", 30))
@@ -1368,6 +1386,11 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerWarning.Loaded", 30))
                 {
                     Debug.Log($"[LastChance] Loaded timer warning audio from: {resolvedPath}");
+                }
+                }
+                else
+                {
+                    return false;
                 }
             }
 
@@ -2708,15 +2731,10 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
 
         private static void SetLastChanceActive(bool active)
         {
-            var previous = s_active;
             s_active = active;
             if (active)
             {
                 ApplyLastChanceHostRuntimeOverrides();
-                if (!previous)
-                {
-                    ActiveStateChanged?.Invoke();
-                }
                 return;
             }
 
@@ -2728,10 +2746,6 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
             LastChanceMonstersPlayerVisionCheckModule.ResetRuntimeState();
             LastChanceHeadPupilVisualModule.ResetRuntimeState();
             LastChanceHeadEyesOverrideBypassModule.ResetRuntimeState();
-            if (previous)
-            {
-                ActiveStateChanged?.Invoke();
-            }
         }
 
         private static void ResetLastChanceRuntimeModules(bool allowVanillaAllPlayersDead, bool allowAutoDelete)

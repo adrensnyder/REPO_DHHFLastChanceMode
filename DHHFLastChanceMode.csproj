@@ -64,6 +64,10 @@
       <HintPath>..\00Libs\OriginalMod\DeathHeadHopper.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="DeathHeadHopperFix">
+      <HintPath>..\REPO_DeathHeadHopperFix\bin\Debug\DeathHeadHopperFix.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Photon.Pun">
       <HintPath>..\00Libs\GameAssemblies\PhotonUnityNetworking.dll</HintPath>
       <Private>false</Private>

@@ -91,7 +91,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards
                 return true;
             }
 
-            if (!IsProceduralMonsterLevelContext())
+            if (IsVanillaOnlyContext())
             {
                 s_suppressedLogged = false;
                 s_allowAllPlayersDead = false;
@@ -171,7 +171,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards
             if (LastChanceTimerController.IsSuppressedForRoom)
                 return true;
 
-            if (!IsProceduralMonsterLevelContext())
+            if (IsVanillaOnlyContext())
                 return true;
 
             if (s_allowAllPlayersDead)
@@ -180,6 +180,17 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards
             // Prevent vanilla all-players-dead transitions while LastChance mode is enabled.
             // Vanilla flow is re-enabled explicitly via AllowVanillaAllPlayersDead().
             return false;
+        }
+
+        private static bool IsVanillaOnlyContext()
+        {
+            // Preserve vanilla behavior in non-gameplay flows to avoid lobby/password regressions.
+            return SemiFunc.RunIsArena() ||
+                   SemiFunc.RunIsShop() ||
+                   SemiFunc.RunIsLobbyMenu() ||
+                   SemiFunc.RunIsLobby() ||
+                   SemiFunc.RunIsTutorial() ||
+                   SemiFunc.MenuLevel();
         }
 
         private static bool IsProceduralMonsterLevelContext()
