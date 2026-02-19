@@ -39,7 +39,8 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
         private static bool s_currencyCaptured;
         private static readonly Color TimerColor = new(1f, 0.85f, 0.1f, 1f);
         private static readonly Color FlashColor = new(1f, 0.2f, 0.2f, 1f);
-        private const string SurrenderHintPrompt = "Hold Crouch to surrender";
+        private static readonly InputKey SurrenderInputKey = InputKey.Crouch;
+        private const string SurrenderHintPromptFormat = "Back to truck, hop hop! (Surrender [{0}])";
         private const string SurrenderCountdownFormat = "Surrender in {0}s";
         private const string SurrenderedHintText = "Surrendered <3";
         private const string LocalSurrenderedHintText = "You surrendered <3";
@@ -505,7 +506,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
                 afterEnsureNetwork = Time.realtimeSinceStartup;
             }
 
-            LastChanceTimerUI.Show(SurrenderHintPrompt);
+            LastChanceTimerUI.Show(GetSurrenderHintPrompt());
             if (profileEnabled)
             {
                 afterShowUi = Time.realtimeSinceStartup;
@@ -905,7 +906,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
 
             if (active)
             {
-                LastChanceTimerUI.Show(SurrenderHintPrompt);
+                LastChanceTimerUI.Show(GetSurrenderHintPrompt());
                 LastChanceTimerUI.UpdateText(FormatTimerText(s_timerRemaining));
                 return;
             }
@@ -945,7 +946,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            if (!SemiFunc.InputHold(InputKey.Crouch))
+            if (!SemiFunc.InputHold(SurrenderInputKey))
             {
                 ResetLocalSurrenderAttempt();
                 return;
@@ -1005,6 +1006,11 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
 
             LastChanceTruckDistanceLogger.LogDistances();
             s_surrenderDistanceLogged = true;
+        }
+
+        private static string GetSurrenderHintPrompt()
+        {
+            return string.Format(SurrenderHintPromptFormat, SurrenderInputKey);
         }
 
         private static int GetLocalActorNumber()
