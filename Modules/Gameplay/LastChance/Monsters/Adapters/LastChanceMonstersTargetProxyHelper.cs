@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using HarmonyLib;
 using UnityEngine;
 
@@ -22,7 +23,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
         {
             return FeatureFlags.LastChanceMonstersSearchEnabled &&
                    FeatureFlags.LastChangeMode &&
-                   LastChanceTimerController.IsActive;
+                   LastChanceRuntimeOrchestrator.IsRuntimeActive;
         }
 
         internal static bool IsMasterContext()

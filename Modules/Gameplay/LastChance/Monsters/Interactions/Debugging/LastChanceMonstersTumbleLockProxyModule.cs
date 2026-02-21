@@ -81,7 +81,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
             var runtimeEnabled = LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled();
             if (__instance == null || !runtimeEnabled)
             {
-                if (InternalDebugFlags.DebugLastChanceSpinnyVerbose)
+                if (LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceSpinnyVerbose))
                 {
                     if (!s_lastRuntimeEnabled.HasValue || s_lastRuntimeEnabled.Value != runtimeEnabled || LogLimiter.ShouldLog("Spinny.Skip.Early.Runtime", 5))
                     {
@@ -216,7 +216,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void LogStateTransition(object instance, LockReflection cache)
         {
-            if (!InternalDebugFlags.DebugLastChanceSpinnyFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceSpinnyFlow))
             {
                 return;
             }
@@ -234,12 +234,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void DebugLog(string reason, string detail)
         {
-            if (!InternalDebugFlags.DebugLastChanceSpinnyFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceSpinnyFlow))
             {
                 return;
             }
 
-            if (!InternalDebugFlags.DebugLastChanceSpinnyVerbose && !LogLimiter.ShouldLog($"Spinny.{reason}", 10))
+            if (!LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceSpinnyVerbose) && !LogLimiter.ShouldLog($"Spinny.{reason}", 10))
             {
                 return;
             }

@@ -5,6 +5,7 @@ namespace DHHFLastChanceMode.Modules.Config
     // Internal-only debug switches for LastChance pipelines.
     internal static class InternalDebugFlags
     {
+        public static bool DebugLastChanceMonsterDebugPatchesEnabled = false;
         public static bool DebugLastChanceHiddenCarryFlow = false;
         public static bool DebugLastChanceCeilingEyeFlow = false;
         public static bool DebugLastChanceHeartHuggerFlow = false;

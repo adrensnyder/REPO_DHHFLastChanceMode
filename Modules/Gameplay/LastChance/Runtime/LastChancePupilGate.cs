@@ -12,7 +12,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         internal static bool IsEnabled()
         {
-            return FeatureFlags.LastChancePupilVisualsEnabled && LastChanceTimerController.IsActive;
+            return FeatureFlags.LastChancePupilVisualsEnabled && LastChanceRuntimeOrchestrator.IsRuntimeActive;
         }
 
         internal static bool TryGetEligibleHead(PlayerAvatar? player, out PlayerDeathHead? head, out string reason)

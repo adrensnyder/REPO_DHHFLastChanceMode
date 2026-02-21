@@ -340,8 +340,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             hasEnoughEnergy = visible && penaltyPreview > 0f && timerRemaining >= penaltyPreview;
         }
 
-        internal static void OnLevelLoaded()
+        internal static void OnLevelLoaded(bool shouldPrewarmAssets)
         {
+            LastChanceRuntimeOrchestrator.OnLevelTransition();
             s_suppressedForRoom = false;
             s_suppressedLogEmitted = false;
             ClearSurrenderState();
@@ -351,8 +352,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_assetsPrewarmedForSession = false;
             LastChanceTimerUI.DestroyUi();
 
-            // Preload UI/audio assets on scene load to avoid activation hitch when LastChance starts.
-            PrewarmGlobalAssetsAtBoot();
+            if (shouldPrewarmAssets)
+            {
+                // Preload UI/audio assets on gameplay scene load to avoid activation hitch when LastChance starts.
+                PrewarmGlobalAssetsAtBoot();
+            }
 
             if (!s_active)
             {
@@ -2729,10 +2733,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_active = active;
             if (active)
             {
+                LastChanceRuntimeOrchestrator.EnterActiveRuntime();
                 ApplyLastChanceHostRuntimeOverrides();
                 return;
             }
 
+            LastChanceRuntimeOrchestrator.ExitRuntime("lastchance-deactivated");
             ClearLastChanceHostRuntimeOverrides();
             LastChanceMonstersNoiseAggroModule.ResetRuntimeState();
             LastChanceMonstersSearchModule.ResetRuntimeState();
@@ -2775,6 +2781,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void ApplyLastChanceHostRuntimeOverrides()
         {
+            if (!LastChanceRuntimeOrchestrator.IsRuntimeActive)
+            {
+                return;
+            }
+
             if (!SemiFunc.IsMasterClientOrSingleplayer())
             {
                 return;
@@ -2812,6 +2823,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             CoreBatteryInterop.ClearCoreHostRuntimeOverride();
             CoreBatteryInterop.RequestCoreConfigSyncBroadcast();
             s_lastChanceBatteryOverrideApplied = false;
+            s_lastChancePreviousBatteryJumpEnabled = false;
         }
     }
 

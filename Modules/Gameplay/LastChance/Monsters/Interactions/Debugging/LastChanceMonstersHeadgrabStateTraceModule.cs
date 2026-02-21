@@ -107,7 +107,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static bool ShouldTrace(object? instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadgrabFlow || instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadgrabFlow) || instance == null)
             {
                 return false;
             }
@@ -187,12 +187,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void DebugLog(string reason, string detail)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadgrabFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadgrabFlow))
             {
                 return;
             }
 
-            if (!InternalDebugFlags.DebugLastChanceHeadgrabVerbose && !LogLimiter.ShouldLog($"Headgrab.{reason}", 10))
+            if (!LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceHeadgrabVerbose) && !LogLimiter.ShouldLog($"Headgrab.{reason}", 10))
             {
                 return;
             }

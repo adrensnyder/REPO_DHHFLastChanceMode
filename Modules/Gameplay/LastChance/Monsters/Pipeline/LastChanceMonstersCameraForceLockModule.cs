@@ -18,18 +18,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     {
         private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersCameraForceLock";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.CeilingEye");
-
-        private sealed class LockState
-        {
-            internal float LockStartAt = -1f;
-            internal float LastSeenAt = -1f;
-            internal float CooldownUntil = -1f;
-            internal float LastTouchAt = -1f;
-        }
-
-        private static readonly Dictionary<int, LockState> s_lockBySource = new();
         private static readonly HashSet<MethodBase> s_patchedMethods = new();
-        private static float s_nextCleanupAt;
         private static Harmony? s_harmony;
 
         private static readonly MethodInfo? s_aimTargetSoftSetVanilla =
@@ -207,13 +196,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         internal static void AimTargetSoftSetLastChanceAware(CameraAim? cameraAim, Vector3 position, float inSpeed, float outSpeed, float strengthNoAim, GameObject source, int prio)
         {
-            if (!ShouldApplyCameraForce(source))
+            var target = cameraAim ?? CameraAim.Instance;
+            if (target == null)
             {
                 return;
             }
 
-            var target = cameraAim ?? CameraAim.Instance;
-            if (target == null)
+            if (!IsLastChanceCameraContextActive())
+            {
+                target.AimTargetSoftSet(position, inSpeed, outSpeed, strengthNoAim, source, prio);
+                return;
+            }
+
+            if (!ShouldApplyCameraForce(source))
             {
                 return;
             }
@@ -224,19 +219,35 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         internal static void AimTargetSetLastChanceAware(CameraAim? cameraAim, Vector3 position, float inSpeed, float outSpeed, GameObject source, int prio)
         {
-            if (!ShouldApplyCameraForce(source))
-            {
-                return;
-            }
-
             var target = cameraAim ?? CameraAim.Instance;
             if (target == null)
             {
                 return;
             }
 
+            if (!IsLastChanceCameraContextActive())
+            {
+                target.AimTargetSet(position, inSpeed, outSpeed, source, prio);
+                return;
+            }
+
+            if (!ShouldApplyCameraForce(source))
+            {
+                return;
+            }
+
             TryForceSpectateAimTo(position, source);
             target.AimTargetSet(position, inSpeed, outSpeed, source, prio);
+        }
+
+        private static bool IsLastChanceCameraContextActive()
+        {
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            {
+                return false;
+            }
+
+            return LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(PlayerAvatar.instance);
         }
 
         private static bool ShouldApplyCameraForce(GameObject? source)
@@ -253,47 +264,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             var now = Time.unscaledTime;
-            CleanupOldStates(now);
-
             var key = source != null ? source.GetInstanceID() : 0;
-            if (!s_lockBySource.TryGetValue(key, out var state))
+            if (!LastChanceMonstersCeilingEyeLockCoordinator.CanForceCamera(local, now, out var reason))
             {
-                state = new LockState();
-                s_lockBySource[key] = state;
-            }
-
-            state.LastTouchAt = now;
-            if (state.CooldownUntil > now)
-            {
-                DebugDecision(source, key, "CooldownActive", state, now, false);
-                return false;
-            }
-
-            var grace = Mathf.Max(0.05f, InternalConfig.LastChanceMonstersCameraLockKeepAliveGraceSeconds);
-            if (state.LockStartAt < 0f || state.LastSeenAt < 0f || now - state.LastSeenAt > grace)
-            {
-                state.LockStartAt = now;
-            }
-
-            state.LastSeenAt = now;
-            var maxLock = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersCameraLockMaxSeconds);
-            if (now - state.LockStartAt >= maxLock)
-            {
-                var cooldown = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersCameraLockCooldownSeconds);
-                state.CooldownUntil = now + cooldown;
-                state.LockStartAt = -1f;
-                state.LastSeenAt = -1f;
-                DebugDecision(source, key, "ReachedMaxLock_SetCooldown", state, now, false);
+                DebugDecision(source, key, reason, now, false);
                 return false;
             }
 
             // Gameplay stays active regardless; this only controls camera forcing.
             var allow = InternalConfig.LastChanceMonstersForceCameraOnLock;
-            DebugDecision(source, key, allow ? "AllowForceCamera" : "ForceCameraDisabledByConfig", state, now, allow);
+            DebugDecision(source, key, allow ? "AllowForceCamera" : "ForceCameraDisabledByConfig", now, allow);
             return allow;
         }
 
-        private static void DebugDecision(GameObject? source, int key, string reason, LockState state, float now, bool decision)
+        private static void DebugDecision(GameObject? source, int key, string reason, float now, bool decision)
         {
             if (!InternalDebugFlags.DebugLastChanceCeilingEyeFlow || !LogLimiter.ShouldLog($"CeilingEye.CameraForce.{reason}.{key}", 90))
             {
@@ -303,8 +287,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var sourceName = source != null ? source.name : "null-source";
             Log.LogInfo(
                 $"[CeilingEye][CameraForce][{reason}] source='{sourceName}' key={key} decision={decision} " +
-                $"now={now:F2} lockStart={state.LockStartAt:F2} lastSeen={state.LastSeenAt:F2} cooldownUntil={state.CooldownUntil:F2} " +
-                $"cfgForce={InternalConfig.LastChanceMonstersForceCameraOnLock}");
+                $"now={now:F2} cfgForce={InternalConfig.LastChanceMonstersForceCameraOnLock}");
         }
 
         private static void TryForceSpectateAimTo(Vector3 targetPosition, GameObject? source)
@@ -342,46 +325,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
         }
 
-        private static void CleanupOldStates(float now)
-        {
-            if (now < s_nextCleanupAt)
-            {
-                return;
-            }
-
-            s_nextCleanupAt = now + 5f;
-            if (s_lockBySource.Count == 0)
-            {
-                return;
-            }
-
-            var stale = new List<int>();
-            foreach (var kvp in s_lockBySource)
-            {
-                var state = kvp.Value;
-                if (state == null)
-                {
-                    stale.Add(kvp.Key);
-                    continue;
-                }
-
-                var lastRelevant = Mathf.Max(state.LastTouchAt, state.CooldownUntil);
-                if (lastRelevant < 0f || now - lastRelevant > 30f)
-                {
-                    stale.Add(kvp.Key);
-                }
-            }
-
-            for (var i = 0; i < stale.Count; i++)
-            {
-                s_lockBySource.Remove(stale[i]);
-            }
-        }
-
         internal static void ResetRuntimeState()
         {
-            s_lockBySource.Clear();
-            s_nextCleanupAt = 0f;
+            LastChanceMonstersCeilingEyeLockCoordinator.ResetRuntimeState();
         }
     }
 }

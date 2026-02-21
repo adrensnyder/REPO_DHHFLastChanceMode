@@ -101,6 +101,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return Vector3.zero;
             }
 
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            {
+                return player.transform.position;
+            }
+
             if (LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
             {
                 return headCenter;

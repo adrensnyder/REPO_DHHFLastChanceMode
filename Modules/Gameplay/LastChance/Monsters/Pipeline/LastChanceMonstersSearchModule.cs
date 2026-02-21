@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
@@ -158,7 +159,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         internal static int GetAliveSearchMonsterCount()
         {
-            if (!FeatureFlags.LastChanceMonstersSearchEnabled || !FeatureFlags.LastChangeMode || !LastChanceTimerController.IsActive)
+            if (!FeatureFlags.LastChanceMonstersSearchEnabled || !FeatureFlags.LastChangeMode || !LastChanceRuntimeOrchestrator.IsRuntimeActive)
             {
                 return 0;
             }
@@ -371,7 +372,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             s_runtimeStateEnabled =
                 FeatureFlags.LastChanceMonstersSearchEnabled &&
                 FeatureFlags.LastChangeMode &&
-                LastChanceTimerController.IsActive;
+                LastChanceRuntimeOrchestrator.IsRuntimeActive;
 
             if (!s_runtimeStateEnabled)
             {

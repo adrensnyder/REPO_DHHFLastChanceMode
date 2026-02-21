@@ -2,6 +2,7 @@
 
 using System;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 
@@ -13,7 +14,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
         internal static bool ShouldBlockAutoDelete()
         {
-            if (!FeatureFlags.LastChangeMode || !LastChanceTimerController.IsActive)
+            if (!FeatureFlags.LastChangeMode || !LastChanceRuntimeOrchestrator.IsRuntimeActive)
             {
                 return false;
             }

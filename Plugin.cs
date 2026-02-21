@@ -8,8 +8,7 @@ using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using HarmonyLib;
 using UnityEngine;
@@ -134,14 +133,15 @@ namespace DHHFLastChanceMode
             CompatibilityGate.EnsureCreated();
             s_log?.LogInfo("[LastChance][CompatGate][Trace] OnSceneLoaded ensured CompatibilityGate.");
 
-            if (!ShouldHandleRuntimeScene())
+            var shouldHandleRuntimeScene = ShouldHandleRuntimeScene();
+            LastChanceTimerController.OnLevelLoaded(shouldHandleRuntimeScene);
+            if (!shouldHandleRuntimeScene)
             {
                 s_log?.LogInfo("[LastChance][CompatGate][Trace] OnSceneLoaded runtime handling skipped by ShouldHandleRuntimeScene.");
                 return;
             }
 
             ConfigSyncManager.EnsureCreated();
-            LastChanceTimerController.OnLevelLoaded();
             ConfigSyncManager.RequestHostSnapshotBroadcast();
             ReconcileConditionalMonsterPatches();
         }
@@ -207,19 +207,7 @@ namespace DHHFLastChanceMode
                 FeatureFlags.LastChangeMode &&
                 FeatureFlags.LastChanceMonstersSearchEnabled;
 
-            if (enableMonsterPipelinePatches)
-            {
-                LastChanceMonstersSearchModule.Apply(harmony, asm);
-                LastChanceMonstersNoiseAggroModule.Apply(harmony, asm);
-                LastChanceMonstersPlayerVisionCheckModule.Apply();
-                LastChanceMonstersCameraForceLockModule.Apply();
-                return;
-            }
-
-            LastChanceMonstersCameraForceLockModule.Unapply();
-            LastChanceMonstersPlayerVisionCheckModule.Unapply();
-            LastChanceMonstersNoiseAggroModule.Unapply();
-            LastChanceMonstersSearchModule.Unapply();
+            LastChanceMonstersPatchLifecycle.ReconcilePipeline(enableMonsterPipelinePatches, harmony, asm);
         }
     }
 }

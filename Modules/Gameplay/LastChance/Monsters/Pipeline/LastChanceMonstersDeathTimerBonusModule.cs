@@ -1,6 +1,7 @@
 #nullable enable
 
 using HarmonyLib;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
@@ -11,6 +12,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static void Postfix(EnemyHealth __instance)
         {
             if (__instance == null)
+            {
+                return;
+            }
+
+            if (!LastChanceRuntimeOrchestrator.IsRuntimeActive)
             {
                 return;
             }

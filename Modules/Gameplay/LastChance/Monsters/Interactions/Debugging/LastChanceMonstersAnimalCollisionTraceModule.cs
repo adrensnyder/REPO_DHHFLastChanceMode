@@ -40,7 +40,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPostfix]
         private static void GameDirectorUpdatePostfix()
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow))
             {
                 s_runtimeLastInitialized = false;
                 return;
@@ -59,7 +59,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPostfix]
         private static void EnemyAnimalUpdatePostfix(EnemyAnimal __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) || __instance == null)
             {
                 return;
             }
@@ -77,7 +77,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
                 return;
             }
 
-            s_animalHeartbeatNextAt[key] = now + (InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose ? 0.25f : 1f);
+            s_animalHeartbeatNextAt[key] = now + (LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose) ? 0.25f : 1f);
             var runtimeEnabled = LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled();
             var currentState = s_enemyAnimalCurrentStateField?.GetValue(__instance)?.ToString() ?? "n/a";
             var stateTimer = s_enemyAnimalStateTimerField?.GetValue(__instance) as float? ?? -1f;
@@ -102,7 +102,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPrefix]
         private static void EnemyAnimalUpdateStatePrefix(EnemyAnimal __instance, object _nextState)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) || __instance == null)
             {
                 return;
             }
@@ -125,7 +125,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPrefix]
         private static void EnemyAnimalOnVisionPrefix(EnemyAnimal __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) || __instance == null)
             {
                 return;
             }
@@ -147,7 +147,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPrefix]
         private static void EnemyAnimalOnInvestigatePrefix(EnemyAnimal __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) || __instance == null)
             {
                 return;
             }
@@ -167,7 +167,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPrefix]
         private static void EnemySetChaseTargetPrefix(Enemy __instance, PlayerAvatar playerAvatar)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow ||
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) ||
                 __instance == null ||
                 __instance.GetComponent<EnemyAnimal>() == null)
             {
@@ -184,7 +184,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPostfix]
         private static void EnemyTriggerAttackOnTriggerStayPostfix(EnemyTriggerAttack __instance, Collider other)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow ||
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) ||
                 __instance == null ||
                 other == null)
             {
@@ -204,7 +204,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
                 {
                     TryLog(enemy.GetInstanceID(), $"[Animal][Trigger] collider='{other.name}' mappedToHeadPlayer='{GetPlayerName(headPlayer)}' tag='{other.tag}' layer={LayerMask.LayerToName(other.gameObject.layer)}");
                 }
-                else if (InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose)
+                else if (LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose))
                 {
                     TryLog(enemy.GetInstanceID(), $"[Animal][Trigger] collider='{other.name}' without PlayerTrigger tag='{other.tag}' layer={LayerMask.LayerToName(other.gameObject.layer)}");
                 }
@@ -252,7 +252,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPrefix]
         private static void HurtColliderPlayerHurtPrefix(HurtCollider __instance, PlayerAvatar _player)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow ||
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow) ||
                 __instance == null ||
                 _player == null)
             {
@@ -276,12 +276,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void TryLog(int key, string message)
         {
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow))
             {
                 return;
             }
 
-            if (!InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose &&
+            if (!LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose) &&
                 !LogLimiter.ShouldLog($"AnimalCollision.{key}", 10))
             {
                 return;

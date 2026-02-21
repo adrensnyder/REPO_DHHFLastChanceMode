@@ -114,7 +114,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static bool ShouldTrace(object? instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceSpinnyFlow || instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceSpinnyFlow) || instance == null)
             {
                 return false;
             }
@@ -193,12 +193,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void DebugLog(string reason, string detail)
         {
-            if (!InternalDebugFlags.DebugLastChanceSpinnyFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceSpinnyFlow))
             {
                 return;
             }
 
-            if (!InternalDebugFlags.DebugLastChanceSpinnyVerbose && !LogLimiter.ShouldLog($"Spinny.Trace.{reason}", 10))
+            if (!LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceSpinnyVerbose) && !LogLimiter.ShouldLog($"Spinny.Trace.{reason}", 10))
             {
                 return;
             }

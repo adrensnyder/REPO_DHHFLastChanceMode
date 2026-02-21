@@ -44,7 +44,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPrefix]
         private static void EnemyHeadVisionTriggeredPrefix(EnemyHeadController __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadmanFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadmanFlow) || __instance == null)
             {
                 return;
             }
@@ -61,7 +61,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPostfix]
         private static void EnemyStateChaseBeginUpdatePostfix(EnemyStateChaseBegin __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadmanFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadmanFlow) || __instance == null)
             {
                 return;
             }
@@ -86,7 +86,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPostfix]
         private static void EnemyStateChaseUpdatePostfix(EnemyStateChase __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadmanFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadmanFlow) || __instance == null)
             {
                 return;
             }
@@ -116,7 +116,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
         [HarmonyPostfix]
         private static void EnemyStateChaseSlowUpdatePostfix(EnemyStateChaseSlow __instance)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadmanFlow || __instance == null)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadmanFlow) || __instance == null)
             {
                 return;
             }
@@ -198,12 +198,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void LogDecision(string reason, Enemy? enemy, string message)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadmanFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadmanFlow))
             {
                 return;
             }
 
-            if (!InternalDebugFlags.DebugLastChanceHeadmanVerbose && !LogLimiter.ShouldLog($"Headman.{reason}", 10))
+            if (!LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceHeadmanVerbose) && !LogLimiter.ShouldLog($"Headman.{reason}", 10))
             {
                 return;
             }
@@ -215,7 +215,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
 
         private static void LogHeartbeat(string reason, Enemy? enemy, string message)
         {
-            if (!InternalDebugFlags.DebugLastChanceHeadmanFlow)
+            if (!LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceHeadmanFlow))
             {
                 return;
             }
@@ -224,7 +224,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.D
                 ? $"Headman.{reason}.none"
                 : $"Headman.{reason}.{enemy.GetInstanceID()}";
 
-            var interval = InternalDebugFlags.DebugLastChanceHeadmanVerbose ? 3 : 15;
+            var interval = LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceHeadmanVerbose) ? 3 : 15;
             if (!LogLimiter.ShouldLog(key, interval))
             {
                 return;

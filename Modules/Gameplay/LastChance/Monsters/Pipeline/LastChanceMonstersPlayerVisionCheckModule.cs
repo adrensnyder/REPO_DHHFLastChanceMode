@@ -18,24 +18,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     {
         private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersPlayerVisionCheck";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.CeilingEye");
-
-        private sealed class ContinuousLockState
-        {
-            internal float LockStartAt = -1f;
-            internal float LastSeenAt = -1f;
-            internal float CooldownUntil = -1f;
-            internal float LastTouchAt = -1f;
-        }
-
-        private static readonly Dictionary<long, ContinuousLockState> s_lockBySourceAndPlayer = new();
         private static readonly HashSet<MethodBase> s_patchedMethods = new();
-        private static float s_nextCleanupAt;
         private static Harmony? s_harmony;
 
         internal static void ResetRuntimeState()
         {
-            s_lockBySourceAndPlayer.Clear();
-            s_nextCleanupAt = 0f;
+            LastChanceMonstersCeilingEyeLockCoordinator.ResetRuntimeState();
         }
 
         private static readonly MethodInfo? s_playerVisionCheckVanilla = AccessTools.Method(
@@ -228,6 +216,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         internal static bool PlayerVisionCheckLastChanceAware(Vector3 position, float range, PlayerAvatar player, bool previouslySeen)
         {
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            {
+                return SemiFunc.PlayerVisionCheck(position, range, player, previouslySeen);
+            }
+
             if (LastChanceMonstersTargetProxyHelper.TryGetHeadProxyVisionTarget(player, out var headCenter))
             {
                 return PlayerVisionCheckPositionLastChanceAware(position, headCenter, range, player, previouslySeen);
@@ -238,6 +231,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         internal static bool PlayerVisionCheckPositionLastChanceAware(Vector3 startPosition, Vector3 endPosition, float range, PlayerAvatar player, bool previouslySeen)
         {
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            {
+                return SemiFunc.PlayerVisionCheckPosition(startPosition, endPosition, range, player, previouslySeen);
+            }
+
             if (!LastChanceMonstersTargetProxyHelper.TryGetHeadProxyVisionTarget(player, out var headCenter))
             {
                 return SemiFunc.PlayerVisionCheckPosition(startPosition, endPosition, range, player, previouslySeen);
@@ -245,53 +243,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             endPosition = headCenter;
             var now = Time.unscaledTime;
-            CleanupOldStates(now);
-
-            var key = BuildLockKey(startPosition, player);
-            if (!s_lockBySourceAndPlayer.TryGetValue(key, out var state))
-            {
-                state = new ContinuousLockState();
-                s_lockBySourceAndPlayer[key] = state;
-            }
-
-            state.LastTouchAt = now;
-            if (state.CooldownUntil > now)
-            {
-                DebugVision("CooldownActive", startPosition, endPosition, player, state, now, false);
-                return false;
-            }
-
             var seen = HeadProxyVisionCheckPosition(startPosition, endPosition, range, player);
-            var keepAliveGrace = Mathf.Max(0.05f, InternalConfig.LastChanceMonstersCameraLockKeepAliveGraceSeconds);
-            if (!seen)
-            {
-                if (state.LastSeenAt < 0f || now - state.LastSeenAt > keepAliveGrace)
-                {
-                    state.LockStartAt = -1f;
-                }
-                DebugVision("NotSeen", startPosition, endPosition, player, state, now, false);
-                return false;
-            }
-
-            if (state.LockStartAt < 0f || state.LastSeenAt < 0f || now - state.LastSeenAt > keepAliveGrace)
-            {
-                state.LockStartAt = now;
-            }
-
-            state.LastSeenAt = now;
-            var maxLock = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersCameraLockMaxSeconds);
-            if (now - state.LockStartAt >= maxLock)
-            {
-                var cooldown = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersCameraLockCooldownSeconds);
-                state.CooldownUntil = now + cooldown;
-                state.LockStartAt = -1f;
-                state.LastSeenAt = -1f;
-                DebugVision("ReachedMaxLock_SetCooldown", startPosition, endPosition, player, state, now, false);
-                return false;
-            }
-
-            DebugVision("SeenAndAllowed", startPosition, endPosition, player, state, now, true);
-            return true;
+            var allow = LastChanceMonstersCeilingEyeLockCoordinator.EvaluateVisionLock(player, seen, now, out var reason);
+            DebugVision(reason, startPosition, endPosition, player, now, allow);
+            return allow;
         }
 
 
@@ -381,7 +336,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             Vector3 startPosition,
             Vector3 endPosition,
             PlayerAvatar player,
-            ContinuousLockState state,
             float now,
             bool decision)
         {
@@ -398,54 +352,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             Log.LogInfo(
                 $"[CeilingEye][Vision][{reason}] playerId={playerId} decision={decision} " +
-                $"start={startPosition} end={endPosition} now={now:F2} lockStart={state.LockStartAt:F2} lastSeen={state.LastSeenAt:F2} cooldownUntil={state.CooldownUntil:F2}");
-        }
-
-        private static long BuildLockKey(Vector3 startPosition, PlayerAvatar player)
-        {
-            var sourceBucketSize = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersVisionLockSourceBucketSize);
-            var px = Mathf.RoundToInt(startPosition.x / sourceBucketSize);
-            var py = Mathf.RoundToInt(startPosition.y / sourceBucketSize);
-            var pz = Mathf.RoundToInt(startPosition.z / sourceBucketSize);
-            var sourceHash = ((px * 73856093) ^ (py * 19349663) ^ (pz * 83492791));
-            var playerId = player != null && player.photonView != null ? player.photonView.ViewID : (player?.GetInstanceID() ?? 0);
-            return ((long)sourceHash << 32) ^ (uint)playerId;
-        }
-
-        private static void CleanupOldStates(float now)
-        {
-            if (now < s_nextCleanupAt)
-            {
-                return;
-            }
-
-            s_nextCleanupAt = now + 5f;
-            if (s_lockBySourceAndPlayer.Count == 0)
-            {
-                return;
-            }
-
-            var stale = new List<long>();
-            foreach (var kvp in s_lockBySourceAndPlayer)
-            {
-                var state = kvp.Value;
-                if (state == null)
-                {
-                    stale.Add(kvp.Key);
-                    continue;
-                }
-
-                var lastRelevant = Mathf.Max(state.LastTouchAt, state.CooldownUntil);
-                if (lastRelevant < 0f || now - lastRelevant > 30f)
-                {
-                    stale.Add(kvp.Key);
-                }
-            }
-
-            for (var i = 0; i < stale.Count; i++)
-            {
-                s_lockBySourceAndPlayer.Remove(stale[i]);
-            }
+                $"start={startPosition} end={endPosition} now={now:F2}");
         }
     }
 }

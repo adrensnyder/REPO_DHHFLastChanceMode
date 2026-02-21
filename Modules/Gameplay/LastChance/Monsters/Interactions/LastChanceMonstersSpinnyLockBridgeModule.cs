@@ -43,6 +43,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return;
             }
 
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            {
+                return;
+            }
+
             if (!IsSpinnyLockState(__instance))
             {
                 return;
