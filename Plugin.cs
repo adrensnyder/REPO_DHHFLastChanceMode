@@ -96,7 +96,9 @@ namespace DHHFLastChanceMode
             _runtimeInitialized = true;
             _deferredBootstrapRoutine = null;
 
+            s_log?.LogInfo("[LastChance][CompatGate][Trace] InitializeRuntime begin.");
             ConfigManager.Initialize(Config);
+            s_log?.LogInfo("[LastChance][CompatGate][Trace] Config initialized.");
             AllPlayersDeadGuard.EnsureEnabled();
             if (FeatureFlags.LastChangeMode)
             {
@@ -128,12 +130,16 @@ namespace DHHFLastChanceMode
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            s_log?.LogInfo($"[LastChance][CompatGate][Trace] OnSceneLoaded name='{scene.name}' mode={mode}.");
+            CompatibilityGate.EnsureCreated();
+            s_log?.LogInfo("[LastChance][CompatGate][Trace] OnSceneLoaded ensured CompatibilityGate.");
+
             if (!ShouldHandleRuntimeScene())
             {
+                s_log?.LogInfo("[LastChance][CompatGate][Trace] OnSceneLoaded runtime handling skipped by ShouldHandleRuntimeScene.");
                 return;
             }
 
-            CompatibilityGate.EnsureCreated();
             ConfigSyncManager.EnsureCreated();
             LastChanceTimerController.OnLevelLoaded();
             ConfigSyncManager.RequestHostSnapshotBroadcast();

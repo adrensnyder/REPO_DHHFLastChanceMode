@@ -12,5 +12,6 @@ namespace DeathHeadHopperFix.Modules.Utilities
         internal const byte ClientFixPresence = 84;
         internal const byte HostGateState = 85;
         internal const byte LastChancePlayerTruckHint = 86;
+        internal const byte HostFixPresenceRequest = 87;
     }
 }

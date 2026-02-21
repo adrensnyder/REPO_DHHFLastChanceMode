@@ -18,6 +18,7 @@ namespace DHHFLastChanceMode.Modules.Config
 
     internal sealed class CompatibilityGate : MonoBehaviourPunCallbacks, IOnEventCallback
     {
+        private const string TracePrefix = "[LastChance][CompatGate][Trace]";
         private const string LastChanceModeKey = nameof(FeatureFlags.LastChangeMode);
         private const string UnknownVersion = "unknown";
         private static CompatibilityGate? s_instance;
@@ -27,6 +28,10 @@ namespace DHHFLastChanceMode.Modules.Config
         private static string s_lastHostDecisionReason = string.Empty;
         private static string s_lastLoggedIncompatibilityReason = string.Empty;
         private readonly Dictionary<int, string> _playersWithFixVersion = new();
+        private readonly Dictionary<int, float> _pendingPresenceSince = new();
+        private readonly Dictionary<int, float> _pendingPresenceNextRetryAt = new();
+        private const float PresenceRetrySeconds = 0.15f;
+        private const float PresenceTimeoutSeconds = 0.45f;
 
         internal static event Action? HostApprovalChanged;
 
@@ -34,12 +39,14 @@ namespace DHHFLastChanceMode.Modules.Config
         {
             if (s_instance != null)
             {
+                Debug.Log($"{TracePrefix} EnsureCreated skipped (already created).");
                 return;
             }
 
             var go = new GameObject("DHHFLastChanceMode.CompatibilityGate");
             DontDestroyOnLoad(go);
             s_instance = go.AddComponent<CompatibilityGate>();
+            Debug.Log($"{TracePrefix} EnsureCreated created GameObject and component.");
         }
 
         internal static bool IsFeatureUsable(ModFeatureGate feature)
@@ -65,19 +72,36 @@ namespace DHHFLastChanceMode.Modules.Config
         public override void OnEnable()
         {
             base.OnEnable();
+            Debug.Log($"{TracePrefix} OnEnable begin.");
             PhotonNetwork.AddCallbackTarget(this);
-            EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
+            Debug.Log($"{TracePrefix} OnEnable added Photon callback target.");
         }
 
         public override void OnDisable()
         {
             base.OnDisable();
+            Debug.Log($"{TracePrefix} OnDisable begin. inRoom={PhotonNetwork.InRoom} isMaster={PhotonNetwork.IsMasterClient}");
             PhotonNetwork.RemoveCallbackTarget(this);
+            Debug.Log($"{TracePrefix} OnDisable removed Photon callback target.");
+        }
+
+        private void OnDestroy()
+        {
+            Debug.Log($"{TracePrefix} OnDestroy fired.");
+            if (ReferenceEquals(s_instance, this))
+            {
+                s_instance = null;
+                Debug.Log($"{TracePrefix} OnDestroy cleared static instance reference.");
+            }
         }
 
         public override void OnJoinedRoom()
         {
+            Debug.Log($"{TracePrefix} OnJoinedRoom begin.");
+            LogJoinLeaveDebug("OnJoinedRoom");
             _playersWithFixVersion.Clear();
+            _pendingPresenceSince.Clear();
+            _pendingPresenceNextRetryAt.Clear();
             RegisterLocalPlayerFixVersion();
             s_receivedHostDecision = PhotonNetwork.IsMasterClient;
             s_hostApprovedLastChanceCluster = PhotonNetwork.IsMasterClient;
@@ -85,12 +109,21 @@ namespace DHHFLastChanceMode.Modules.Config
             s_lastLoggedIncompatibilityReason = string.Empty;
 
             AnnounceLocalFixPresence();
-            EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
+            if (PhotonNetwork.IsMasterClient)
+            {
+                Debug.Log($"{TracePrefix} OnJoinedRoom host detected; deferred compatibility check.");
+                LogJoinLeaveDebug("OnJoinedRoom host creation phase: compatibility check deferred");
+                return;
+            }
+            Debug.Log($"{TracePrefix} OnJoinedRoom client: presence announced, waiting host decision.");
         }
 
         public override void OnLeftRoom()
         {
+            LogJoinLeaveDebug("OnLeftRoom");
             _playersWithFixVersion.Clear();
+            _pendingPresenceSince.Clear();
+            _pendingPresenceNextRetryAt.Clear();
             s_receivedHostDecision = false;
             s_hostApprovedLastChanceCluster = true;
             s_lastHostDecisionReason = string.Empty;
@@ -101,14 +134,38 @@ namespace DHHFLastChanceMode.Modules.Config
 
         public override void OnPlayerEnteredRoom(Player newPlayer)
         {
+            Debug.Log($"{TracePrefix} OnPlayerEnteredRoom player={(newPlayer == null ? "null" : FormatPlayerTag(newPlayer))}.");
+            if (!PhotonNetwork.IsMasterClient)
+            {
+                return;
+            }
+
+            if (newPlayer != null)
+            {
+                _playersWithFixVersion.Remove(newPlayer.ActorNumber);
+                _pendingPresenceSince[newPlayer.ActorNumber] = Time.realtimeSinceStartup;
+                _pendingPresenceNextRetryAt[newPlayer.ActorNumber] = 0f;
+                RequestPresenceFromActor(newPlayer.ActorNumber, "OnPlayerEnteredRoom");
+            }
+
             EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
         }
 
         public override void OnPlayerLeftRoom(Player otherPlayer)
         {
+            LogJoinLeaveDebug(otherPlayer == null
+                ? "OnPlayerLeftRoom player=null"
+                : $"OnPlayerLeftRoom player={FormatPlayerTag(otherPlayer)}");
             if (otherPlayer != null)
             {
                 _playersWithFixVersion.Remove(otherPlayer.ActorNumber);
+                _pendingPresenceSince.Remove(otherPlayer.ActorNumber);
+                _pendingPresenceNextRetryAt.Remove(otherPlayer.ActorNumber);
+            }
+
+            if (!PhotonNetwork.IsMasterClient)
+            {
+                return;
             }
 
             EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
@@ -117,6 +174,8 @@ namespace DHHFLastChanceMode.Modules.Config
         public override void OnMasterClientSwitched(Player newMasterClient)
         {
             _playersWithFixVersion.Clear();
+            _pendingPresenceSince.Clear();
+            _pendingPresenceNextRetryAt.Clear();
             RegisterLocalPlayerFixVersion();
             s_receivedHostDecision = PhotonNetwork.IsMasterClient;
             s_hostApprovedLastChanceCluster = PhotonNetwork.IsMasterClient;
@@ -124,6 +183,11 @@ namespace DHHFLastChanceMode.Modules.Config
             s_lastLoggedIncompatibilityReason = string.Empty;
 
             AnnounceLocalFixPresence();
+            if (!PhotonNetwork.IsMasterClient)
+            {
+                return;
+            }
+
             EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
         }
 
@@ -148,7 +212,34 @@ namespace DHHFLastChanceMode.Modules.Config
                 }
 
                 _playersWithFixVersion[actorNumber] = reportedVersion;
+                _pendingPresenceSince.Remove(actorNumber);
+                _pendingPresenceNextRetryAt.Remove(actorNumber);
+                Debug.Log($"{TracePrefix} ClientFixPresence received actor={actorNumber} version={reportedVersion}.");
                 EvaluateHostApprovalAndBroadcast(forceBroadcast: false);
+                return;
+            }
+
+            if (photonEvent.Code == PhotonEventCodes.HostFixPresenceRequest)
+            {
+                if (PhotonNetwork.IsMasterClient)
+                {
+                    return;
+                }
+
+                var localActor = PhotonNetwork.LocalPlayer?.ActorNumber ?? 0;
+                if (localActor <= 0)
+                {
+                    return;
+                }
+
+                if (photonEvent.CustomData is not int targetActor || targetActor != localActor)
+                {
+                    Debug.Log($"{TracePrefix} HostFixPresenceRequest ignored localActor={localActor} targetActor={(photonEvent.CustomData is int t ? t : -1)}.");
+                    return;
+                }
+
+                Debug.Log($"{TracePrefix} HostFixPresenceRequest accepted localActor={localActor}, sending presence.");
+                AnnounceLocalFixPresence();
                 return;
             }
 
@@ -181,12 +272,14 @@ namespace DHHFLastChanceMode.Modules.Config
         {
             if (!PhotonNetwork.InRoom)
             {
+                Debug.Log($"{TracePrefix} AnnounceLocalFixPresence skipped (not in room).");
                 return;
             }
 
             var actor = PhotonNetwork.LocalPlayer?.ActorNumber ?? 0;
             if (actor <= 0)
             {
+                Debug.Log($"{TracePrefix} AnnounceLocalFixPresence skipped (invalid actor).");
                 return;
             }
 
@@ -200,6 +293,67 @@ namespace DHHFLastChanceMode.Modules.Config
                 new object[] { actor, GetLocalFixVersion() },
                 options,
                 SendOptions.SendReliable);
+            Debug.Log($"{TracePrefix} AnnounceLocalFixPresence sent actor={actor} version={GetLocalFixVersion()}.");
+        }
+
+        private void RequestPresenceFromActor(int actorNumber, string source)
+        {
+            if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient || actorNumber <= 0)
+            {
+                return;
+            }
+
+            var options = new RaiseEventOptions
+            {
+                TargetActors = new[] { actorNumber }
+            };
+
+            PhotonNetwork.RaiseEvent(
+                PhotonEventCodes.HostFixPresenceRequest,
+                actorNumber,
+                options,
+                SendOptions.SendReliable);
+            Debug.Log($"{TracePrefix} RequestPresenceFromActor sent actor={actorNumber} source={source}.");
+        }
+
+        private void Update()
+        {
+            if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom || _pendingPresenceSince.Count == 0)
+            {
+                return;
+            }
+
+            var now = Time.realtimeSinceStartup;
+            var needsRecheck = false;
+            var actors = new List<int>(_pendingPresenceSince.Keys);
+            for (var i = 0; i < actors.Count; i++)
+            {
+                var actor = actors[i];
+                if (_playersWithFixVersion.ContainsKey(actor))
+                {
+                    _pendingPresenceSince.Remove(actor);
+                    _pendingPresenceNextRetryAt.Remove(actor);
+                    continue;
+                }
+
+                if (!_pendingPresenceNextRetryAt.TryGetValue(actor, out var nextRetryAt) || now >= nextRetryAt)
+                {
+                    RequestPresenceFromActor(actor, "UpdateRetry");
+                    _pendingPresenceNextRetryAt[actor] = now + PresenceRetrySeconds;
+                }
+
+                if (now - _pendingPresenceSince[actor] >= PresenceTimeoutSeconds)
+                {
+                    needsRecheck = true;
+                    Debug.Log($"{TracePrefix} Pending presence timeout reached actor={actor} elapsed={now - _pendingPresenceSince[actor]:0.000}s.");
+                }
+            }
+
+            if (needsRecheck)
+            {
+                Debug.Log($"{TracePrefix} Update forcing compatibility recheck due to pending timeout.");
+                EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
+            }
         }
 
         private void EvaluateHostApprovalAndBroadcast(bool forceBroadcast)
@@ -224,9 +378,11 @@ namespace DHHFLastChanceMode.Modules.Config
 
             var localVersion = GetLocalFixVersion();
             var missingPlayers = new List<string>();
+            var pendingPlayers = new List<string>();
             var mismatchPlayers = new List<string>();
             var allPlayersCompatible = true;
             var players = PhotonNetwork.PlayerList;
+            var now = Time.realtimeSinceStartup;
             for (var i = 0; i < players.Length; i++)
             {
                 var player = players[i];
@@ -237,8 +393,20 @@ namespace DHHFLastChanceMode.Modules.Config
 
                 if (!_playersWithFixVersion.TryGetValue(player.ActorNumber, out var remoteVersion))
                 {
+                    var playerTag = FormatPlayerTag(player);
+                    if (_pendingPresenceSince.TryGetValue(player.ActorNumber, out var since))
+                    {
+                        var elapsed = now - since;
+                        if (elapsed < PresenceTimeoutSeconds)
+                        {
+                            pendingPlayers.Add($"{playerTag} ({elapsed:0.0}s/{PresenceTimeoutSeconds:0.0}s)");
+                            allPlayersCompatible = false;
+                            continue;
+                        }
+                    }
+
                     allPlayersCompatible = false;
-                    missingPlayers.Add(FormatPlayerTag(player));
+                    missingPlayers.Add(playerTag);
                     continue;
                 }
 
@@ -249,7 +417,7 @@ namespace DHHFLastChanceMode.Modules.Config
                 }
             }
 
-            var reason = BuildIncompatibilityReason(localVersion, missingPlayers, mismatchPlayers);
+            var reason = BuildIncompatibilityReason(localVersion, missingPlayers, mismatchPlayers, pendingPlayers);
             var changed = s_hostApprovedLastChanceCluster != allPlayersCompatible ||
                           !s_receivedHostDecision ||
                           !string.Equals(s_lastHostDecisionReason, reason, StringComparison.Ordinal);
@@ -381,9 +549,15 @@ namespace DHHFLastChanceMode.Modules.Config
         private static string BuildIncompatibilityReason(
             string localVersion,
             List<string> missingPlayers,
-            List<string> mismatchPlayers)
+            List<string> mismatchPlayers,
+            List<string> pendingPlayers)
         {
             var reasonParts = new List<string>();
+            if (pendingPlayers.Count > 0)
+            {
+                reasonParts.Add("awaiting fix presence from: " + string.Join(", ", pendingPlayers));
+            }
+
             if (missingPlayers.Count > 0)
             {
                 reasonParts.Add("missing fix presence from: " + string.Join(", ", missingPlayers));
@@ -402,5 +576,19 @@ namespace DHHFLastChanceMode.Modules.Config
             var name = string.IsNullOrWhiteSpace(player.NickName) ? "unknown" : player.NickName.Trim();
             return $"{name}#{player.ActorNumber}";
         }
+
+        private static void LogJoinLeaveDebug(string message)
+        {
+            if (!FeatureFlags.DebugLogging)
+            {
+                return;
+            }
+
+            var inRoom = PhotonNetwork.InRoom;
+            var isMaster = PhotonNetwork.IsMasterClient;
+            var actor = PhotonNetwork.LocalPlayer?.ActorNumber ?? 0;
+            Debug.Log($"[LastChance][CompatGate] {message} | inRoom={inRoom}, isMaster={isMaster}, localActor={actor}");
+        }
+
     }
 }
