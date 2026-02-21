@@ -31,7 +31,7 @@ namespace DHHFLastChanceMode.Modules.Config
         private readonly Dictionary<int, float> _pendingPresenceSince = new();
         private readonly Dictionary<int, float> _pendingPresenceNextRetryAt = new();
         private const float PresenceRetrySeconds = 0.15f;
-        private const float PresenceTimeoutSeconds = 0.45f;
+        private const float PresenceTimeoutSeconds = 2f;
 
         internal static event Action? HostApprovalChanged;
 
@@ -47,6 +47,11 @@ namespace DHHFLastChanceMode.Modules.Config
             DontDestroyOnLoad(go);
             s_instance = go.AddComponent<CompatibilityGate>();
             Debug.Log($"{TracePrefix} EnsureCreated created GameObject and component.");
+        }
+
+        internal static void ForceResolvePendingPresenceForStart()
+        {
+            s_instance?.ResolvePendingPresenceForStart();
         }
 
         internal static bool IsFeatureUsable(ModFeatureGate feature)
@@ -211,6 +216,14 @@ namespace DHHFLastChanceMode.Modules.Config
                     return;
                 }
 
+                if (_playersWithFixVersion.TryGetValue(actorNumber, out var knownVersion) &&
+                    string.Equals(knownVersion, reportedVersion, StringComparison.Ordinal))
+                {
+                    _pendingPresenceSince.Remove(actorNumber);
+                    _pendingPresenceNextRetryAt.Remove(actorNumber);
+                    return;
+                }
+
                 _playersWithFixVersion[actorNumber] = reportedVersion;
                 _pendingPresenceSince.Remove(actorNumber);
                 _pendingPresenceNextRetryAt.Remove(actorNumber);
@@ -342,10 +355,18 @@ namespace DHHFLastChanceMode.Modules.Config
                     _pendingPresenceNextRetryAt[actor] = now + PresenceRetrySeconds;
                 }
 
-                if (now - _pendingPresenceSince[actor] >= PresenceTimeoutSeconds)
+                if (!_pendingPresenceSince.TryGetValue(actor, out var pendingSince))
                 {
+                    continue;
+                }
+
+                var elapsed = now - pendingSince;
+                if (elapsed >= PresenceTimeoutSeconds)
+                {
+                    _pendingPresenceSince.Remove(actor);
+                    _pendingPresenceNextRetryAt.Remove(actor);
                     needsRecheck = true;
-                    Debug.Log($"{TracePrefix} Pending presence timeout reached actor={actor} elapsed={now - _pendingPresenceSince[actor]:0.000}s.");
+                    Debug.Log($"{TracePrefix} Pending presence timeout reached actor={actor} elapsed={elapsed:0.000}s. Marking as missing and stopping retries.");
                 }
             }
 
@@ -431,6 +452,35 @@ namespace DHHFLastChanceMode.Modules.Config
                 BroadcastHostApproval();
                 HostApprovalChanged?.Invoke();
             }
+        }
+
+        private void ResolvePendingPresenceForStart()
+        {
+            if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom || _pendingPresenceSince.Count == 0)
+            {
+                return;
+            }
+
+            var now = Time.realtimeSinceStartup;
+            var actors = new List<int>(_pendingPresenceSince.Keys);
+            for (var i = 0; i < actors.Count; i++)
+            {
+                var actor = actors[i];
+                if (_playersWithFixVersion.ContainsKey(actor))
+                {
+                    _pendingPresenceSince.Remove(actor);
+                    _pendingPresenceNextRetryAt.Remove(actor);
+                    continue;
+                }
+
+                var elapsed = _pendingPresenceSince.TryGetValue(actor, out var since) ? now - since : 0f;
+                _pendingPresenceSince.Remove(actor);
+                _pendingPresenceNextRetryAt.Remove(actor);
+                Debug.Log($"{TracePrefix} Start pressed with unresolved presence actor={actor} elapsed={elapsed:0.000}s. Marking as missing immediately.");
+            }
+
+            Debug.Log($"{TracePrefix} Start forced compatibility recheck after pending presence flush.");
+            EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
         }
 
         private static void BroadcastHostApproval()
