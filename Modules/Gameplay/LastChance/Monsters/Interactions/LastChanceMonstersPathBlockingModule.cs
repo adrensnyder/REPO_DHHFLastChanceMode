@@ -80,7 +80,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyPostfix]
         private static void Postfix(object __instance, ref bool __result)
         {
-            var tricycle = IsTricycleType(__instance?.GetType());
+            var enemyType = __instance?.GetType();
+            var tricycle = IsTricycleType(enemyType);
+            var animal = IsAnimalType(enemyType);
             if (__result || __instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
             {
                 if (tricycle)
@@ -216,7 +218,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                     continue;
                 }
 
-                if (!TryResolveNavmeshPoint(player, out var candidatePoint, out var fallbackPoint))
+                if (!TryResolveNavmeshPoint(player, animal, out var candidatePoint, out var fallbackPoint))
                 {
                     if (tricycle)
                     {
@@ -310,9 +312,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             return LastChanceMonstersReflectionHelper.TryResolvePlayerFromCollider(collider, out player);
         }
 
-        private static bool TryResolveNavmeshPoint(PlayerAvatar player, out Vector3 point, out Vector3? fallbackPoint)
+        private static bool TryResolveNavmeshPoint(PlayerAvatar player, bool preferBodyAnchor, out Vector3 point, out Vector3? fallbackPoint)
         {
             fallbackPoint = null;
+            if (preferBodyAnchor)
+            {
+                point = player.transform.position;
+                return true;
+            }
+
             if (LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
             {
                 point = headCenter;
@@ -333,6 +341,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             return type.Name.IndexOf("Tricycle", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    (type.FullName?.IndexOf("Tricycle", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0;
+        }
+
+        private static bool IsAnimalType(Type? type)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            return type.Name.IndexOf("Animal", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   (type.FullName?.IndexOf("Animal", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0;
         }
 
         private static bool IsPointInsideProbeCorridor(Vector3 origin, Vector3 headingNormalized, Vector3 point)

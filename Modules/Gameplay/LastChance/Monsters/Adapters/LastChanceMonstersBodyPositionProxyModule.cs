@@ -12,6 +12,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
     internal static class LastChanceMonstersBodyPositionProxyModule
     {
         private static readonly Dictionary<Type, FieldInfo?> PlayerTargetFieldCache = new();
+        private static readonly FieldInfo? EnemyAnimalPlayerTargetField =
+            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyAnimal), "playerTarget");
 
         [HarmonyPostfix]
         private static void Postfix()
@@ -69,6 +71,22 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 
                 var type = enemy.GetType();
                 if (TryGetPlayerTarget(enemy, type) == player)
+                {
+                    return true;
+                }
+            }
+
+            // EnemyAnimal keeps its own target field on the EnemyAnimal component.
+            var animals = UnityEngine.Object.FindObjectsOfType<EnemyAnimal>();
+            for (var i = 0; i < animals.Length; i++)
+            {
+                var animal = animals[i];
+                if (animal == null)
+                {
+                    continue;
+                }
+
+                if (EnemyAnimalPlayerTargetField?.GetValue(animal) as PlayerAvatar == player)
                 {
                     return true;
                 }

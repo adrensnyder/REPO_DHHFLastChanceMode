@@ -67,7 +67,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             if (enemy.GetComponent<EnemyAnimal>() != null)
             {
-                return true;
+                s_enemyTriggerAttackAttackField?.SetValue(__instance, true);
+                return false;
             }
 
             if (enemy.CurrentState != EnemyState.Chase && enemy.CurrentState != EnemyState.LookUnder)

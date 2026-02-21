@@ -45,12 +45,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < overlaps.Length; i++)
             {
                 var collider = overlaps[i];
-                if (collider == null || !collider.gameObject.CompareTag("Player"))
+                if (collider == null)
                 {
                     continue;
                 }
 
                 var player = ResolvePlayer(collider);
+                if (player == null &&
+                    LastChanceMonstersTargetProxyHelper.TryGetPlayerFromDeathHeadCollider(collider, out var headPlayer))
+                {
+                    player = headPlayer;
+                }
+
                 if (player == null)
                 {
                     continue;
