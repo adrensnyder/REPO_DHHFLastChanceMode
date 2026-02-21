@@ -8,7 +8,7 @@ using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch(typeof(PlayerVoiceChat), "Update")]
     internal static class LastChanceMonstersVoiceEnemyOnlyModule

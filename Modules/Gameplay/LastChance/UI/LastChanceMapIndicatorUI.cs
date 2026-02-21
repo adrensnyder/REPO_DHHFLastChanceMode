@@ -2,7 +2,7 @@
 
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.UI
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 {
     internal static class LastChanceMapIndicatorUI
     {

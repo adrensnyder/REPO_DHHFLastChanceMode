@@ -1,12 +1,12 @@
 #nullable enable
 
 using ExitGames.Client.Photon;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     internal sealed class LastChanceSurrenderNetwork : MonoBehaviourPunCallbacks, IOnEventCallback
     {

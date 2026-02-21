@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace DeathHeadHopperFix.Modules.Utilities
+namespace DHHFLastChanceMode.Modules.Utilities
 {
     internal static class PhotonEventCodes
     {

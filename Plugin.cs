@@ -7,10 +7,10 @@ using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -211,11 +211,13 @@ namespace DHHFLastChanceMode
             {
                 LastChanceMonstersSearchModule.Apply(harmony, asm);
                 LastChanceMonstersNoiseAggroModule.Apply(harmony, asm);
+                LastChanceMonstersPlayerVisionCheckModule.Apply();
                 LastChanceMonstersCameraForceLockModule.Apply();
                 return;
             }
 
             LastChanceMonstersCameraForceLockModule.Unapply();
+            LastChanceMonstersPlayerVisionCheckModule.Unapply();
             LastChanceMonstersNoiseAggroModule.Unapply();
             LastChanceMonstersSearchModule.Unapply();
         }

@@ -5,14 +5,13 @@ using System.Collections.Generic;
 using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
-using DeathHeadHopperFix.Modules.Gameplay.Core.Abilities;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.UI;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.UI;
 using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     // RunManager.Update is intentionally patched in two places:
     // 1) this postfix drives LastChance runtime/timer state every frame,

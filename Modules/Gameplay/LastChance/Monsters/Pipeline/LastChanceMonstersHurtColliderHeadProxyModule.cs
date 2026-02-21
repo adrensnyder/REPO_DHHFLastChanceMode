@@ -5,7 +5,7 @@ using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch(typeof(HurtCollider), "Update")]
     internal static class LastChanceMonstersHurtColliderHeadProxyModule

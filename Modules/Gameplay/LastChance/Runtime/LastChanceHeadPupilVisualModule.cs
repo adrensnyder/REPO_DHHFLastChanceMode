@@ -4,17 +4,17 @@ using System.Reflection;
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     [HarmonyPatch(typeof(PlayerDeathHead), "Update")]
     internal static class LastChanceHeadPupilVisualModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Eyes");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Eyes");
         private static readonly FieldInfo? HeadPlayerAvatarField = AccessTools.Field(typeof(PlayerDeathHead), "playerAvatar");
         private static readonly FieldInfo? HeadPlayerEyesField = AccessTools.Field(typeof(PlayerDeathHead), "playerEyes");
         private static readonly FieldInfo? HeadPupilScaleTransformRightField = AccessTools.Field(typeof(PlayerDeathHead), "pupilScaleTransformRight");

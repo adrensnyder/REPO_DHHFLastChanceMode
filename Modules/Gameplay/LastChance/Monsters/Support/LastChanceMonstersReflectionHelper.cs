@@ -4,7 +4,7 @@ using System;
 using System.Reflection;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
 {
     internal static class LastChanceMonstersReflectionHelper
     {

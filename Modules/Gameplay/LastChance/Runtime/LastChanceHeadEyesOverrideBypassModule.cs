@@ -3,17 +3,17 @@
 using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     [HarmonyPatch(typeof(PlayerEyes), nameof(PlayerEyes.Override))]
     internal static class LastChanceHeadEyesOverrideBypassModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Eyes");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Eyes");
         private static readonly FieldInfo? EyesPlayerAvatarField = AccessTools.Field(typeof(PlayerEyes), "playerAvatar");
         private static readonly FieldInfo? HeadSpectatedField = AccessTools.Field(typeof(PlayerDeathHead), "spectated");
 

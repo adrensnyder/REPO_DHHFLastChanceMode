@@ -2,10 +2,10 @@
 
 using System;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 {
     internal static class LastChanceSaveDeleteState
     {

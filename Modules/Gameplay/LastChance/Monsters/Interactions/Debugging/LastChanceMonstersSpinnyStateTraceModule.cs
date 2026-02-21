@@ -4,18 +4,18 @@ using System;
 using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersSpinnyStateTraceModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Spinny");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spinny");
 
         private static readonly Type? EnemySpinnyType = AccessTools.TypeByName("EnemySpinny");
         private static readonly FieldInfo? CurrentStateField = EnemySpinnyType != null ? AccessTools.Field(EnemySpinnyType, "currentState") : null;

@@ -3,10 +3,10 @@
 using System;
 using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Spectate
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
 {
     internal static class LastChanceSpectateHelper
     {

@@ -4,7 +4,7 @@ using HarmonyLib;
 using System.Reflection;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch(typeof(EnemyVision), "Awake")]
     internal static class LastChanceMonstersVisionModule

@@ -4,18 +4,18 @@ using HarmonyLib;
 using System.Reflection;
 using BepInEx.Logging;
 using UnityEngine;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Adapters;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch(typeof(EnemyHeartHuggerGasGuider), "FixedUpdate")]
     internal static class LastChanceMonstersGasGuiderHeadProxyModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.HeartHugger");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeartHugger");
         private static readonly FieldInfo? s_playerField =
             LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyHeartHuggerGasGuider), "player");
         private static readonly FieldInfo? s_physGrabObjectField =

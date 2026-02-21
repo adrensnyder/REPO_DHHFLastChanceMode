@@ -2,11 +2,11 @@
 
 using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Adapters;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch(typeof(EnemyThinMan), "StateStand")]
     internal static class LastChanceMonstersThinManStandModule

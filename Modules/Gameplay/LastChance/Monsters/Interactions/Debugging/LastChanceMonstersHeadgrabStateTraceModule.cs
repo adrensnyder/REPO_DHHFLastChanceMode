@@ -6,18 +6,18 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersHeadgrabStateTraceModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Headgrab");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Headgrab");
         private static readonly Dictionary<int, string> LastStateByEnemy = new();
 
         private static readonly FieldInfo? PlayerDeadSetField = AccessTools.Field(typeof(PlayerAvatar), "deadSet");

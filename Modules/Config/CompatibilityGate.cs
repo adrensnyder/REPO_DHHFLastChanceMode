@@ -3,7 +3,7 @@
 using System;
 using System.Collections.Generic;
 using BepInEx;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;

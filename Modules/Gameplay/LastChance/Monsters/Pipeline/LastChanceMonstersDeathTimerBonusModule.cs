@@ -2,7 +2,7 @@
 
 using HarmonyLib;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch(typeof(EnemyHealth), "DeathImpulseRPC")]
     internal static class LastChanceMonstersDeathTimerBonusModule

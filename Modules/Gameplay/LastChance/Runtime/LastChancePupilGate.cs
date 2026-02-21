@@ -4,7 +4,7 @@ using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     internal static class LastChancePupilGate
     {

@@ -7,7 +7,7 @@ using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Adapters
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
     internal static class LastChanceMonstersTargetProxyHelper
     {

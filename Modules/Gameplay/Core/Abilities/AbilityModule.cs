@@ -3,7 +3,7 @@
 using System;
 using System.Reflection;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.Core.Abilities
+namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
 {
     internal static class AbilityModule
     {

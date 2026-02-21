@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Adapters
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
     [HarmonyPatch(typeof(EnemyDirector), "Update")]
     internal static class LastChanceMonstersBodyPositionProxyModule

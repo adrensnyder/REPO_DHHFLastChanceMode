@@ -5,17 +5,17 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersAnimalCollisionTraceModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.AnimalCollision");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.AnimalCollision");
 
         private static readonly FieldInfo? s_attackField = AccessTools.Field(typeof(EnemyTriggerAttack), "Attack");
         private static readonly FieldInfo? s_enemyStateLookUnderField = AccessTools.Field(typeof(Enemy), "StateLookUnder");

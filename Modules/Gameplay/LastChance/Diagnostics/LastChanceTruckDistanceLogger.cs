@@ -2,10 +2,10 @@
 
 using System.Text;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Diagnostics
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Diagnostics
 {
     internal static class LastChanceTruckDistanceLogger
     {

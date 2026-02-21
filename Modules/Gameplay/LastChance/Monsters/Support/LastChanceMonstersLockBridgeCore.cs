@@ -1,9 +1,9 @@
 #nullable enable
 
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
 {
     internal static class LastChanceMonstersLockBridgeCore
     {

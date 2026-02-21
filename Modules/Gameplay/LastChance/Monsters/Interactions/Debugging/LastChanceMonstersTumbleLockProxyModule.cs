@@ -6,17 +6,17 @@ using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Utilities;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersTumbleLockProxyModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Spinny");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spinny");
         private static readonly FieldInfo? PlayerTumbleField = AccessTools.Field(typeof(PlayerAvatar), "tumble");
         private static readonly FieldInfo? PlayerIsTumblingField = AccessTools.Field(typeof(PlayerAvatar), "isTumbling");
         private static readonly Dictionary<Type, LockReflection> ReflectionCache = new();

@@ -10,11 +10,11 @@ using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     internal static class LastChanceMonstersSearchModule
     {
-        private const string PatchId = "DeathHeadHopperFix.Gameplay.LastChance.MonstersSearch";
+        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersSearch";
         private const BindingFlags AnyInstanceField = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private static readonly FieldInfo? s_playerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
         private static readonly AccessTools.FieldRef<PlayerAvatar, bool>? s_playerIsDisabledGetter =
@@ -24,7 +24,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static readonly FieldInfo? s_enemyParentEnemyField =
             typeof(EnemyParent).GetField("Enemy", AnyInstanceField) ??
             typeof(EnemyParent).GetField("enemy", AnyInstanceField);
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.MonstersSearch");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
         private static readonly HashSet<MethodBase> s_patchedMethods = new HashSet<MethodBase>();
         private static readonly Dictionary<Assembly, List<MethodBase>> s_discoveredMethodsByAssembly = new();
         private static Harmony? s_harmony;

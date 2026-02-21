@@ -8,16 +8,16 @@ using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
 using BepInEx.Logging;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Pipeline
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersCameraForceLockModule
     {
-        private const string PatchId = "DeathHeadHopperFix.Gameplay.LastChance.MonstersCameraForceLock";
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.CeilingEye");
+        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersCameraForceLock";
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.CeilingEye");
 
         private sealed class LockState
         {

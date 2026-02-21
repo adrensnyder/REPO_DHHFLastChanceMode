@@ -4,12 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Adapters;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersCarryTargetPositionModule

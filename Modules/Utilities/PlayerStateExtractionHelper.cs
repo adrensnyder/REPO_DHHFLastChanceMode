@@ -2,11 +2,11 @@
 
 using System.Collections.Generic;
 using System.Reflection;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Runtime;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Utilities
+namespace DHHFLastChanceMode.Modules.Utilities
 {
     internal static class PlayerStateExtractionHelper
     {

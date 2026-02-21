@@ -5,17 +5,17 @@ using System.Reflection;
 using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 {
     internal static class AllPlayersDeadGuard
     {
-        private const string ModuleTag = "[DeathHeadHopperFix] [Gameplay]";
+        private const string ModuleTag = "[DHHFLastChanceMode] [Gameplay]";
         private const string LogKey = "SuppressAllDeadTransition";
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.Gameplay");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
         private static readonly FieldInfo? AllPlayersDeadField = AccessTools.Field(typeof(RunManager), "allPlayersDead");
         private static readonly FieldInfo? PlayerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
         private static Harmony? _harmony;
@@ -39,7 +39,7 @@ namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Guards
                 return;
             }
 
-            _harmony = new Harmony("DeathHeadHopperFix.Gameplay.AllPlayersDeadGuard");
+            _harmony = new Harmony("DHHFLastChanceMode.Gameplay.AllPlayersDeadGuard");
             // This transpiler intentionally coexists with RunManagerUpdateLastChanceTimerPatch.Postfix.
             // It owns only the guard of vanilla allPlayersDead assignment flow.
             _harmony.Patch(

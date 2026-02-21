@@ -5,20 +5,20 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     internal static class LastChanceMonstersNoiseAggroModule
     {
-        private const string PatchId = "DeathHeadHopperFix.Gameplay.LastChance.Monsters.NoiseAggro";
+        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.Monsters.NoiseAggro";
         private const float DefaultAggroRadius = 18f;
         private const float DefaultAggroCooldown = 0.75f;
 
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Monsters.NoiseAggro");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Monsters.NoiseAggro");
         private static readonly Dictionary<int, float> s_lastAggroByPlayerViewId = new();
         private static Harmony? s_harmony;
         private static bool s_applied;

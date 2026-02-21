@@ -4,11 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.UI
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 {
     internal static class LastChanceTimerUI
     {

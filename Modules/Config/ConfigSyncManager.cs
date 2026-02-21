@@ -3,11 +3,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Utilities;
 using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace DHHFLastChanceMode.Modules.Config
 {
@@ -33,6 +34,7 @@ namespace DHHFLastChanceMode.Modules.Config
             PhotonNetwork.AddCallbackTarget(this);
             ConfigManager.HostControlledChanged += OnHostControlledChanged;
             CompatibilityGate.HostApprovalChanged += OnHostControlledChanged;
+            SceneManager.sceneLoaded += OnSceneLoaded;
             TrySendSnapshot();
         }
 
@@ -42,6 +44,7 @@ namespace DHHFLastChanceMode.Modules.Config
             PhotonNetwork.RemoveCallbackTarget(this);
             ConfigManager.HostControlledChanged -= OnHostControlledChanged;
             CompatibilityGate.HostApprovalChanged -= OnHostControlledChanged;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
         private void OnHostControlledChanged()
@@ -74,6 +77,15 @@ namespace DHHFLastChanceMode.Modules.Config
 
         public override void OnMasterClientSwitched(Player newMasterClient)
         {
+            if (PhotonNetwork.IsMasterClient)
+            {
+                TrySendSnapshot();
+            }
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            // Re-assert host-controlled values after scene transitions.
             if (PhotonNetwork.IsMasterClient)
             {
                 TrySendSnapshot();

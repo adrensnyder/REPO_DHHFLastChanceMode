@@ -2,7 +2,7 @@
 
 using UnityEngine;
 
-namespace DeathHeadHopperFix.Modules.Utilities
+namespace DHHFLastChanceMode.Modules.Utilities
 {
     internal static class AudioAssetLoader
     {

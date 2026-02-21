@@ -7,16 +7,16 @@ using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersPathBlockingModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.Tricycle");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Tricycle");
         private const float DefaultBlockingRadius = 0.5f;
         private const float DefaultBlockingDistance = 3f;
         private const float DefaultNavmeshRadius = 1f;

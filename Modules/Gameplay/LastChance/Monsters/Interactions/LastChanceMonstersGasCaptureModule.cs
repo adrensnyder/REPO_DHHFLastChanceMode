@@ -8,16 +8,16 @@ using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
-using DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Support;
-using DeathHeadHopperFix.Modules.Utilities;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
-namespace DeathHeadHopperFix.Modules.Gameplay.LastChance.Monsters.Interactions
+namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersGasCaptureModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DeathHeadHopperFix.LastChance.HeartHugger");
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeartHugger");
         private static readonly Dictionary<Type, GasCheckerReflection> ReflectionCache = new();
         private static readonly FieldInfo? EnemyVisionField = AccessTools.Field(typeof(Enemy), "Vision");
 
