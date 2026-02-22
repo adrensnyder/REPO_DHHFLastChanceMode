@@ -944,9 +944,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                         TimerChangeReason.NetworkSync,
                         broadcastIfHost: false,
                         forceBroadcastIfHost: false);
-                    s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
-                    LastChanceTimerUI.Show(GetSurrenderHintPrompt());
-                    return;
                 }
                 else
                 {
@@ -955,9 +952,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                         TimerChangeReason.NetworkSync,
                         broadcastIfHost: false,
                         forceBroadcastIfHost: false);
-                    s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
-                    LastChanceTimerUI.Show(GetSurrenderHintPrompt());
-                    return;
                 }
             }
             s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
