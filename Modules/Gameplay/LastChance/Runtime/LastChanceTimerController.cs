@@ -62,6 +62,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             Direction = 1
         }
 
+        private enum TimerChangeReason
+        {
+            CountdownTick = 0,
+            MonsterKillBonus = 1,
+            DirectionPenalty = 2,
+            NetworkSync = 3
+        }
+
         private static readonly FieldInfo? RunManagerRunStartedField =
             AccessTools.Field(typeof(RunManager), "runStarted");
         private static readonly FieldInfo? RunManagerRestartingField =
@@ -571,11 +579,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void UpdateTimer()
         {
-            s_timerRemaining = Mathf.Max(0f, s_timerRemaining - Time.deltaTime);
-            BroadcastTimerStateIfHost(force: false);
+            ApplyTimerDelta(-Time.deltaTime, TimerChangeReason.CountdownTick, broadcastIfHost: true, forceBroadcastIfHost: false);
             TryPlayLastChanceTimerWarnings();
             TryPlayLastChanceTimerSecondTick();
-            LastChanceTimerUI.UpdateText(FormatTimerText(s_timerRemaining));
         }
 
         private static void HandleTimeout()
@@ -919,18 +925,32 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             var authoritativeRemaining = ComputeAuthoritativeRemaining(secondsRemaining, hostSentAt);
             if (!active || !s_active)
             {
-                s_timerRemaining = authoritativeRemaining;
+                s_timerRemaining = Mathf.Max(0f, authoritativeRemaining);
             }
             else
             {
                 var drift = Mathf.Abs(s_timerRemaining - authoritativeRemaining);
                 if (drift >= TimerDriftHardSnapSeconds)
                 {
-                    s_timerRemaining = authoritativeRemaining;
+                    SetTimerRemainingAndRefreshUi(
+                        authoritativeRemaining,
+                        TimerChangeReason.NetworkSync,
+                        broadcastIfHost: false,
+                        forceBroadcastIfHost: false);
+                    s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
+                    LastChanceTimerUI.Show(GetSurrenderHintPrompt());
+                    return;
                 }
                 else
                 {
-                    s_timerRemaining = Mathf.Lerp(s_timerRemaining, authoritativeRemaining, TimerDriftLerpFactor);
+                    SetTimerRemainingAndRefreshUi(
+                        Mathf.Lerp(s_timerRemaining, authoritativeRemaining, TimerDriftLerpFactor),
+                        TimerChangeReason.NetworkSync,
+                        broadcastIfHost: false,
+                        forceBroadcastIfHost: false);
+                    s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
+                    LastChanceTimerUI.Show(GetSurrenderHintPrompt());
+                    return;
                 }
             }
             s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
@@ -1747,9 +1767,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            s_timerRemaining = Mathf.Max(0f, s_timerRemaining + bonusSeconds);
-            BroadcastTimerStateIfHost(force: true);
-            LastChanceTimerUI.UpdateText(FormatTimerText(s_timerRemaining));
+            ApplyTimerDelta(bonusSeconds, TimerChangeReason.MonsterKillBonus, broadcastIfHost: true, forceBroadcastIfHost: true);
         }
 
         private static void ApplyIndicatorPenaltyHost(int maxPlayers)
@@ -1760,9 +1778,42 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            s_timerRemaining = Mathf.Max(0f, s_timerRemaining - penalty);
-            BroadcastTimerStateIfHost(force: true);
+            ApplyTimerDelta(-penalty, TimerChangeReason.DirectionPenalty, broadcastIfHost: true, forceBroadcastIfHost: true);
+        }
+
+        private static void ApplyTimerDelta(
+            float deltaSeconds,
+            TimerChangeReason reason,
+            bool broadcastIfHost,
+            bool forceBroadcastIfHost)
+        {
+            if (Mathf.Abs(deltaSeconds) <= Mathf.Epsilon)
+            {
+                return;
+            }
+
+            SetTimerRemainingAndRefreshUi(
+                s_timerRemaining + deltaSeconds,
+                reason,
+                broadcastIfHost,
+                forceBroadcastIfHost);
+        }
+
+        private static void SetTimerRemainingAndRefreshUi(
+            float nextSeconds,
+            TimerChangeReason reason,
+            bool broadcastIfHost,
+            bool forceBroadcastIfHost)
+        {
+            // Keep a single authoritative write path for timer value and UI refresh.
+            s_timerRemaining = Mathf.Max(0f, nextSeconds);
+            if (broadcastIfHost)
+            {
+                BroadcastTimerStateIfHost(forceBroadcastIfHost);
+            }
+
             LastChanceTimerUI.UpdateText(FormatTimerText(s_timerRemaining));
+            _ = reason;
         }
 
         private static float CalculateIndicatorPenaltySeconds()
