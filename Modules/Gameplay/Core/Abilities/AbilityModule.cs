@@ -2,6 +2,7 @@
 
 using System;
 using System.Reflection;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Utilities;
 using UnityEngine;
 
@@ -10,11 +11,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
     internal static class AbilityModule
     {
         private const int DirectionIndicatorSlotIndex = 1;
+        private const string AbilityBarDemandSourceId = "DHHFLastChanceMode.Direction";
         private static Type? s_runtimeType;
         private static MethodInfo? s_refreshDirectionSlotVisuals;
         private static MethodInfo? s_setDirectionSlotActivationProgress;
         private static MethodInfo? s_triggerDirectionSlotCooldown;
         private static MethodInfo? s_applyDirectionIconMethod;
+        private static Type? s_abilityBarVisibilityAnchorType;
+        private static MethodInfo? s_setExternalDemandMethod;
         private static Type? s_abilitySpotType;
         private static FieldInfo? s_abilitySpotIndexField;
         private static Sprite? s_directionSprite;
@@ -23,6 +27,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
         internal static void RefreshDirectionSlotVisuals()
         {
             EnsureResolved();
+            PushDirectionAbilityBarDemand();
             s_refreshDirectionSlotVisuals?.Invoke(null, null);
             TryApplyDirectionIconFallback();
         }
@@ -60,6 +65,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
                 var slotVisualType = s_runtimeType.GetNestedType("SlotVisualOverrides", BindingFlags.NonPublic);
                 s_applyDirectionIconMethod = slotVisualType?.GetMethod("ApplyDirectionIcon", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             }
+
+            s_abilityBarVisibilityAnchorType ??= ResolveType("DeathHeadHopperFix.Modules.Gameplay.Spectate.AbilityBarVisibilityAnchor");
+            s_setExternalDemandMethod ??= s_abilityBarVisibilityAnchorType?.GetMethod("SetExternalDemand", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         }
 
         private static Type? ResolveType()
@@ -74,6 +82,44 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
             }
 
             return null;
+        }
+
+        private static Type? ResolveType(string fullName)
+        {
+            var type = Type.GetType(fullName, throwOnError: false);
+            if (type != null)
+            {
+                return type;
+            }
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                type = asm.GetType(fullName, throwOnError: false);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
+        }
+
+        private static void PushDirectionAbilityBarDemand()
+        {
+            if (s_setExternalDemandMethod == null)
+            {
+                return;
+            }
+
+            var visible = LastChanceTimerController.IsDirectionIndicatorUiVisible;
+            try
+            {
+                s_setExternalDemandMethod.Invoke(null, new object[] { AbilityBarDemandSourceId, visible });
+            }
+            catch
+            {
+                // Keep LastChance flow resilient if DHHFix is not present or updated.
+            }
         }
 
         private static void TryApplyDirectionIconFallback()
