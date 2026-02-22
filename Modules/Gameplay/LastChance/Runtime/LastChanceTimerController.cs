@@ -50,6 +50,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private const float DirectionPathRefreshSeconds = 0.4f;
         private const float DirectionPathMovementThresholdSqr = 0.64f; // 0.8m
         private const float DirectionIndicatorHoldSeconds = 1f;
+        private const float DirectionIndicatorMinimumTimerSeconds = 30f;
 
         private enum LastChanceIndicatorMode
         {
@@ -118,6 +119,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static bool s_timerWarningAudioLoadAttempted;
         private static float s_nextTimerWarningAudioRetryAt;
         private static int s_lastTimerWarningAudioPlayed = -1;
+        private static float s_previousTimerWarningCheckSeconds = float.NaN;
         private static int s_lastNetworkTimerBroadcastSecond = -1;
         private static bool s_timerSyncedFromHost;
         private static bool s_hasNetworkUiState;
@@ -337,7 +339,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return false;
             }
 
-            return s_timerRemaining >= penaltyPreview;
+            return HasEnoughTimerForDirectionPenalty(penaltyPreview);
         }
 
         internal static void GetDirectionIndicatorEnergyDebugSnapshot(
@@ -511,6 +513,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             s_lastTimerSecondAudioPlayed = -1;
             s_lastTimerWarningAudioPlayed = -1;
+            s_previousTimerWarningCheckSeconds = s_timerRemaining;
             s_lastNetworkTimerBroadcastSecond = -1;
             s_currencyCaptured = false;
             s_indicatorNoneLoggedThisCycle = false;
@@ -580,7 +583,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static void UpdateTimer()
         {
             ApplyTimerDelta(-Time.deltaTime, TimerChangeReason.CountdownTick, broadcastIfHost: true, forceBroadcastIfHost: false);
-            TryPlayLastChanceTimerWarnings();
             TryPlayLastChanceTimerSecondTick();
         }
 
@@ -922,10 +924,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             SetLastChanceActive(active);
             s_timerSyncedFromHost = active;
+            var previousTimerRemaining = s_timerRemaining;
             var authoritativeRemaining = ComputeAuthoritativeRemaining(secondsRemaining, hostSentAt);
             if (!active || !s_active)
             {
                 s_timerRemaining = Mathf.Max(0f, authoritativeRemaining);
+                if (!active)
+                {
+                    s_previousTimerWarningCheckSeconds = float.NaN;
+                }
             }
             else
             {
@@ -959,6 +966,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             {
                 LastChanceTimerUI.Show(GetSurrenderHintPrompt());
                 LastChanceTimerUI.UpdateText(FormatTimerText(s_timerRemaining));
+                var syncedDelta = s_timerRemaining - previousTimerRemaining;
+                LastChanceTimerUI.NotifyTimerDelta(syncedDelta, isNetworkSync: true);
                 return;
             }
 
@@ -1382,16 +1391,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_lastTimerSecondAudioPlayed = wholeSeconds;
         }
 
-        private static void TryPlayLastChanceTimerWarnings()
+        private static void TryPlayLastChanceTimerWarnings(float previousSeconds, float currentSeconds)
         {
             if (!s_active)
             {
                 return;
             }
 
-            var wholeSeconds = Mathf.CeilToInt(s_timerRemaining);
-            var shouldPlay = wholeSeconds == 60 || wholeSeconds == 30;
-            if (!shouldPlay || wholeSeconds == s_lastTimerWarningAudioPlayed)
+            var crossedBelow60 = previousSeconds > 60f && currentSeconds <= 60f;
+            var crossedBelow30 = previousSeconds > 30f && currentSeconds <= 30f;
+            if (!crossedBelow60 && !crossedBelow30)
             {
                 return;
             }
@@ -1407,9 +1416,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             // 1:00 at normal speed, 0:30 at +50% speed.
-            s_timerWarningAudioSource.pitch = wholeSeconds == 30 ? 1.5f : 1f;
+            s_timerWarningAudioSource.pitch = crossedBelow30 ? 1.5f : 1f;
             s_timerWarningAudioSource.PlayOneShot(s_timerWarningAudioClip);
-            s_lastTimerWarningAudioPlayed = wholeSeconds;
+            s_lastTimerWarningAudioPlayed = crossedBelow30 ? 30 : 60;
         }
 
         private static bool TryEnsureTimerSecondAudioReady()
@@ -1541,6 +1550,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             s_lastTimerWarningAudioPlayed = -1;
+            s_previousTimerWarningCheckSeconds = float.NaN;
             if (s_timerWarningAudioSource != null)
             {
                 s_timerWarningAudioSource.Stop();
@@ -1645,6 +1655,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             if (IsIndicatorActive(kind) || Time.time < GetIndicatorCooldownUntil(kind))
+            {
+                ResetIndicatorHold();
+                return;
+            }
+
+            if (kind == IndicatorKind.Direction && !IsDirectionIndicatorEnergySufficientPreview())
             {
                 ResetIndicatorHold();
                 return;
@@ -1778,7 +1794,28 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
+            if (!HasEnoughTimerForDirectionPenalty(penalty))
+            {
+                return;
+            }
+
             ApplyTimerDelta(-penalty, TimerChangeReason.DirectionPenalty, broadcastIfHost: true, forceBroadcastIfHost: true);
+        }
+
+        private static bool HasEnoughTimerForDirectionPenalty(float penaltySeconds)
+        {
+            var safePenalty = Mathf.Max(0f, penaltySeconds);
+            if (safePenalty <= 0f)
+            {
+                return false;
+            }
+
+            if (s_timerRemaining <= DirectionIndicatorMinimumTimerSeconds)
+            {
+                return false;
+            }
+
+            return s_timerRemaining >= safePenalty;
         }
 
         private static void ApplyTimerDelta(
@@ -1797,6 +1834,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 reason,
                 broadcastIfHost,
                 forceBroadcastIfHost);
+            if (reason == TimerChangeReason.MonsterKillBonus || reason == TimerChangeReason.DirectionPenalty)
+            {
+                LastChanceTimerUI.NotifyTimerDelta(deltaSeconds);
+            }
         }
 
         private static void SetTimerRemainingAndRefreshUi(
@@ -1806,6 +1847,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             bool forceBroadcastIfHost)
         {
             // Keep a single authoritative write path for timer value and UI refresh.
+            var previousSeconds = s_timerRemaining;
             s_timerRemaining = Mathf.Max(0f, nextSeconds);
             if (broadcastIfHost)
             {
@@ -1813,6 +1855,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             LastChanceTimerUI.UpdateText(FormatTimerText(s_timerRemaining));
+            var warningPrevious = float.IsNaN(s_previousTimerWarningCheckSeconds)
+                ? previousSeconds
+                : s_previousTimerWarningCheckSeconds;
+            TryPlayLastChanceTimerWarnings(warningPrevious, s_timerRemaining);
+            s_previousTimerWarningCheckSeconds = s_timerRemaining;
             _ = reason;
         }
 

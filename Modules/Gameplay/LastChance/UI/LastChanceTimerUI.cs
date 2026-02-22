@@ -122,6 +122,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
             s_label = go.AddComponent(LabelType);
             SetDefaults(s_label);
+            LastChanceTimerChangeEffectsModule.Initialize(
+                s_rect,
+                s_label,
+                LabelType,
+                TextProperty,
+                ColorProperty,
+                AlignmentProperty,
+                FontSizeProperty,
+                AutoSizeProperty,
+                WordWrapProperty,
+                RichTextProperty,
+                CenterAlignment,
+                TimerFontSize);
             SetEnabled(false);
 
             var hintGo = new GameObject("LastChanceSurrenderHint", typeof(RectTransform));
@@ -192,6 +205,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_truckIconImage = null;
             s_truckCounterLabel = null;
             s_lastTruckCounterText = string.Empty;
+            LastChanceTimerChangeEffectsModule.Reset();
         }
 
         internal static void UpdateText(string text)
@@ -202,13 +216,31 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             RefreshVisibility(force: false);
+            LastChanceTimerChangeEffectsModule.OnBaseTimerTextUpdated(text);
+            LastChanceTimerChangeEffectsModule.Tick();
             if (string.Equals(s_lastTimerText, text, StringComparison.Ordinal))
             {
                 return;
             }
 
             s_lastTimerText = text;
-            TextProperty?.SetValue(s_label, text);
+        }
+
+        internal static void NotifyTimerDelta(float deltaSeconds, bool isNetworkSync = false)
+        {
+            if (s_label == null)
+            {
+                return;
+            }
+
+            if (isNetworkSync)
+            {
+                LastChanceTimerChangeEffectsModule.NotifyNetworkDelta(deltaSeconds);
+            }
+            else
+            {
+                LastChanceTimerChangeEffectsModule.NotifyLocalDelta(deltaSeconds);
+            }
         }
 
         internal static void UpdatePlayerStates(IReadOnlyList<PlayerStateExtractionHelper.PlayerStateSnapshot> snapshots, int requiredOnTruck)
@@ -270,6 +302,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             SetEnabled(false);
+            LastChanceTimerChangeEffectsModule.SetVisible(false);
         }
 
         internal static void SetSurrenderHintText(string text)
@@ -744,6 +777,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             {
                 hintComponent.gameObject.SetActive(enabled);
             }
+
+            LastChanceTimerChangeEffectsModule.SetVisible(enabled);
         }
 
         private static void TryApplyAbilityCostTextStyle(Component? label)
