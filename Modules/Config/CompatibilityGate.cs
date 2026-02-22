@@ -34,7 +34,6 @@ namespace DHHFLastChanceMode.Modules.Config
         private readonly Dictionary<int, float> _pendingPresenceSince = new();
         private readonly Dictionary<int, float> _pendingPresenceNextRetryAt = new();
         private const float PresenceRetrySeconds = 0.15f;
-        private const float PresenceTimeoutSeconds = 2f;
 
         internal static event Action? HostApprovalChanged;
 
@@ -401,7 +400,7 @@ namespace DHHFLastChanceMode.Modules.Config
                 }
 
                 var elapsed = now - pendingSince;
-                if (elapsed >= PresenceTimeoutSeconds)
+                if (elapsed >= InternalConfig.CompatibilityGatePresenceTimeoutSeconds)
                 {
                     _pendingPresenceSince.Remove(actor);
                     _pendingPresenceNextRetryAt.Remove(actor);
@@ -458,9 +457,9 @@ namespace DHHFLastChanceMode.Modules.Config
                     if (_pendingPresenceSince.TryGetValue(player.ActorNumber, out var since))
                     {
                         var elapsed = now - since;
-                        if (elapsed < PresenceTimeoutSeconds)
+                        if (elapsed < InternalConfig.CompatibilityGatePresenceTimeoutSeconds)
                         {
-                            pendingPlayers.Add($"{playerTag} ({elapsed:0.0}s/{PresenceTimeoutSeconds:0.0}s)");
+                            pendingPlayers.Add($"{playerTag} ({elapsed:0.0}s/{InternalConfig.CompatibilityGatePresenceTimeoutSeconds:0.0}s)");
                             allPlayersCompatible = false;
                             continue;
                         }

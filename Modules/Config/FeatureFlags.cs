@@ -48,7 +48,7 @@ namespace DHHFLastChanceMode.Modules.Config
         }
 
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceMode)]
-        public static bool LastChangeMode = false;
+        public static bool LastChangeMode = true;
 
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceTimerSeconds, Min = 30f, Max = 600f)]
         public static int LastChanceTimerSeconds = 60;
