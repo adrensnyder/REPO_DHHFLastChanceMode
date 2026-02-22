@@ -127,6 +127,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static string? s_lastTruckStateDebugMessage;
         private const float UiStateBroadcastIntervalSeconds = 0.2f;
         private const float DirectionPenaltyRequestCooldownSeconds = 0.2f;
+        private const float TimerDriftHardSnapSeconds = 1.25f;
+        private const float TimerDriftLerpFactor = 0.35f;
         private static bool s_activationProfilePending;
         private static float s_activationProfileStartedAt;
         private static DynamicTimerProfileSnapshot s_lastDynamicTimerProfile;
@@ -905,7 +907,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             runMgr.ChangeLevel(false, true, RunManager.ChangeLevelType.Normal);
         }
 
-        internal static void ApplyNetworkTimerState(bool active, float secondsRemaining)
+        internal static void ApplyNetworkTimerState(bool active, float secondsRemaining, double hostSentAt)
         {
             if (!SemiFunc.IsMultiplayer() || SemiFunc.IsMasterClient())
             {
@@ -914,7 +916,23 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             SetLastChanceActive(active);
             s_timerSyncedFromHost = active;
-            s_timerRemaining = Mathf.Max(0f, secondsRemaining);
+            var authoritativeRemaining = ComputeAuthoritativeRemaining(secondsRemaining, hostSentAt);
+            if (!active || !s_active)
+            {
+                s_timerRemaining = authoritativeRemaining;
+            }
+            else
+            {
+                var drift = Mathf.Abs(s_timerRemaining - authoritativeRemaining);
+                if (drift >= TimerDriftHardSnapSeconds)
+                {
+                    s_timerRemaining = authoritativeRemaining;
+                }
+                else
+                {
+                    s_timerRemaining = Mathf.Lerp(s_timerRemaining, authoritativeRemaining, TimerDriftLerpFactor);
+                }
+            }
             s_lastNetworkTimerBroadcastSecond = Mathf.CeilToInt(s_timerRemaining);
 
             if (active)
@@ -942,7 +960,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             s_lastNetworkTimerBroadcastSecond = wholeSeconds;
-            LastChanceSurrenderNetwork.NotifyTimerState(s_active, s_timerRemaining);
+            LastChanceSurrenderNetwork.NotifyTimerState(s_active, s_timerRemaining, PhotonNetwork.Time);
         }
 
         private static void UpdateSurrenderInput(bool allDead)
@@ -1087,6 +1105,28 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             RegisterSurrenderedActor(actorNumber, false);
         }
 
+        internal static void ApplyRemoteSurrenderSnapshot(object[] payload)
+        {
+            if (!SemiFunc.IsMultiplayer() || SemiFunc.IsMasterClient())
+            {
+                return;
+            }
+
+            LastChanceSurrenderedPlayers.Clear();
+            if (payload == null || payload.Length == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < payload.Length; i++)
+            {
+                if (payload[i] is int actor && actor > 0)
+                {
+                    LastChanceSurrenderedPlayers.Add(actor);
+                }
+            }
+        }
+
         private static void UpdatePlayersStatusUi(int maxPlayers)
         {
             if (!s_active)
@@ -1110,7 +1150,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             var snapshots = PlayerStateExtractionHelper.GetPlayersStateSnapshot();
             var required = GetLastChanceNeededPlayers(maxPlayers);
             LastChanceTimerUI.UpdatePlayerStates(snapshots, required);
-            TryBroadcastUiStateIfHost(snapshots, required);
+            TryBroadcastUiStateIfHost(snapshots, required, force: false);
         }
 
         internal static bool IsPlayerSurrenderedForData(PlayerAvatar? player)
@@ -1207,20 +1247,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void TryBroadcastUiStateIfHost(
             List<PlayerStateExtractionHelper.PlayerStateSnapshot> snapshots,
-            int requiredOnTruck)
+            int requiredOnTruck,
+            bool force)
         {
             if (!SemiFunc.IsMultiplayer() || !SemiFunc.IsMasterClient())
             {
                 return;
             }
 
-            if (Time.time < s_lastUiStateBroadcastAt + UiStateBroadcastIntervalSeconds)
+            if (!force && Time.time < s_lastUiStateBroadcastAt + UiStateBroadcastIntervalSeconds)
             {
                 return;
             }
 
             var hash = ComputeUiStateHash(snapshots, requiredOnTruck);
-            if (hash == s_lastUiStateHash && s_lastUiStateBroadcastAt > 0f)
+            if (!force && hash == s_lastUiStateHash && s_lastUiStateBroadcastAt > 0f)
             {
                 return;
             }
@@ -1229,6 +1270,32 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             LastChanceSurrenderNetwork.NotifyUiState(Mathf.Max(1, requiredOnTruck), payload);
             s_lastUiStateHash = hash;
             s_lastUiStateBroadcastAt = Time.time;
+        }
+
+        internal static void ForceBroadcastRuntimeSnapshotForSync()
+        {
+            if (!SemiFunc.IsMultiplayer() || !SemiFunc.IsMasterClient())
+            {
+                return;
+            }
+
+            BroadcastTimerStateIfHost(force: true);
+
+            var maxPlayers = GetRunPlayerCount();
+            if (s_active && maxPlayers > 0)
+            {
+                var snapshots = PlayerStateExtractionHelper.GetPlayersStateSnapshot();
+                var required = GetLastChanceNeededPlayers(maxPlayers);
+                TryBroadcastUiStateIfHost(snapshots, required, force: true);
+            }
+            else
+            {
+                LastChanceSurrenderNetwork.NotifyUiState(1, System.Array.Empty<object>());
+                s_lastUiStateBroadcastAt = Time.time;
+                s_lastUiStateHash = 0;
+            }
+
+            LastChanceSurrenderNetwork.NotifySurrenderSnapshot(BuildSurrenderedActorsPayload());
         }
 
         private static object[] BuildUiStatePayload(List<PlayerStateExtractionHelper.PlayerStateSnapshot> snapshots)
@@ -2845,6 +2912,39 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             CoreBatteryInterop.RequestCoreConfigSyncBroadcast();
             s_lastChanceBatteryOverrideApplied = false;
             s_lastChancePreviousBatteryJumpEnabled = false;
+        }
+
+        private static object[] BuildSurrenderedActorsPayload()
+        {
+            if (LastChanceSurrenderedPlayers.Count == 0)
+            {
+                return System.Array.Empty<object>();
+            }
+
+            var payload = new object[LastChanceSurrenderedPlayers.Count];
+            var index = 0;
+            foreach (var actor in LastChanceSurrenderedPlayers)
+            {
+                payload[index++] = actor;
+            }
+
+            return payload;
+        }
+
+        private static float ComputeAuthoritativeRemaining(float secondsRemaining, double hostSentAt)
+        {
+            if (!SemiFunc.IsMultiplayer())
+            {
+                return Mathf.Max(0f, secondsRemaining);
+            }
+
+            var elapsed = PhotonNetwork.Time - hostSentAt;
+            if (double.IsNaN(elapsed) || double.IsInfinity(elapsed) || elapsed < 0d)
+            {
+                elapsed = 0d;
+            }
+
+            return Mathf.Max(0f, secondsRemaining - (float)elapsed);
         }
     }
 

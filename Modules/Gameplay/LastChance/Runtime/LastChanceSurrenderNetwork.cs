@@ -21,6 +21,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private const string LastChanceDirectionPenaltyRequestMessageType = "LastChanceDirectionPenaltyRequest";
         private const string LastChanceUiStateMessageType = "LastChanceUiState";
         private const string LastChancePlayerTruckHintMessageType = "LastChancePlayerTruckHint";
+        private const string LastChanceSurrenderSnapshotMessageType = "LastChanceSurrenderSnapshot";
 
         internal static void EnsureCreated()
         {
@@ -52,7 +53,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceSurrender, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
-        internal static void NotifyTimerState(bool active, float secondsRemaining)
+        internal static void NotifyTimerState(bool active, float secondsRemaining, double hostSentAt)
         {
             if (!PhotonNetwork.InRoom)
             {
@@ -65,8 +66,25 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 Receivers = ReceiverGroup.All
             };
 
-            var envelope = CreateEnvelope(LastChanceTimerStateMessageType, new object[] { active, secondsRemaining });
+            var envelope = CreateEnvelope(LastChanceTimerStateMessageType, new object[] { active, secondsRemaining, hostSentAt });
             PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceTimerState, envelope.ToEventPayload(), options, SendOptions.SendReliable);
+        }
+
+        internal static void NotifySurrenderSnapshot(object[] surrenderedActorsPayload)
+        {
+            if (!PhotonNetwork.InRoom)
+            {
+                return;
+            }
+
+            EnsureCreated();
+            var options = new RaiseEventOptions
+            {
+                Receivers = ReceiverGroup.All
+            };
+
+            var envelope = CreateEnvelope(LastChanceSurrenderSnapshotMessageType, surrenderedActorsPayload ?? System.Array.Empty<object>());
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceSurrender, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         internal static void NotifyDirectionPenaltyRequest()
@@ -162,6 +180,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             base.OnJoinedRoom();
             LastChanceTimerController.ClearRoomSuppression();
+            if (PhotonNetwork.IsMasterClient)
+            {
+                LastChanceTimerController.ForceBroadcastRuntimeSnapshotForSync();
+            }
+        }
+
+        public override void OnPlayerEnteredRoom(Player newPlayer)
+        {
+            base.OnPlayerEnteredRoom(newPlayer);
+            if (!PhotonNetwork.IsMasterClient || newPlayer == null)
+            {
+                return;
+            }
+
+            LastChanceTimerController.ForceBroadcastRuntimeSnapshotForSync();
         }
 
         public override void OnLeftRoom()
@@ -181,11 +214,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     envelope.IsExpectedSource() &&
                     string.Equals(envelope.MessageType, LastChanceTimerStateMessageType, System.StringComparison.Ordinal) &&
                     envelope.Payload is object[] timerPayload &&
-                    timerPayload.Length >= 2 &&
+                    timerPayload.Length >= 3 &&
                     timerPayload[0] is bool active &&
-                    timerPayload[1] is float remaining)
+                    timerPayload[1] is float remaining &&
+                    timerPayload[2] is double hostSentAt)
                 {
-                    LastChanceTimerController.ApplyNetworkTimerState(active, remaining);
+                    LastChanceTimerController.ApplyNetworkTimerState(active, remaining, hostSentAt);
                 }
                 return;
             }
@@ -258,8 +292,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 photonEvent.Sender != surrenderMasterActor ||
                 !NetworkEnvelope.TryParse(photonEvent.CustomData, out var surrenderEnvelope) ||
                 !surrenderEnvelope.IsExpectedSource() ||
-                !string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderMessageType, System.StringComparison.Ordinal))
+                !string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderMessageType, System.StringComparison.Ordinal) &&
+                !string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderSnapshotMessageType, System.StringComparison.Ordinal))
             {
+                return;
+            }
+
+            if (string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderSnapshotMessageType, System.StringComparison.Ordinal))
+            {
+                LastChanceTimerController.ApplyRemoteSurrenderSnapshot(surrenderEnvelope.Payload as object[] ?? System.Array.Empty<object>());
                 return;
             }
 
