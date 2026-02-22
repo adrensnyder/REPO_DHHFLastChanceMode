@@ -21,6 +21,9 @@ namespace DHHFLastChanceMode.Modules.Config
         private const string TracePrefix = "[LastChance][CompatGate][Trace]";
         private const string LastChanceModeKey = nameof(FeatureFlags.LastChangeMode);
         private const string UnknownVersion = "unknown";
+        private const string ClientFixPresenceMessageType = "ClientFixPresence";
+        private const string HostFixPresenceRequestMessageType = "HostFixPresenceRequest";
+        private const string HostGateStateMessageType = "HostGateState";
         private static CompatibilityGate? s_instance;
         private static bool s_hostApprovedLastChanceCluster = true;
         private static bool s_receivedHostDecision;
@@ -210,8 +213,20 @@ namespace DHHFLastChanceMode.Modules.Config
                     return;
                 }
 
-                var hasPayload = TryParseClientPresencePayload(photonEvent.CustomData, out var actorNumber, out var reportedVersion);
+                if (!NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelope) ||
+                    !envelope.IsExpectedSource() ||
+                    !string.Equals(envelope.MessageType, ClientFixPresenceMessageType, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                var hasPayload = TryParseClientPresencePayload(envelope.Payload, out var actorNumber, out var reportedVersion);
                 if (!hasPayload || actorNumber <= 0)
+                {
+                    return;
+                }
+
+                if (photonEvent.Sender <= 0 || photonEvent.Sender != actorNumber)
                 {
                     return;
                 }
@@ -245,7 +260,17 @@ namespace DHHFLastChanceMode.Modules.Config
                     return;
                 }
 
-                if (photonEvent.CustomData is not int targetActor || targetActor != localActor)
+                var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+                if (masterActor <= 0 || photonEvent.Sender != masterActor)
+                {
+                    return;
+                }
+
+                if (!NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelope) ||
+                    !envelope.IsExpectedSource() ||
+                    !string.Equals(envelope.MessageType, HostFixPresenceRequestMessageType, StringComparison.Ordinal) ||
+                    envelope.Payload is not int targetActor ||
+                    targetActor != localActor)
                 {
                     Debug.Log($"{TracePrefix} HostFixPresenceRequest ignored localActor={localActor} targetActor={(photonEvent.CustomData is int t ? t : -1)}.");
                     return;
@@ -261,7 +286,18 @@ namespace DHHFLastChanceMode.Modules.Config
                 return;
             }
 
-            if (photonEvent.CustomData is not object[] payload || payload.Length < 1 || payload[0] is not bool allowed)
+            var hostActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+            if (hostActor <= 0 || photonEvent.Sender != hostActor)
+            {
+                return;
+            }
+
+            if (!NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelopeHostGate) ||
+                !envelopeHostGate.IsExpectedSource() ||
+                !string.Equals(envelopeHostGate.MessageType, HostGateStateMessageType, StringComparison.Ordinal) ||
+                envelopeHostGate.Payload is not object[] payload ||
+                payload.Length < 1 ||
+                payload[0] is not bool allowed)
             {
                 return;
             }
@@ -301,11 +337,13 @@ namespace DHHFLastChanceMode.Modules.Config
                 Receivers = ReceiverGroup.MasterClient
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.ClientFixPresence,
-                new object[] { actor, GetLocalFixVersion() },
-                options,
-                SendOptions.SendReliable);
+            var envelope = new NetworkEnvelope(
+                NetworkProtocol.ModId,
+                NetworkProtocol.ProtocolVersion,
+                ClientFixPresenceMessageType,
+                0,
+                new object[] { actor, GetLocalFixVersion() });
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.ClientFixPresence, envelope.ToEventPayload(), options, SendOptions.SendReliable);
             Debug.Log($"{TracePrefix} AnnounceLocalFixPresence sent actor={actor} version={GetLocalFixVersion()}.");
         }
 
@@ -321,11 +359,13 @@ namespace DHHFLastChanceMode.Modules.Config
                 TargetActors = new[] { actorNumber }
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.HostFixPresenceRequest,
-                actorNumber,
-                options,
-                SendOptions.SendReliable);
+            var envelope = new NetworkEnvelope(
+                NetworkProtocol.ModId,
+                NetworkProtocol.ProtocolVersion,
+                HostFixPresenceRequestMessageType,
+                0,
+                actorNumber);
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.HostFixPresenceRequest, envelope.ToEventPayload(), options, SendOptions.SendReliable);
             Debug.Log($"{TracePrefix} RequestPresenceFromActor sent actor={actorNumber} source={source}.");
         }
 
@@ -495,11 +535,13 @@ namespace DHHFLastChanceMode.Modules.Config
                 Receivers = ReceiverGroup.All
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.HostGateState,
-                new object[] { s_hostApprovedLastChanceCluster, s_lastHostDecisionReason },
-                options,
-                SendOptions.SendReliable);
+            var envelope = new NetworkEnvelope(
+                NetworkProtocol.ModId,
+                NetworkProtocol.ProtocolVersion,
+                HostGateStateMessageType,
+                0,
+                new object[] { s_hostApprovedLastChanceCluster, s_lastHostDecisionReason });
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.HostGateState, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         private static void ApplyRuntimeHostOverrides()

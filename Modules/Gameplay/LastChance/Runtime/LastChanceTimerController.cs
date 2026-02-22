@@ -115,6 +115,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static bool s_hasNetworkUiState;
         private static int s_networkUiRequiredOnTruck;
         private static readonly Dictionary<int, NetworkUiPlayerState> s_networkUiStatesByActor = new();
+        private static readonly Dictionary<int, float> s_nextDirectionPenaltyAllowedAtByActor = new();
         private static float s_lastUiStateBroadcastAt;
         private static int s_lastUiStateHash;
         private static bool s_suppressedForRoom;
@@ -125,6 +126,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static bool s_hasCachedDynamicTimerInputs;
         private static string? s_lastTruckStateDebugMessage;
         private const float UiStateBroadcastIntervalSeconds = 0.2f;
+        private const float DirectionPenaltyRequestCooldownSeconds = 0.2f;
         private static bool s_activationProfilePending;
         private static float s_activationProfileStartedAt;
         private static DynamicTimerProfileSnapshot s_lastDynamicTimerProfile;
@@ -436,6 +438,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             UpdateIndicators(maxPlayers, allDead);
             UpdatePlayersStatusUi(maxPlayers);
 
+            if (SemiFunc.IsMultiplayer() && !SemiFunc.IsMasterClient())
+            {
+                return;
+            }
+
             if (CheckSurrenderFailure(maxPlayers))
             {
                 return;
@@ -519,6 +526,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_hasNetworkUiState = false;
             s_networkUiRequiredOnTruck = 0;
             s_networkUiStatesByActor.Clear();
+            s_nextDirectionPenaltyAllowedAtByActor.Clear();
             s_lastUiStateBroadcastAt = 0f;
             s_lastUiStateHash = 0;
             if (profileEnabled)
@@ -644,6 +652,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_hasNetworkUiState = false;
             s_networkUiRequiredOnTruck = 0;
             s_networkUiStatesByActor.Clear();
+            s_nextDirectionPenaltyAllowedAtByActor.Clear();
             s_lastUiStateBroadcastAt = 0f;
             s_lastUiStateHash = 0;
             StopTimerSecondAudio();
@@ -686,6 +695,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_hasNetworkUiState = false;
             s_networkUiRequiredOnTruck = 0;
             s_networkUiStatesByActor.Clear();
+            s_nextDirectionPenaltyAllowedAtByActor.Clear();
             s_lastUiStateBroadcastAt = 0f;
             s_lastUiStateHash = 0;
             StopTimerSecondAudio();
@@ -1629,8 +1639,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            // Sender is currently informational; host computes authoritative penalty and syncs timer.
-            _ = senderActorNumber;
+            if (senderActorNumber <= 0)
+            {
+                return;
+            }
+
+            var now = Time.unscaledTime;
+            if (s_nextDirectionPenaltyAllowedAtByActor.TryGetValue(senderActorNumber, out var nextAllowedAt) &&
+                now < nextAllowedAt)
+            {
+                return;
+            }
+
+            s_nextDirectionPenaltyAllowedAtByActor[senderActorNumber] = now + DirectionPenaltyRequestCooldownSeconds;
             var maxPlayers = GetRunPlayerCount();
             if (maxPlayers <= 0)
             {

@@ -65,8 +65,8 @@ namespace DHHFLastChanceMode.Modules.Config
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceMissingPlayers, Min = 0f, Max = 32f)]
         public static int LastChanceMissingPlayers = 0;
 
-        [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceTimerBonusPerMonsterDeathSeconds, Min = 0f, Max = 10f)]
-        public static int LastChanceTimerBonusPerMonsterDeathSeconds = 5;
+        [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceTimerBonusPerMonsterDeathSeconds, Min = 0f, Max = 60f)]
+        public static int LastChanceTimerBonusPerMonsterDeathSeconds = 15;
 
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceMonstersSearchEnabled)]
         public static bool LastChanceMonstersSearchEnabled = true;

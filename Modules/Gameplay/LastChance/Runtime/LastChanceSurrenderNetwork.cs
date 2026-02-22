@@ -11,10 +11,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
     internal sealed class LastChanceSurrenderNetwork : MonoBehaviourPunCallbacks, IOnEventCallback
     {
         private static LastChanceSurrenderNetwork? s_instance;
+        private static int s_messageSeq;
         private static float s_lastTruckHintSentAt;
         private static int s_lastTruckHintRoomHash;
         private static int s_lastTruckHintLevelStamp = -1;
         private const float TruckHintBroadcastIntervalSeconds = 0.5f;
+        private const string LastChanceSurrenderMessageType = "LastChanceSurrender";
+        private const string LastChanceTimerStateMessageType = "LastChanceTimerState";
+        private const string LastChanceDirectionPenaltyRequestMessageType = "LastChanceDirectionPenaltyRequest";
+        private const string LastChanceUiStateMessageType = "LastChanceUiState";
+        private const string LastChancePlayerTruckHintMessageType = "LastChancePlayerTruckHint";
 
         internal static void EnsureCreated()
         {
@@ -42,7 +48,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 Receivers = ReceiverGroup.All
             };
 
-            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceSurrender, actorNumber, options, SendOptions.SendReliable);
+            var envelope = CreateEnvelope(LastChanceSurrenderMessageType, actorNumber);
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceSurrender, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         internal static void NotifyTimerState(bool active, float secondsRemaining)
@@ -58,11 +65,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 Receivers = ReceiverGroup.All
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.LastChanceTimerState,
-                new object[] { active, secondsRemaining },
-                options,
-                SendOptions.SendReliable);
+            var envelope = CreateEnvelope(LastChanceTimerStateMessageType, new object[] { active, secondsRemaining });
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceTimerState, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         internal static void NotifyDirectionPenaltyRequest()
@@ -78,11 +82,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 Receivers = ReceiverGroup.MasterClient
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.LastChanceDirectionPenaltyRequest,
-                null,
-                options,
-                SendOptions.SendReliable);
+            var envelope = CreateEnvelope(LastChanceDirectionPenaltyRequestMessageType, null);
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceDirectionPenaltyRequest, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         internal static void NotifyUiState(int requiredOnTruck, object[] playerStatesPayload)
@@ -98,11 +99,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 Receivers = ReceiverGroup.All
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.LastChanceUiState,
-                new object[] { requiredOnTruck, playerStatesPayload },
-                options,
-                SendOptions.SendReliable);
+            var envelope = CreateEnvelope(LastChanceUiStateMessageType, new object[] { requiredOnTruck, playerStatesPayload });
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceUiState, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         internal static void TryBroadcastLocalPlayerTruckHint()
@@ -130,11 +128,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 Receivers = ReceiverGroup.MasterClient
             };
 
-            PhotonNetwork.RaiseEvent(
-                PhotonEventCodes.LastChancePlayerTruckHint,
-                new object[] { PhotonNetwork.LocalPlayer.ActorNumber, roomHash, heightDelta, levelStamp },
-                options,
-                SendOptions.SendUnreliable);
+            var envelope = CreateEnvelope(
+                LastChancePlayerTruckHintMessageType,
+                new object[] { PhotonNetwork.LocalPlayer.ActorNumber, roomHash, heightDelta, levelStamp });
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChancePlayerTruckHint, envelope.ToEventPayload(), options, SendOptions.SendUnreliable);
 
             s_lastTruckHintSentAt = Time.unscaledTime;
             s_lastTruckHintRoomHash = roomHash;
@@ -177,7 +174,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             if (photonEvent.Code == PhotonEventCodes.LastChanceTimerState)
             {
-                if (photonEvent.CustomData is object[] timerPayload &&
+                var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+                if (masterActor > 0 &&
+                    photonEvent.Sender == masterActor &&
+                    NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelope) &&
+                    envelope.IsExpectedSource() &&
+                    string.Equals(envelope.MessageType, LastChanceTimerStateMessageType, System.StringComparison.Ordinal) &&
+                    envelope.Payload is object[] timerPayload &&
                     timerPayload.Length >= 2 &&
                     timerPayload[0] is bool active &&
                     timerPayload[1] is float remaining)
@@ -189,13 +192,31 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (photonEvent.Code == PhotonEventCodes.LastChanceDirectionPenaltyRequest)
             {
+                var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+                if (masterActor <= 0 ||
+                    !PhotonNetwork.IsMasterClient ||
+                    photonEvent.Sender <= 0 ||
+                    photonEvent.Sender == masterActor ||
+                    !NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelope) ||
+                    !envelope.IsExpectedSource() ||
+                    !string.Equals(envelope.MessageType, LastChanceDirectionPenaltyRequestMessageType, System.StringComparison.Ordinal))
+                {
+                    return;
+                }
+
                 LastChanceTimerController.HandleDirectionPenaltyRequest(photonEvent.Sender);
                 return;
             }
 
             if (photonEvent.Code == PhotonEventCodes.LastChanceUiState)
             {
-                if (photonEvent.CustomData is object[] uiPayload &&
+                var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+                if (masterActor > 0 &&
+                    photonEvent.Sender == masterActor &&
+                    NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelope) &&
+                    envelope.IsExpectedSource() &&
+                    string.Equals(envelope.MessageType, LastChanceUiStateMessageType, System.StringComparison.Ordinal) &&
+                    envelope.Payload is object[] uiPayload &&
                     uiPayload.Length >= 2 &&
                     uiPayload[0] is int required &&
                     uiPayload[1] is object[] states)
@@ -207,9 +228,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (photonEvent.Code == PhotonEventCodes.LastChancePlayerTruckHint)
             {
-                if (photonEvent.CustomData is object[] hintPayload &&
+                var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+                if (masterActor > 0 &&
+                    PhotonNetwork.IsMasterClient &&
+                    photonEvent.Sender > 0 &&
+                    NetworkEnvelope.TryParse(photonEvent.CustomData, out var envelope) &&
+                    envelope.IsExpectedSource() &&
+                    string.Equals(envelope.MessageType, LastChancePlayerTruckHintMessageType, System.StringComparison.Ordinal) &&
+                    envelope.Payload is object[] hintPayload &&
                     hintPayload.Length >= 4 &&
                     hintPayload[0] is int hintActorNumber &&
+                    hintActorNumber == photonEvent.Sender &&
                     hintPayload[1] is int roomHash &&
                     hintPayload[2] is float heightDelta &&
                     hintPayload[3] is int levelStamp)
@@ -224,7 +253,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            if (photonEvent.CustomData is int actorNumber)
+            var surrenderMasterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+            if (surrenderMasterActor <= 0 ||
+                photonEvent.Sender != surrenderMasterActor ||
+                !NetworkEnvelope.TryParse(photonEvent.CustomData, out var surrenderEnvelope) ||
+                !surrenderEnvelope.IsExpectedSource() ||
+                !string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderMessageType, System.StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (surrenderEnvelope.Payload is int actorNumber)
             {
                 if (actorNumber > 0)
                 {
@@ -233,7 +272,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            if (photonEvent.CustomData is object[] payload &&
+            if (surrenderEnvelope.Payload is object[] payload &&
                 payload.Length > 0 &&
                 payload[0] is int payloadActor)
             {
@@ -242,6 +281,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     LastChanceTimerController.RegisterRemoteSurrender(payloadActor);
                 }
             }
+        }
+
+        private static NetworkEnvelope CreateEnvelope(string messageType, object? payload)
+        {
+            var nextSeq = unchecked(++s_messageSeq);
+            return new NetworkEnvelope(
+                NetworkProtocol.ModId,
+                NetworkProtocol.ProtocolVersion,
+                messageType,
+                nextSeq,
+                payload);
         }
     }
 }
