@@ -90,6 +90,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static FieldInfo? s_deathHeadRoomVolumeCheckField;
         private static readonly FieldInfo? RoundDirectorAllExtractionField =
             AccessTools.Field(typeof(RoundDirector), "allExtractionPointsCompleted");
+        private static readonly FieldInfo? RoundDirectorExtractionPointActiveField =
+            AccessTools.Field(typeof(RoundDirector), "extractionPointActive");
+        private static readonly FieldInfo? RoundDirectorExtractionPointCurrentField =
+            AccessTools.Field(typeof(RoundDirector), "extractionPointCurrent");
+        private static readonly FieldInfo? EnemyDirectorExtractionsDoneStateField =
+            AccessTools.Field(typeof(EnemyDirector), "extractionsDoneState");
         private static float SurrenderHoldDuration => Mathf.Clamp(FeatureFlags.LastChanceSurrenderSeconds, 2f, 10f);
         private static readonly HashSet<int> LastChanceSurrenderedPlayers = new();
         private static float s_surrenderHoldTimer;
@@ -600,6 +606,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             LastChanceTimerUI.Hide();
             SetLastChanceActive(false);
+            ResetLastChanceRuntimeModules(allowVanillaAllPlayersDead: false, allowAutoDelete: false);
             s_timerSyncedFromHost = false;
             StopTimerSecondAudio();
             BroadcastTimerStateIfHost(force: true);
@@ -619,13 +626,79 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             var bonus = Mathf.Max(0, FeatureFlags.LastChanceConsolationMoney);
             var newCurrency = s_baseCurrency + bonus;
             SemiFunc.StatSetRunCurrency(newCurrency);
+            NormalizeDirectorsBeforeShopReturn();
 
             if (RunManagerPreviousRunLevelField != null)
             {
                 RunManagerPreviousRunLevelField.SetValue(runMgr, runMgr.levelCurrent);
             }
 
+            TryLogShopReturnSnapshot(runMgr, newCurrency, "before-change-level");
             runMgr.ChangeLevel(false, false, RunManager.ChangeLevelType.Shop);
+        }
+
+        private static void NormalizeDirectorsBeforeShopReturn()
+        {
+            try
+            {
+                if (RoundDirector.instance != null)
+                {
+                    RoundDirectorAllExtractionField?.SetValue(RoundDirector.instance, false);
+                    RoundDirectorExtractionPointActiveField?.SetValue(RoundDirector.instance, false);
+                    RoundDirectorExtractionPointCurrentField?.SetValue(RoundDirector.instance, null);
+                }
+
+                if (EnemyDirector.instance != null && EnemyDirectorExtractionsDoneStateField != null)
+                {
+                    var stateType = EnemyDirectorExtractionsDoneStateField.FieldType;
+                    var startRoom = System.Enum.ToObject(stateType, 0);
+                    EnemyDirectorExtractionsDoneStateField.SetValue(EnemyDirector.instance, startRoom);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogReflectionHotPathException("NormalizeDirectorsBeforeShopReturn", ex);
+            }
+        }
+
+        private static void TryLogShopReturnSnapshot(RunManager runMgr, int targetCurrency, string phase)
+        {
+            if (!FeatureFlags.DebugLogging || !LogLimiter.ShouldLog("LastChance.ShopReturn", 15))
+            {
+                return;
+            }
+
+            try
+            {
+                var levelCurrent = runMgr.levelCurrent != null ? runMgr.levelCurrent.name : "<null>";
+                var previousRunLevelName = "<n/a>";
+                if (RunManagerPreviousRunLevelField != null)
+                {
+                    if (RunManagerPreviousRunLevelField.GetValue(runMgr) is Level previousRunLevel && previousRunLevel != null)
+                    {
+                        previousRunLevelName = previousRunLevel.name;
+                    }
+                    else
+                    {
+                        previousRunLevelName = "<null>";
+                    }
+                }
+
+                var extractionDone = RoundDirector.instance != null &&
+                                     RoundDirectorAllExtractionField != null &&
+                                     RoundDirectorAllExtractionField.GetValue(RoundDirector.instance) is bool b &&
+                                     b;
+
+                Debug.Log(
+                    $"[LastChance] ShopReturn snapshot phase={phase} " +
+                    $"levelCurrent={levelCurrent} previousRunLevel={previousRunLevelName} " +
+                    $"runCurrency={SemiFunc.StatGetRunCurrency()} targetCurrency={targetCurrency} " +
+                    $"allExtractionPointsCompleted={extractionDone}.");
+            }
+            catch (Exception ex)
+            {
+                LogReflectionHotPathException("TryLogShopReturnSnapshot", ex);
+            }
         }
 
         private static void CaptureBaseCurrency()
