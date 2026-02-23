@@ -120,7 +120,7 @@ namespace DHHFLastChanceMode.Modules.Config
         public static float LastChanceIndicatorDirectionCooldownSeconds = 15f;
 
         [FeatureConfigEntry(Sections.LastChanceGameplay, Descriptions.LastChanceIndicatorDirectionPenaltyMaxSeconds, Min = 0f, Max = 30f)]
-        public static float LastChanceIndicatorDirectionPenaltyMaxSeconds = 5f;
+        public static float LastChanceIndicatorDirectionPenaltyMaxSeconds = 8f;
 
         [FeatureConfigEntry(Sections.LastChanceGameplay, Descriptions.LastChanceIndicatorDirectionPenaltyMinSeconds, Min = 0f, Max = 60f)]
         public static float LastChanceIndicatorDirectionPenaltyMinSeconds = 4f;

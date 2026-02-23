@@ -152,6 +152,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static ActivationStartPhaseProfileSnapshot s_lastActivationStartPhaseProfile;
         private static bool s_hasActivationStartPhaseProfile;
         private static bool s_assetsPrewarmedForSession;
+        private static float s_cachedDirectionPenaltySeconds;
+        private static bool s_hasCachedDirectionPenaltySeconds;
         private const float AssetAudioRetryIntervalSeconds = 2f;
 
         private readonly struct NetworkUiPlayerState
@@ -329,7 +331,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return 0f;
             }
 
-            return CalculateIndicatorPenaltySeconds();
+            return GetOrComputeDirectionPenaltySeconds();
         }
 
         internal static bool IsDirectionIndicatorEnergySufficientPreview()
@@ -548,6 +550,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_nextDirectionPenaltyAllowedAtByActor.Clear();
             s_lastUiStateBroadcastAt = 0f;
             s_lastUiStateHash = 0;
+            CacheDirectionPenaltySeconds();
             if (profileEnabled)
             {
                 afterClearState = Time.realtimeSinceStartup;
@@ -1680,7 +1683,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             var directionEnabled = mode == LastChanceIndicatorMode.Direction;
-            UpdateSingleIndicator(IndicatorKind.Direction, directionEnabled, InputKey.Inventory2, maxPlayers);
+            UpdateSingleIndicator(IndicatorKind.Direction, directionEnabled);
             AbilityModule.RefreshDirectionSlotVisuals();
         }
 
@@ -1700,7 +1703,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             return LastChanceIndicatorMode.None;
         }
 
-        private static void UpdateSingleIndicator(IndicatorKind kind, bool enabled, InputKey inputKey, int maxPlayers)
+        private static void UpdateSingleIndicator(IndicatorKind kind, bool enabled)
         {
             if (!enabled)
             {
@@ -1733,13 +1736,44 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            var holdSeconds = DirectionIndicatorHoldSeconds;
-            if (!SemiFunc.InputHold(inputKey))
+            // Input handling is driven by equipped ability callbacks (OnAbilityDown/Hold/Up/Cancel).
+        }
+
+        private static void ResetIndicatorHold()
+        {
+            s_directionHoldTimer = 0f;
+            AbilityModule.SetDirectionSlotActivationProgress(0f);
+        }
+
+        internal static void OnDirectionAbilityInputDown()
+        {
+            if (!IsDirectionIndicatorUiVisible)
+            {
+                ResetIndicatorHold();
+            }
+        }
+
+        internal static void OnDirectionAbilityInputHold()
+        {
+            if (!IsDirectionIndicatorUiVisible)
             {
                 ResetIndicatorHold();
                 return;
             }
 
+            if (IsIndicatorActive(IndicatorKind.Direction) || Time.time < GetIndicatorCooldownUntil(IndicatorKind.Direction))
+            {
+                ResetIndicatorHold();
+                return;
+            }
+
+            if (!IsDirectionIndicatorEnergySufficientPreview())
+            {
+                ResetIndicatorHold();
+                return;
+            }
+
+            var holdSeconds = DirectionIndicatorHoldSeconds;
             s_directionHoldTimer = Mathf.Min(holdSeconds, s_directionHoldTimer + Time.deltaTime);
             AbilityModule.SetDirectionSlotActivationProgress(Mathf.Clamp01(s_directionHoldTimer / holdSeconds));
             if (s_directionHoldTimer < holdSeconds)
@@ -1748,13 +1782,23 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             ResetIndicatorHold();
-            TriggerIndicator(kind, maxPlayers);
+            var maxPlayers = GetRunPlayerCount();
+            if (maxPlayers <= 0)
+            {
+                return;
+            }
+
+            TriggerIndicator(IndicatorKind.Direction, maxPlayers);
         }
 
-        private static void ResetIndicatorHold()
+        internal static void OnDirectionAbilityInputUp()
         {
-            s_directionHoldTimer = 0f;
-            AbilityModule.SetDirectionSlotActivationProgress(0f);
+            ResetIndicatorHold();
+        }
+
+        internal static void OnDirectionAbilityInputCancel()
+        {
+            ResetIndicatorHold();
         }
 
         private static void TriggerIndicator(IndicatorKind kind, int maxPlayers)
@@ -1855,7 +1899,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void ApplyIndicatorPenaltyHost(int maxPlayers)
         {
-            var penalty = CalculateIndicatorPenaltySeconds();
+            var penalty = GetOrComputeDirectionPenaltySeconds();
             if (penalty <= 0f)
             {
                 return;
@@ -1942,13 +1986,36 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             // Static timer mode: always use maximum penalty.
             if (!FeatureFlags.LastChanceDynamicTimerEnabled)
             {
-                return maxPenalty;
+                return Mathf.Round(maxPenalty);
             }
 
             var level = GetCurrentLevelNumber();
             var maxAtLevel = Mathf.Max(2, FeatureFlags.LastChanceDynamicMaxMinutesAtLevel);
             var normalized = Mathf.Clamp01((Mathf.Max(1, level) - 1f) / (maxAtLevel - 1f));
-            return Mathf.Lerp(maxPenalty, minPenalty, normalized);
+            return Mathf.Round(Mathf.Lerp(maxPenalty, minPenalty, normalized));
+        }
+
+        private static float GetOrComputeDirectionPenaltySeconds()
+        {
+            if (s_hasCachedDirectionPenaltySeconds)
+            {
+                return s_cachedDirectionPenaltySeconds;
+            }
+
+            CacheDirectionPenaltySeconds();
+            return s_cachedDirectionPenaltySeconds;
+        }
+
+        private static void CacheDirectionPenaltySeconds()
+        {
+            s_cachedDirectionPenaltySeconds = CalculateIndicatorPenaltySeconds();
+            s_hasCachedDirectionPenaltySeconds = true;
+        }
+
+        private static void ClearDirectionPenaltyCache()
+        {
+            s_cachedDirectionPenaltySeconds = 0f;
+            s_hasCachedDirectionPenaltySeconds = false;
         }
 
         private static void TickActiveIndicator(IndicatorKind kind)
@@ -2992,6 +3059,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             LastChanceRuntimeOrchestrator.ExitRuntime("lastchance-deactivated");
+            ClearDirectionPenaltyCache();
             ClearLastChanceHostRuntimeOverrides();
             LastChanceMonstersNoiseAggroModule.ResetRuntimeState();
             LastChanceMonstersSearchModule.ResetRuntimeState();
