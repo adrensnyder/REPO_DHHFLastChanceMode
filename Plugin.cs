@@ -141,6 +141,7 @@ namespace DHHFLastChanceMode
                 return;
             }
 
+            CompatibilityGate.NotifyRuntimeSceneLoaded();
             ConfigSyncManager.EnsureCreated();
             ConfigSyncManager.RequestHostSnapshotBroadcast();
             ReconcileConditionalMonsterPatches();

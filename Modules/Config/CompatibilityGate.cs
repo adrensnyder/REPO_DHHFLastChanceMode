@@ -33,6 +33,9 @@ namespace DHHFLastChanceMode.Modules.Config
         private readonly Dictionary<int, string> _playersWithFixVersion = new();
         private readonly Dictionary<int, float> _pendingPresenceSince = new();
         private readonly Dictionary<int, float> _pendingPresenceNextRetryAt = new();
+        private bool _postStartRetryArmed;
+        private bool _postStartRetryConsumed;
+        private bool _deferMissingPresenceUntilPostStartRetry;
         private const float PresenceRetrySeconds = 0.15f;
 
         internal static event Action? HostApprovalChanged;
@@ -54,6 +57,11 @@ namespace DHHFLastChanceMode.Modules.Config
         internal static void ForceResolvePendingPresenceForStart()
         {
             s_instance?.ResolvePendingPresenceForStart();
+        }
+
+        internal static void NotifyRuntimeSceneLoaded()
+        {
+            s_instance?.HandleRuntimeSceneLoaded();
         }
 
         internal static bool IsFeatureUsable(ModFeatureGate feature)
@@ -109,6 +117,9 @@ namespace DHHFLastChanceMode.Modules.Config
             _playersWithFixVersion.Clear();
             _pendingPresenceSince.Clear();
             _pendingPresenceNextRetryAt.Clear();
+            _postStartRetryArmed = false;
+            _postStartRetryConsumed = false;
+            _deferMissingPresenceUntilPostStartRetry = false;
             RegisterLocalPlayerFixVersion();
             s_receivedHostDecision = PhotonNetwork.IsMasterClient;
             s_hostApprovedLastChanceCluster = PhotonNetwork.IsMasterClient;
@@ -131,6 +142,9 @@ namespace DHHFLastChanceMode.Modules.Config
             _playersWithFixVersion.Clear();
             _pendingPresenceSince.Clear();
             _pendingPresenceNextRetryAt.Clear();
+            _postStartRetryArmed = false;
+            _postStartRetryConsumed = false;
+            _deferMissingPresenceUntilPostStartRetry = false;
             s_receivedHostDecision = false;
             s_hostApprovedLastChanceCluster = true;
             s_lastHostDecisionReason = string.Empty;
@@ -183,6 +197,9 @@ namespace DHHFLastChanceMode.Modules.Config
             _playersWithFixVersion.Clear();
             _pendingPresenceSince.Clear();
             _pendingPresenceNextRetryAt.Clear();
+            _postStartRetryArmed = false;
+            _postStartRetryConsumed = false;
+            _deferMissingPresenceUntilPostStartRetry = false;
             RegisterLocalPlayerFixVersion();
             s_receivedHostDecision = PhotonNetwork.IsMasterClient;
             s_hostApprovedLastChanceCluster = PhotonNetwork.IsMasterClient;
@@ -390,8 +407,11 @@ namespace DHHFLastChanceMode.Modules.Config
 
                 if (!_pendingPresenceNextRetryAt.TryGetValue(actor, out var nextRetryAt) || now >= nextRetryAt)
                 {
-                    RequestPresenceFromActor(actor, "UpdateRetry");
-                    _pendingPresenceNextRetryAt[actor] = now + PresenceRetrySeconds;
+                    if (!float.IsPositiveInfinity(nextRetryAt))
+                    {
+                        RequestPresenceFromActor(actor, "UpdateRetry");
+                        _pendingPresenceNextRetryAt[actor] = now + PresenceRetrySeconds;
+                    }
                 }
 
                 if (!_pendingPresenceSince.TryGetValue(actor, out var pendingSince))
@@ -405,6 +425,10 @@ namespace DHHFLastChanceMode.Modules.Config
                     _pendingPresenceSince.Remove(actor);
                     _pendingPresenceNextRetryAt.Remove(actor);
                     needsRecheck = true;
+                    if (_deferMissingPresenceUntilPostStartRetry && _postStartRetryConsumed)
+                    {
+                        _deferMissingPresenceUntilPostStartRetry = false;
+                    }
                     Debug.Log($"{TracePrefix} Pending presence timeout reached actor={actor} elapsed={elapsed:0.000}s. Marking as missing and stopping retries.");
                 }
             }
@@ -478,6 +502,26 @@ namespace DHHFLastChanceMode.Modules.Config
             }
 
             var reason = BuildIncompatibilityReason(localVersion, missingPlayers, mismatchPlayers, pendingPlayers);
+            var hasMissingOrPending = missingPlayers.Count > 0 || pendingPlayers.Count > 0;
+            var hasVersionMismatch = mismatchPlayers.Count > 0;
+            if (_deferMissingPresenceUntilPostStartRetry)
+            {
+                if (_postStartRetryConsumed && missingPlayers.Count > 0)
+                {
+                    _deferMissingPresenceUntilPostStartRetry = false;
+                }
+                else if (!hasMissingOrPending)
+                {
+                    _deferMissingPresenceUntilPostStartRetry = false;
+                }
+
+                if (_deferMissingPresenceUntilPostStartRetry)
+                {
+                    allPlayersCompatible = !hasVersionMismatch;
+                    reason = BuildDeferredReason(reason, _postStartRetryConsumed);
+                }
+            }
+
             var changed = s_hostApprovedLastChanceCluster != allPlayersCompatible ||
                           !s_receivedHostDecision ||
                           !string.Equals(s_lastHostDecisionReason, reason, StringComparison.Ordinal);
@@ -500,25 +544,38 @@ namespace DHHFLastChanceMode.Modules.Config
                 return;
             }
 
-            var now = Time.realtimeSinceStartup;
-            var actors = new List<int>(_pendingPresenceSince.Keys);
-            for (var i = 0; i < actors.Count; i++)
+            _postStartRetryArmed = true;
+            _postStartRetryConsumed = false;
+            _deferMissingPresenceUntilPostStartRetry = true;
+            Debug.Log($"{TracePrefix} Start pressed with unresolved presence. Arming one-shot post-start retry.");
+            EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
+        }
+
+        private void HandleRuntimeSceneLoaded()
+        {
+            if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom || !_postStartRetryArmed)
             {
-                var actor = actors[i];
-                if (_playersWithFixVersion.ContainsKey(actor))
+                return;
+            }
+
+            _postStartRetryArmed = false;
+            _postStartRetryConsumed = true;
+            var now = Time.realtimeSinceStartup;
+            var actors = PhotonNetwork.PlayerList;
+            for (var i = 0; i < actors.Length; i++)
+            {
+                var actor = actors[i]?.ActorNumber ?? 0;
+                if (actor <= 0 || _playersWithFixVersion.ContainsKey(actor))
                 {
-                    _pendingPresenceSince.Remove(actor);
-                    _pendingPresenceNextRetryAt.Remove(actor);
                     continue;
                 }
 
-                var elapsed = _pendingPresenceSince.TryGetValue(actor, out var since) ? now - since : 0f;
-                _pendingPresenceSince.Remove(actor);
-                _pendingPresenceNextRetryAt.Remove(actor);
-                Debug.Log($"{TracePrefix} Start pressed with unresolved presence actor={actor} elapsed={elapsed:0.000}s. Marking as missing immediately.");
+                _pendingPresenceSince[actor] = now;
+                _pendingPresenceNextRetryAt[actor] = float.PositiveInfinity;
+                RequestPresenceFromActor(actor, "PostStartRuntimeRetry");
             }
 
-            Debug.Log($"{TracePrefix} Start forced compatibility recheck after pending presence flush.");
+            Debug.Log($"{TracePrefix} Runtime scene loaded. One-shot post-start presence retry executed.");
             EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
         }
 
@@ -660,6 +717,17 @@ namespace DHHFLastChanceMode.Modules.Config
             }
 
             return reasonParts.Count == 0 ? string.Empty : string.Join(" | ", reasonParts);
+        }
+
+        private static string BuildDeferredReason(string reason, bool consumed)
+        {
+            var phase = consumed ? "post-start retry pending confirmation" : "post-start retry armed";
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return phase;
+            }
+
+            return $"{phase} | {reason}";
         }
 
         private static string FormatPlayerTag(Player player)
