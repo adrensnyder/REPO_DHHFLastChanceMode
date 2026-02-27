@@ -3,12 +3,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using DHHFLastChanceMode.Modules.Config;
-using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace DHHFLastChanceMode.Modules.Utilities
 {
@@ -59,52 +58,12 @@ namespace DHHFLastChanceMode.Modules.Utilities
             internal Vector3 LastKnownWorldPosition;
         }
 
-        private static readonly Type? s_levelGeneratorType = AccessTools.TypeByName("LevelGenerator");
-        private static readonly FieldInfo? s_levelGeneratorInstanceField = s_levelGeneratorType == null ? null : AccessTools.Field(s_levelGeneratorType, "Instance");
-        private static readonly FieldInfo? s_levelPathTruckField = s_levelGeneratorType == null ? null : AccessTools.Field(s_levelGeneratorType, "LevelPathTruck");
-        private static readonly FieldInfo? s_levelPathPointsField = s_levelGeneratorType == null ? null : AccessTools.Field(s_levelGeneratorType, "LevelPathPoints");
-        private static readonly Type? s_levelPointType = AccessTools.TypeByName("LevelPoint");
-        private static readonly FieldInfo? s_levelPointTruckField = s_levelPointType == null ? null : AccessTools.Field(s_levelPointType, "Truck");
-        private static readonly FieldInfo? s_levelPointRoomField = s_levelPointType == null ? null : AccessTools.Field(s_levelPointType, "Room");
-        private static readonly FieldInfo? s_levelPointConnectedPointsField = s_levelPointType == null ? null : AccessTools.Field(s_levelPointType, "ConnectedPoints");
-        private static readonly Type? s_roomVolumeType = AccessTools.TypeByName("RoomVolume");
-        private static readonly FieldInfo? s_roomVolumeTruckField = s_roomVolumeType == null ? null : AccessTools.Field(s_roomVolumeType, "Truck");
-        private static readonly FieldInfo? s_playerLastNavmeshField = AccessTools.Field(typeof(PlayerAvatar), "LastNavmeshPosition");
-        private static readonly FieldInfo? s_playerRoomVolumeCheckField = AccessTools.Field(typeof(PlayerAvatar), "RoomVolumeCheck");
-        private static readonly Type? s_playerDeathHeadType = AccessTools.TypeByName("PlayerDeathHead");
-        private static readonly FieldInfo? s_playerDeathHeadRoomVolumeCheckField = s_playerDeathHeadType == null ? null : AccessTools.Field(s_playerDeathHeadType, "roomVolumeCheck");
-        private static readonly FieldInfo? s_playerDeathHeadPhysGrabObjectField = s_playerDeathHeadType == null ? null : AccessTools.Field(s_playerDeathHeadType, "physGrabObject");
-        private static readonly Type? s_physGrabObjectType = AccessTools.TypeByName("PhysGrabObject");
-        private static readonly FieldInfo? s_physGrabObjectCenterPointField = s_physGrabObjectType == null ? null : AccessTools.Field(s_physGrabObjectType, "centerPoint");
-        private static readonly Type? s_roomVolumeCheckType = AccessTools.TypeByName("RoomVolumeCheck");
-        private static readonly FieldInfo? s_roomVolumeCheckCurrentRoomsField = s_roomVolumeCheckType == null ? null : AccessTools.Field(s_roomVolumeCheckType, "CurrentRooms");
-        private static readonly Type? s_navMeshType = AccessTools.TypeByName("UnityEngine.AI.NavMesh");
-        private static readonly Type? s_navMeshHitType = AccessTools.TypeByName("UnityEngine.AI.NavMeshHit");
-        private static readonly Type? s_navMeshPathType = AccessTools.TypeByName("UnityEngine.AI.NavMeshPath");
-        private static readonly MethodInfo? s_navMeshSamplePositionMethod = s_navMeshType?.GetMethod(
-            "SamplePosition",
-            BindingFlags.Static | BindingFlags.Public,
-            null,
-            s_navMeshHitType == null
-                ? null
-                : new[] { typeof(Vector3), s_navMeshHitType.MakeByRefType(), typeof(float), typeof(int) },
-            null);
-        private static readonly PropertyInfo? s_navMeshHitPositionProperty = s_navMeshHitType?.GetProperty("position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        private static readonly FieldInfo? s_navMeshHitPositionField = s_navMeshHitType?.GetField("position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        private static readonly MethodInfo? s_navMeshCalculatePathMethod = s_navMeshType?.GetMethod(
-            "CalculatePath",
-            BindingFlags.Static | BindingFlags.Public,
-            null,
-            new[] { typeof(Vector3), typeof(Vector3), typeof(int), s_navMeshPathType },
-            null);
-        private static readonly PropertyInfo? s_navMeshPathCornersProperty = s_navMeshPathType?.GetProperty("corners");
-
-        private static object? s_cachedGraphLevelGenerator;
+        private static LevelGenerator? s_cachedGraphLevelGenerator;
         private static int s_cachedGraphPointCount;
-        private static Dictionary<object, HashSet<object>>? s_cachedRoomGraph;
+        private static Dictionary<RoomVolume, HashSet<RoomVolume>>? s_cachedRoomGraph;
         private static readonly Dictionary<int, CachedPlayerDistance> s_playerCache = new();
         private static readonly Dictionary<int, RemotePlayerHint> s_remoteHints = new();
-        private static object? s_cachedLevelGeneratorForPlayers;
+        private static LevelGenerator? s_cachedLevelGeneratorForPlayers;
         private static Vector3 s_cachedTruckPosition;
         private static bool s_hasCachedTruckPosition;
         private static int s_cachedLevelPointsCount;
@@ -166,12 +125,12 @@ namespace DHHFLastChanceMode.Modules.Utilities
             var remoteHintUsedCount = 0;
             var processedPlayers = 0;
 
-            if (fields == DistanceQueryFields.None || s_levelGeneratorInstanceField == null)
+            if (fields == DistanceQueryFields.None)
             {
                 return Array.Empty<PlayerTruckDistance>();
             }
 
-            var levelGenerator = s_levelGeneratorInstanceField.GetValue(null);
+            var levelGenerator = LevelGenerator.Instance;
             if (levelGenerator == null)
             {
                 return Array.Empty<PlayerTruckDistance>();
@@ -269,7 +228,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                     actorNumber != PhotonNetwork.LocalPlayer.ActorNumber &&
                     remoteHint.LevelStamp == levelStamp;
 
-                List<object>? playerRooms = null;
+            List<RoomVolume>? playerRooms = null;
                 var roomHash = cached.RoomHash;
                 if (shouldUseRemoteHint)
                 {
@@ -316,7 +275,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 if (needsRoomPath && (forceRefresh || levelChanged || roomChanged))
                 {
                     playerRooms ??= GetPlayerRooms(player);
-                    cached.ShortestRoomPathToTruck = ResolveShortestRoomPathToTruck(playerRooms ?? new List<object>(), truckPoint, roomGraph);
+                    cached.ShortestRoomPathToTruck = ResolveShortestRoomPathToTruck(playerRooms ?? new List<RoomVolume>(), truckPoint, roomGraph);
                     roomRefreshCount++;
                 }
 
@@ -382,12 +341,12 @@ namespace DHHFLastChanceMode.Modules.Utilities
 
             try
             {
-                if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null || s_levelGeneratorInstanceField == null)
+                if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)
                 {
                     return false;
                 }
 
-                var levelGenerator = s_levelGeneratorInstanceField.GetValue(null);
+                var levelGenerator = LevelGenerator.Instance;
                 if (levelGenerator == null)
                 {
                     return false;
@@ -480,7 +439,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return player.GetInstanceID();
         }
 
-        private static int ComputeRoomsHash(List<object> rooms)
+        private static int ComputeRoomsHash(List<RoomVolume> rooms)
         {
             unchecked
             {
@@ -494,7 +453,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
             }
         }
 
-        private static Dictionary<object, HashSet<object>> GetOrBuildRoomGraph(object levelGenerator, List<object>? allLevelPoints)
+        private static Dictionary<RoomVolume, HashSet<RoomVolume>> GetOrBuildRoomGraph(LevelGenerator levelGenerator, List<LevelPoint>? allLevelPoints)
         {
             var pointCount = allLevelPoints?.Count ?? 0;
             if (s_cachedRoomGraph != null &&
@@ -511,18 +470,15 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return graph;
         }
 
-        private static bool TryGetTruckTarget(object levelGenerator, List<object>? allLevelPoints, out Vector3 truckPosition, out object? truckPoint)
+        private static bool TryGetTruckTarget(LevelGenerator levelGenerator, List<LevelPoint>? allLevelPoints, out Vector3 truckPosition, out LevelPoint? truckPoint)
         {
             truckPosition = Vector3.zero;
             truckPoint = null;
-            if (s_levelPathTruckField != null)
+            var candidate = levelGenerator.LevelPathTruck;
+            if (TryGetLevelPointPosition(candidate, out truckPosition))
             {
-                var candidate = s_levelPathTruckField.GetValue(levelGenerator);
-                if (TryGetLevelPointPosition(candidate, out truckPosition))
-                {
-                    truckPoint = candidate;
-                    return true;
-                }
+                truckPoint = candidate;
+                return true;
             }
 
             if (allLevelPoints == null)
@@ -552,58 +508,37 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return false;
         }
 
-        private static List<object>? GetAllLevelPoints(object levelGenerator)
+        private static List<LevelPoint>? GetAllLevelPoints(LevelGenerator levelGenerator)
         {
-            if (s_levelPathPointsField == null)
-            {
-                return null;
-            }
-
-            var points = s_levelPathPointsField.GetValue(levelGenerator) as IEnumerable;
+            var points = levelGenerator.LevelPathPoints;
             if (points == null)
             {
                 return null;
             }
 
-            var list = new List<object>();
+            var list = new List<LevelPoint>();
             foreach (var point in points)
             {
-                if (point != null)
+                if (point is LevelPoint levelPoint)
                 {
-                    list.Add(point);
+                    list.Add(levelPoint);
                 }
             }
 
             return list.Count > 0 ? list : null;
         }
 
-        private static bool TryIsTruckPoint(object point)
+        private static bool TryIsTruckPoint(LevelPoint point)
         {
-            if (point == null)
-            {
-                return false;
-            }
-
-            if (s_levelPointTruckField != null &&
-                s_levelPointTruckField.GetValue(point) is bool flag &&
-                flag)
+            if (point.Truck)
             {
                 return true;
             }
 
-            if (s_levelPointRoomField != null && s_roomVolumeTruckField != null)
-            {
-                var room = s_levelPointRoomField.GetValue(point);
-                if (room != null && s_roomVolumeTruckField.GetValue(room) is bool roomTruck && roomTruck)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return point.Room != null && point.Room.Truck;
         }
 
-        private static int ResolveShortestRoomPathToTruck(List<object> playerRooms, object? truckPoint, Dictionary<object, HashSet<object>>? roomGraph)
+        private static int ResolveShortestRoomPathToTruck(List<RoomVolume> playerRooms, LevelPoint? truckPoint, Dictionary<RoomVolume, HashSet<RoomVolume>>? roomGraph)
         {
             if (truckPoint == null || roomGraph == null || roomGraph.Count == 0)
             {
@@ -621,8 +556,8 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return -1;
             }
 
-            var visited = new HashSet<object>();
-            var queue = new Queue<(object room, int distance)>();
+            var visited = new HashSet<RoomVolume>();
+            var queue = new Queue<(RoomVolume room, int distance)>();
             foreach (var room in playerRooms)
             {
                 if (room == null || !roomGraph.ContainsKey(room) || !visited.Add(room))
@@ -660,24 +595,24 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return -1;
         }
 
-        private static List<object> GetPlayerRooms(PlayerAvatar player)
+        private static List<RoomVolume> GetPlayerRooms(PlayerAvatar player)
         {
-            var results = new List<object>();
-            if (player == null || s_playerRoomVolumeCheckField == null || s_roomVolumeCheckCurrentRoomsField == null)
+            var results = new List<RoomVolume>();
+            if (player == null)
             {
                 return results;
             }
 
-            object? roomCheck = null;
+            RoomVolumeCheck? roomCheck = null;
             var deathHead = player.playerDeathHead;
-            if (deathHead != null && s_playerDeathHeadRoomVolumeCheckField != null)
+            if (deathHead != null)
             {
-                roomCheck = s_playerDeathHeadRoomVolumeCheckField.GetValue(deathHead);
+                roomCheck = deathHead.roomVolumeCheck;
             }
 
             if (roomCheck == null)
             {
-                roomCheck = s_playerRoomVolumeCheckField.GetValue(player);
+                roomCheck = player.RoomVolumeCheck;
             }
 
             if (roomCheck == null)
@@ -685,7 +620,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return results;
             }
 
-            var currentRooms = s_roomVolumeCheckCurrentRoomsField.GetValue(roomCheck) as IEnumerable;
+            var currentRooms = roomCheck.CurrentRooms;
             if (currentRooms == null)
             {
                 return results;
@@ -693,19 +628,19 @@ namespace DHHFLastChanceMode.Modules.Utilities
 
             foreach (var room in currentRooms)
             {
-                if (room != null)
+                if (room is RoomVolume roomVolume)
                 {
-                    results.Add(room);
+                    results.Add(roomVolume);
                 }
             }
 
             return results;
         }
 
-        private static Dictionary<object, HashSet<object>> BuildRoomGraph(List<object>? allLevelPoints)
+        private static Dictionary<RoomVolume, HashSet<RoomVolume>> BuildRoomGraph(List<LevelPoint>? allLevelPoints)
         {
-            var graph = new Dictionary<object, HashSet<object>>();
-            if (allLevelPoints == null || s_levelPointRoomField == null)
+            var graph = new Dictionary<RoomVolume, HashSet<RoomVolume>>();
+            if (allLevelPoints == null)
             {
                 return graph;
             }
@@ -725,7 +660,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
 
                 if (!graph.ContainsKey(room))
                 {
-                    graph[room] = new HashSet<object>();
+                    graph[room] = new HashSet<RoomVolume>();
                 }
 
                 var connected = GetConnectedPoints(point);
@@ -749,7 +684,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
 
                     if (!graph.ContainsKey(neighborRoom))
                     {
-                        graph[neighborRoom] = new HashSet<object>();
+                        graph[neighborRoom] = new HashSet<RoomVolume>();
                     }
 
                     if (!ReferenceEquals(room, neighborRoom))
@@ -763,41 +698,31 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return graph;
         }
 
-        private static object? GetLevelPointRoom(object levelPoint)
+        private static RoomVolume? GetLevelPointRoom(LevelPoint levelPoint)
         {
-            if (levelPoint == null || s_levelPointRoomField == null)
-            {
-                return null;
-            }
-
-            return s_levelPointRoomField.GetValue(levelPoint);
+            return levelPoint.Room;
         }
 
-        private static IEnumerable<object>? GetConnectedPoints(object levelPoint)
+        private static IEnumerable<LevelPoint>? GetConnectedPoints(LevelPoint levelPoint)
         {
-            if (levelPoint == null || s_levelPointConnectedPointsField == null)
+            if (levelPoint == null || levelPoint.ConnectedPoints == null)
             {
                 return null;
             }
 
-            if (s_levelPointConnectedPointsField.GetValue(levelPoint) is IEnumerable connected)
+            var list = new List<LevelPoint>();
+            foreach (var point in levelPoint.ConnectedPoints)
             {
-                var list = new List<object>();
-                foreach (var point in connected)
+                if (point is LevelPoint levelPointNeighbor)
                 {
-                    if (point != null)
-                    {
-                        list.Add(point);
-                    }
+                    list.Add(levelPointNeighbor);
                 }
-
-                return list.Count > 0 ? list : null;
             }
 
-            return null;
+            return list.Count > 0 ? list : null;
         }
 
-        private static bool TryGetLevelPointPosition(object? levelPoint, out Vector3 position)
+        private static bool TryGetLevelPointPosition(LevelPoint? levelPoint, out Vector3 position)
         {
             position = Vector3.zero;
             if (levelPoint == null)
@@ -805,20 +730,8 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return false;
             }
 
-            if (levelPoint is Component component && component != null)
-            {
-                position = component.transform.position;
-                return true;
-            }
-
-            var transformProperty = levelPoint.GetType().GetProperty("transform", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (transformProperty != null && transformProperty.GetValue(levelPoint) is Transform transform)
-            {
-                position = transform.position;
-                return true;
-            }
-
-            return false;
+            position = levelPoint.transform.position;
+            return true;
         }
 
         private static Vector3 GetPlayerWorldPosition(PlayerAvatar player)
@@ -862,15 +775,10 @@ namespace DHHFLastChanceMode.Modules.Utilities
             if (deathHead != null)
             {
                 var headCenter = deathHead.transform.position;
-                if (s_playerDeathHeadPhysGrabObjectField != null &&
-                    s_physGrabObjectCenterPointField != null)
+                var physGrabObject = deathHead.physGrabObject;
+                if (physGrabObject != null)
                 {
-                    var physGrabObject = s_playerDeathHeadPhysGrabObjectField.GetValue(deathHead);
-                    if (physGrabObject != null &&
-                        s_physGrabObjectCenterPointField.GetValue(physGrabObject) is Vector3 centerPoint)
-                    {
-                        headCenter = centerPoint;
-                    }
+                    headCenter = physGrabObject.centerPoint;
                 }
 
                 if (TrySamplePosition(headCenter, 12f, out sampledPosition) ||
@@ -886,11 +794,9 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return false;
             }
 
-            if (s_playerLastNavmeshField != null &&
-                s_playerLastNavmeshField.GetValue(player) is Vector3 position &&
-                position != Vector3.zero)
+            if (player.LastNavmeshPosition != Vector3.zero)
             {
-                navMeshPosition = position;
+                navMeshPosition = player.LastNavmeshPosition;
                 return true;
             }
 
@@ -900,78 +806,26 @@ namespace DHHFLastChanceMode.Modules.Utilities
         private static bool TrySamplePosition(Vector3 worldPosition, float maxDistance, out Vector3 navMeshPosition)
         {
             navMeshPosition = Vector3.zero;
-            if (s_navMeshType == null || s_navMeshHitType == null || s_navMeshSamplePositionMethod == null)
+            if (!NavMesh.SamplePosition(worldPosition, out var navHit, maxDistance, NavMesh.AllAreas))
             {
                 return false;
             }
 
-            var navHit = Activator.CreateInstance(s_navMeshHitType);
-            if (navHit == null)
-            {
-                return false;
-            }
-
-            var args = new object?[] { worldPosition, navHit, maxDistance, -1 };
-            if (s_navMeshSamplePositionMethod.Invoke(null, args) is not bool success || !success)
-            {
-                return false;
-            }
-
-            if (!TryGetNavMeshHitPosition(args[1], out var hitPosition))
-            {
-                return false;
-            }
-
-            navMeshPosition = hitPosition;
+            navMeshPosition = navHit.position;
             return true;
-        }
-
-        private static bool TryGetNavMeshHitPosition(object? navHitBoxed, out Vector3 position)
-        {
-            position = Vector3.zero;
-            if (navHitBoxed == null)
-            {
-                return false;
-            }
-
-            if (s_navMeshHitPositionProperty != null &&
-                s_navMeshHitPositionProperty.GetValue(navHitBoxed) is Vector3 propPosition)
-            {
-                position = propPosition;
-                return true;
-            }
-
-            if (s_navMeshHitPositionField != null &&
-                s_navMeshHitPositionField.GetValue(navHitBoxed) is Vector3 fieldPosition)
-            {
-                position = fieldPosition;
-                return true;
-            }
-
-            return false;
         }
 
         private static bool TryCalculatePathDistance(Vector3 from, Vector3 to, out float navMeshDistance)
         {
             navMeshDistance = 0f;
-            if (s_navMeshType == null || s_navMeshPathType == null || s_navMeshCalculatePathMethod == null || s_navMeshPathCornersProperty == null)
+            var path = new NavMeshPath();
+            if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, path))
             {
                 return false;
             }
 
-            var path = Activator.CreateInstance(s_navMeshPathType);
-            if (path == null)
-            {
-                return false;
-            }
-
-            var args = new object?[] { from, to, -1, path };
-            if (s_navMeshCalculatePathMethod.Invoke(null, args) is not bool success || !success)
-            {
-                return false;
-            }
-
-            if (s_navMeshPathCornersProperty.GetValue(path) is not Vector3[] corners || corners.Length == 0)
+            var corners = path.corners;
+            if (corners == null || corners.Length == 0)
             {
                 navMeshDistance = Vector3.Distance(from, to);
                 return true;

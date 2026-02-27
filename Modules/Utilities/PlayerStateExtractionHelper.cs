@@ -1,25 +1,13 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
-using HarmonyLib;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Utilities
 {
     internal static class PlayerStateExtractionHelper
     {
-        private static readonly FieldInfo? s_playerNameField = AccessTools.Field(typeof(PlayerAvatar), "playerName");
-        private static readonly FieldInfo? s_playerDeadSetField = AccessTools.Field(typeof(PlayerAvatar), "deadSet");
-        private static readonly FieldInfo? s_playerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
-        private static readonly FieldInfo? s_playerRoomVolumeCheckField = AccessTools.Field(typeof(PlayerAvatar), "RoomVolumeCheck");
-        private static readonly FieldInfo? s_playerSteamIdShortField = AccessTools.Field(typeof(PlayerAvatar), "steamIDshort");
-        private static readonly FieldInfo? s_visualColorField = AccessTools.Field(typeof(PlayerAvatarVisuals), "color");
-        private static FieldInfo? s_roomVolumeCheckInTruckField;
-        private static FieldInfo? s_deathHeadInTruckField;
-        private static FieldInfo? s_deathHeadRoomVolumeCheckField;
-
         internal readonly struct PlayerStateSnapshot
         {
             internal PlayerStateSnapshot(
@@ -128,11 +116,9 @@ namespace DHHFLastChanceMode.Modules.Utilities
 
         private static string GetPlayerName(PlayerAvatar player)
         {
-            if (s_playerNameField != null &&
-                s_playerNameField.GetValue(player) is string name &&
-                !string.IsNullOrWhiteSpace(name))
+            if (!string.IsNullOrWhiteSpace(player.playerName))
             {
-                return name;
+                return player.playerName;
             }
 
             return "unknown";
@@ -146,33 +132,24 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return Color.black;
             }
 
-            if (s_visualColorField != null && s_visualColorField.GetValue(visuals) is Color color)
-            {
-                return color;
-            }
-
-            return Color.black;
+            return visuals.color;
         }
 
         private static bool IsDeadSet(PlayerAvatar player)
         {
-            return s_playerDeadSetField != null &&
-                   s_playerDeadSetField.GetValue(player) is bool deadSet &&
-                   deadSet;
+            return player.deadSet;
         }
 
         private static bool IsDisabled(PlayerAvatar player)
         {
-            return s_playerIsDisabledField != null &&
-                   s_playerIsDisabledField.GetValue(player) is bool isDisabled &&
-                   isDisabled;
+            return player.isDisabled;
         }
 
         private static bool IsPlayerInTruck(PlayerAvatar player, bool isDisabled)
         {
             if (!isDisabled)
             {
-                var roomVolumeCheck = GetRoomVolumeCheck(player);
+                var roomVolumeCheck = player.RoomVolumeCheck;
                 return roomVolumeCheck != null && IsRoomVolumeInTruck(roomVolumeCheck);
             }
 
@@ -182,75 +159,23 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return false;
             }
 
-            var roomVolume = GetDeathHeadRoomVolumeCheck(deathHead);
+            var roomVolume = deathHead.roomVolumeCheck;
             if (roomVolume != null)
             {
                 return IsRoomVolumeInTruck(roomVolume);
             }
 
-            var inTruckField = GetDeathHeadInTruckField(deathHead.GetType());
-            return inTruckField != null &&
-                   inTruckField.GetValue(deathHead) is bool inTruck &&
-                   inTruck;
+            return deathHead.inTruck;
         }
 
-        private static object? GetRoomVolumeCheck(PlayerAvatar player)
+        private static bool IsRoomVolumeInTruck(RoomVolumeCheck roomVolumeCheck)
         {
-            if (s_playerRoomVolumeCheckField == null)
-            {
-                return null;
-            }
-
-            return s_playerRoomVolumeCheckField.GetValue(player);
-        }
-
-        private static bool IsRoomVolumeInTruck(object roomVolumeCheck)
-        {
-            if (roomVolumeCheck == null)
-            {
-                return false;
-            }
-
-            var field = s_roomVolumeCheckInTruckField;
-            if (field == null || field.DeclaringType != roomVolumeCheck.GetType())
-            {
-                field = AccessTools.Field(roomVolumeCheck.GetType(), "inTruck");
-                s_roomVolumeCheckInTruckField = field;
-            }
-
-            return field != null && field.GetValue(roomVolumeCheck) is bool inTruck && inTruck;
-        }
-
-        private static FieldInfo? GetDeathHeadInTruckField(System.Type deathHeadType)
-        {
-            var field = s_deathHeadInTruckField;
-            if (field == null || field.DeclaringType != deathHeadType)
-            {
-                field = AccessTools.Field(deathHeadType, "inTruck");
-                s_deathHeadInTruckField = field;
-            }
-
-            return field;
-        }
-
-        private static object? GetDeathHeadRoomVolumeCheck(PlayerDeathHead deathHead)
-        {
-            var field = s_deathHeadRoomVolumeCheckField;
-            if (field == null || field.DeclaringType != deathHead.GetType())
-            {
-                field = AccessTools.Field(deathHead.GetType(), "roomVolumeCheck");
-                s_deathHeadRoomVolumeCheckField = field;
-            }
-
-            return field?.GetValue(deathHead);
+            return roomVolumeCheck.inTruck;
         }
 
         private static int GetSteamIdShort(PlayerAvatar player)
         {
-            return s_playerSteamIdShortField != null &&
-                   s_playerSteamIdShortField.GetValue(player) is int steamIdShort
-                ? steamIdShort
-                : 0;
+            return player.steamIDshort;
         }
     }
 }

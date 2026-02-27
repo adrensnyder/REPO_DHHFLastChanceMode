@@ -1,14 +1,14 @@
 #nullable enable
 
 using System;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
+using DeathHeadHopper.Abilities;
 using DeathHeadHopper.UI;
+using DeathHeadHopperFix.Modules.Gameplay.Spectate;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Utilities;
 using UnityEngine;
+using DhhFixAbilityModule = DeathHeadHopperFix.Modules.Gameplay.Core.Abilities.AbilityModule;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
 {
@@ -16,112 +16,34 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
     {
         private const int DirectionIndicatorSlotIndex = 1;
         private const string AbilityBarDemandSourceId = "DHHFLastChanceMode.Direction";
-        private static Type? s_runtimeType;
-        private static MethodInfo? s_refreshDirectionSlotVisuals;
-        private static MethodInfo? s_setDirectionSlotActivationProgress;
-        private static MethodInfo? s_triggerDirectionSlotCooldown;
-        private static MethodInfo? s_applyDirectionIconMethod;
-        private static Type? s_abilityBarVisibilityAnchorType;
-        private static MethodInfo? s_setExternalDemandMethod;
-        private static Type? s_abilitySpotType;
-        private static FieldInfo? s_abilitySpotIndexField;
         private static Sprite? s_directionSprite;
         private static float s_nextDirectionIconFallbackApplyAt;
-        private static object? s_directionAbility;
-        private static Type? s_runtimeDirectionAbilityType;
+        private static DirectionIndicatorAbility? s_directionAbility;
 
         internal static void RefreshDirectionSlotVisuals()
         {
-            EnsureResolved();
             EnsureDirectionAbilitySlotState();
             PushDirectionAbilityBarDemand();
-            s_refreshDirectionSlotVisuals?.Invoke(null, null);
+            DhhFixAbilityModule.RefreshDirectionSlotVisuals();
             TryApplyDirectionIconFallback();
         }
 
         internal static void SetDirectionSlotActivationProgress(float progress01)
         {
-            EnsureResolved();
-            s_setDirectionSlotActivationProgress?.Invoke(null, new object[] { progress01 });
+            DhhFixAbilityModule.SetDirectionSlotActivationProgress(progress01);
         }
 
         internal static void TriggerDirectionSlotCooldown(float cooldownSeconds)
         {
-            EnsureResolved();
-            s_triggerDirectionSlotCooldown?.Invoke(null, new object[] { cooldownSeconds });
-        }
-
-        private static void EnsureResolved()
-        {
-            if (s_runtimeType == null)
-            {
-                s_runtimeType = ResolveType();
-            }
-
-            if (s_runtimeType == null)
-            {
-                return;
-            }
-
-            s_refreshDirectionSlotVisuals ??= s_runtimeType.GetMethod("RefreshDirectionSlotVisuals", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            s_setDirectionSlotActivationProgress ??= s_runtimeType.GetMethod("SetDirectionSlotActivationProgress", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            s_triggerDirectionSlotCooldown ??= s_runtimeType.GetMethod("TriggerDirectionSlotCooldown", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-
-            if (s_applyDirectionIconMethod == null)
-            {
-                var slotVisualType = s_runtimeType.GetNestedType("SlotVisualOverrides", BindingFlags.NonPublic);
-                s_applyDirectionIconMethod = slotVisualType?.GetMethod("ApplyDirectionIcon", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            }
-
-            s_abilityBarVisibilityAnchorType ??= ResolveType("DeathHeadHopperFix.Modules.Gameplay.Spectate.AbilityBarVisibilityAnchor");
-            s_setExternalDemandMethod ??= s_abilityBarVisibilityAnchorType?.GetMethod("SetExternalDemand", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        }
-
-        private static Type? ResolveType()
-        {
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var type = asm.GetType("DeathHeadHopperFix.Modules.Gameplay.Core.Abilities.AbilityModule", throwOnError: false);
-                if (type != null && type.Assembly.GetName().Name == "DeathHeadHopperFix")
-                {
-                    return type;
-                }
-            }
-
-            return null;
-        }
-
-        private static Type? ResolveType(string fullName)
-        {
-            var type = Type.GetType(fullName, throwOnError: false);
-            if (type != null)
-            {
-                return type;
-            }
-
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                type = asm.GetType(fullName, throwOnError: false);
-                if (type != null)
-                {
-                    return type;
-                }
-            }
-
-            return null;
+            DhhFixAbilityModule.TriggerDirectionSlotCooldown(cooldownSeconds);
         }
 
         private static void PushDirectionAbilityBarDemand()
         {
-            if (s_setExternalDemandMethod == null)
-            {
-                return;
-            }
-
             var visible = LastChanceTimerController.IsDirectionIndicatorUiVisible;
             try
             {
-                s_setExternalDemandMethod.Invoke(null, new object[] { AbilityBarDemandSourceId, visible });
+                AbilityBarVisibilityAnchor.SetExternalDemand(AbilityBarDemandSourceId, visible);
             }
             catch
             {
@@ -131,11 +53,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
 
         private static void TryApplyDirectionIconFallback()
         {
-            if (s_applyDirectionIconMethod == null)
-            {
-                return;
-            }
-
             if (Time.unscaledTime < s_nextDirectionIconFallbackApplyAt)
             {
                 return;
@@ -157,19 +74,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
                 return;
             }
 
-            s_abilitySpotType ??= ResolveAbilitySpotType();
-            if (s_abilitySpotType == null)
-            {
-                return;
-            }
-
-            s_abilitySpotIndexField ??= s_abilitySpotType.GetField("abilitySpotIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (s_abilitySpotIndexField == null)
-            {
-                return;
-            }
-
-            var spots = UnityEngine.Object.FindObjectsOfType(s_abilitySpotType);
+            var spots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
             if (spots == null || spots.Length == 0)
             {
                 return;
@@ -183,15 +88,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
                     continue;
                 }
 
-                var index = s_abilitySpotIndexField.GetValue(spot) as int? ?? -1;
-                if (index != DirectionIndicatorSlotIndex)
+                if (spot.abilitySpotIndex != DirectionIndicatorSlotIndex)
                 {
                     continue;
                 }
 
                 try
                 {
-                    s_applyDirectionIconMethod.Invoke(null, new object[] { spot, s_directionSprite });
+                    ApplyDirectionIcon(spot, s_directionSprite);
                 }
                 catch
                 {
@@ -246,9 +150,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
                 return;
             }
 
+            if (s_directionSprite != null)
+            {
+                s_directionAbility.icon = s_directionSprite;
+            }
+
             if (directionSpot.CurrentAbility == null)
             {
-                TryEquipAbility(directionSpot, s_directionAbility);
+                directionSpot.EquipAbility(s_directionAbility);
                 return;
             }
 
@@ -275,31 +184,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
 
             if (hasDirectionElsewhere && TryRemoveDirectionAbilityFromSpots(spots))
             {
-                TryEquipAbility(directionSpot, s_directionAbility);
-            }
-        }
-
-        private static bool TryEquipAbility(AbilitySpot spot, object ability)
-        {
-            if (spot == null || ability == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var method = typeof(AbilitySpot).GetMethod("EquipAbility", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (method == null)
-                {
-                    return false;
-                }
-
-                method.Invoke(spot, new[] { ability });
-                return true;
-            }
-            catch
-            {
-                return false;
+                directionSpot.EquipAbility(s_directionAbility);
             }
         }
 
@@ -333,132 +218,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
             return removed;
         }
 
-        private static object? CreateDirectionAbilityInstance()
+        private static DirectionIndicatorAbility CreateDirectionAbilityInstance()
         {
-            var runtimeType = EnsureRuntimeDirectionAbilityType();
-            if (runtimeType == null)
+            var ability = ScriptableObject.CreateInstance<DirectionIndicatorAbility>();
+            if (s_directionSprite != null)
             {
-                return null;
+                ability.icon = s_directionSprite;
             }
-
-            try
-            {
-                return ScriptableObject.CreateInstance(runtimeType);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static Type? EnsureRuntimeDirectionAbilityType()
-        {
-            if (s_runtimeDirectionAbilityType != null)
-            {
-                return s_runtimeDirectionAbilityType;
-            }
-
-            var baseType = ResolveAbilityBaseType();
-            if (baseType == null)
-            {
-                return null;
-            }
-
-            var asmName = new AssemblyName("DHHFLastChanceMode.RuntimeDirectionAbility");
-            var asmBuilder = AppDomain.CurrentDomain.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.Run);
-            var moduleBuilder = asmBuilder.DefineDynamicModule(asmName.Name);
-            var typeBuilder = moduleBuilder.DefineType(
-                "DHHFLastChanceMode.Modules.Gameplay.Core.Abilities.RuntimeDirectionAbility",
-                TypeAttributes.Class | TypeAttributes.NotPublic,
-                baseType);
-
-            foreach (var abstractMethod in baseType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Where(x => x.IsAbstract))
-            {
-                DefineDirectionAbilityOverride(typeBuilder, abstractMethod);
-            }
-
-            s_runtimeDirectionAbilityType = typeBuilder.CreateType();
-            return s_runtimeDirectionAbilityType;
-        }
-
-        private static Type? ResolveAbilityBaseType()
-        {
-            var property = typeof(AbilitySpot).GetProperty("CurrentAbility", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            return property?.PropertyType;
-        }
-
-        private static void DefineDirectionAbilityOverride(TypeBuilder typeBuilder, MethodInfo abstractMethod)
-        {
-            var parameters = abstractMethod.GetParameters();
-            var parameterTypes = parameters.Select(p => p.ParameterType).ToArray();
-            var methodBuilder = typeBuilder.DefineMethod(
-                abstractMethod.Name,
-                MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
-                abstractMethod.ReturnType,
-                parameterTypes);
-            var il = methodBuilder.GetILGenerator();
-
-            if (abstractMethod.ReturnType == typeof(string))
-            {
-                if (abstractMethod.Name.IndexOf("AbilityName", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_GetName), BindingFlags.Static | BindingFlags.Public));
-                }
-                else
-                {
-                    il.Emit(OpCodes.Ldstr, "DirectionAbility");
-                }
-            }
-            else if (abstractMethod.ReturnType == typeof(float))
-            {
-                if (abstractMethod.Name.IndexOf("Energy", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    abstractMethod.Name.IndexOf("Cost", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_GetEnergyCost), BindingFlags.Static | BindingFlags.Public));
-                }
-                else if (abstractMethod.Name.IndexOf("Cooldown", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_GetCooldown), BindingFlags.Static | BindingFlags.Public));
-                }
-                else
-                {
-                    il.Emit(OpCodes.Ldc_R4, 0f);
-                }
-            }
-            else if (abstractMethod.ReturnType == typeof(int))
-            {
-                if (abstractMethod.Name.IndexOf("AbilityLevel", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    abstractMethod.Name.IndexOf("Level", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_GetLevel), BindingFlags.Static | BindingFlags.Public));
-                }
-                else
-                {
-                    il.Emit(OpCodes.Ldc_I4_1);
-                }
-            }
-            else
-            {
-                if (abstractMethod.Name.IndexOf("OnAbilityDown", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_OnDown), BindingFlags.Static | BindingFlags.Public));
-                }
-                else if (abstractMethod.Name.IndexOf("OnAbilityHold", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_OnHold), BindingFlags.Static | BindingFlags.Public));
-                }
-                else if (abstractMethod.Name.IndexOf("OnAbilityUp", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_OnUp), BindingFlags.Static | BindingFlags.Public));
-                }
-                else if (abstractMethod.Name.IndexOf("OnAbilityCancel", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    il.Emit(OpCodes.Call, typeof(AbilityModule).GetMethod(nameof(DirectionAbility_OnCancel), BindingFlags.Static | BindingFlags.Public));
-                }
-            }
-
-            il.Emit(OpCodes.Ret);
-            typeBuilder.DefineMethodOverride(methodBuilder, abstractMethod);
+            return ability;
         }
 
         public static string DirectionAbility_GetName()
@@ -503,38 +270,52 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
 
         private static int GetSpotIndex(AbilitySpot spot)
         {
-            if (spot == null)
-            {
-                return -1;
-            }
-
-            s_abilitySpotType ??= ResolveAbilitySpotType();
-            if (s_abilitySpotType == null || !s_abilitySpotType.IsInstanceOfType(spot))
-            {
-                return -1;
-            }
-
-            s_abilitySpotIndexField ??= s_abilitySpotType.GetField("abilitySpotIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (s_abilitySpotIndexField == null)
-            {
-                return -1;
-            }
-
-            return s_abilitySpotIndexField.GetValue(spot) as int? ?? -1;
+            return spot == null ? -1 : spot.abilitySpotIndex;
         }
 
-        private static Type? ResolveAbilitySpotType()
+        private static void ApplyDirectionIcon(AbilitySpot spot, Sprite sprite)
         {
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            if (spot == null || sprite == null)
             {
-                var type = asm.GetType("DeathHeadHopper.UI.AbilitySpot", throwOnError: false);
-                if (type != null)
-                {
-                    return type;
-                }
+                return;
             }
 
-            return null;
+            spot.backgroundIcon.enabled = true;
+            spot.backgroundIcon.sprite = sprite;
+            spot.cooldownIcon.enabled = true;
+            spot.cooldownIcon.sprite = sprite;
+            spot.noAbility.enabled = false;
+        }
+
+        private sealed class DirectionIndicatorAbility : AbilityBase
+        {
+            public override string AbilityName => DirectionAbility_GetName();
+
+            public override float Cooldown => DirectionAbility_GetCooldown();
+
+            public override float EnergyCost => DirectionAbility_GetEnergyCost();
+
+            public override int AbilityLevel => DirectionAbility_GetLevel();
+
+            public override void OnAbilityDown()
+            {
+                DirectionAbility_OnDown();
+            }
+
+            public override void OnAbilityHold()
+            {
+                DirectionAbility_OnHold();
+            }
+
+            public override void OnAbilityUp()
+            {
+                DirectionAbility_OnUp();
+            }
+
+            public override void OnAbilityCancel()
+            {
+                DirectionAbility_OnCancel();
+            }
         }
     }
 }

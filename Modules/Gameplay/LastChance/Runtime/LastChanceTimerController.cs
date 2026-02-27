@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
 using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
@@ -10,6 +9,7 @@ using DHHFLastChanceMode.Modules.Gameplay.LastChance.UI;
 using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
@@ -71,31 +71,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             NetworkSync = 3
         }
 
-        private static readonly FieldInfo? RunManagerRunStartedField =
-            AccessTools.Field(typeof(RunManager), "runStarted");
-        private static readonly FieldInfo? RunManagerRestartingField =
-            AccessTools.Field(typeof(RunManager), "restarting");
-        private static readonly FieldInfo? RunManagerPreviousRunLevelField =
-            AccessTools.Field(typeof(RunManager), "previousRunLevel");
-        private static readonly FieldInfo? PlayerAvatarIsDisabledField =
-            AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
-        private static readonly FieldInfo? PlayerAvatarRoomVolumeCheckField =
-            AccessTools.Field(typeof(PlayerAvatar), "RoomVolumeCheck");
-        private static readonly FieldInfo? PlayerAvatarNameField =
-            AccessTools.Field(typeof(PlayerAvatar), "playerName");
-        private static readonly FieldInfo? SpectateCameraSpectatePlayerField =
-            AccessTools.Field(typeof(SpectateCamera), "spectatePlayer");
-        private static FieldInfo? s_roomVolumeCheckInTruckField;
-        private static FieldInfo? s_deathHeadInTruckField;
-        private static FieldInfo? s_deathHeadRoomVolumeCheckField;
-        private static readonly FieldInfo? RoundDirectorAllExtractionField =
-            AccessTools.Field(typeof(RoundDirector), "allExtractionPointsCompleted");
-        private static readonly FieldInfo? RoundDirectorExtractionPointActiveField =
-            AccessTools.Field(typeof(RoundDirector), "extractionPointActive");
-        private static readonly FieldInfo? RoundDirectorExtractionPointCurrentField =
-            AccessTools.Field(typeof(RoundDirector), "extractionPointCurrent");
-        private static readonly FieldInfo? EnemyDirectorExtractionsDoneStateField =
-            AccessTools.Field(typeof(EnemyDirector), "extractionsDoneState");
         private static float SurrenderHoldDuration => Mathf.Clamp(FeatureFlags.LastChanceSurrenderSeconds, 2f, 10f);
         private static readonly HashSet<int> LastChanceSurrenderedPlayers = new();
         private static float s_surrenderHoldTimer;
@@ -110,8 +85,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static LineRenderer? s_indicatorDirectionLine;
         private static Material? s_indicatorDirectionMaterial;
         private static float s_indicatorNextPathRefreshAt;
-        private static object? s_reusableNavMeshHitBoxed;
-        private static object? s_reusableNavMeshPath;
         private static Vector3 s_lastDirectionPathFrom;
         private static Vector3 s_lastDirectionPathTo;
         private static bool s_hasLastDirectionPathSample;
@@ -168,32 +141,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             internal bool IsSurrendered { get; }
         }
 
-        private static readonly Type? s_levelGeneratorType = AccessTools.TypeByName("LevelGenerator");
-        private static readonly FieldInfo? s_levelGeneratorInstanceField = s_levelGeneratorType == null ? null : AccessTools.Field(s_levelGeneratorType, "Instance");
-        private static readonly FieldInfo? s_levelPathTruckField = s_levelGeneratorType == null ? null : AccessTools.Field(s_levelGeneratorType, "LevelPathTruck");
-        private static readonly FieldInfo? s_levelPathPointsField = s_levelGeneratorType == null ? null : AccessTools.Field(s_levelGeneratorType, "LevelPathPoints");
-        private static readonly Type? s_levelPointType = AccessTools.TypeByName("LevelPoint");
-        private static readonly FieldInfo? s_levelPointTruckField = s_levelPointType == null ? null : AccessTools.Field(s_levelPointType, "Truck");
-        private static readonly Type? s_navMeshType = AccessTools.TypeByName("UnityEngine.AI.NavMesh");
-        private static readonly Type? s_navMeshHitType = AccessTools.TypeByName("UnityEngine.AI.NavMeshHit");
-        private static readonly Type? s_navMeshPathType = AccessTools.TypeByName("UnityEngine.AI.NavMeshPath");
-        private static readonly MethodInfo? s_navMeshSamplePositionMethod = s_navMeshType?.GetMethod(
-            "SamplePosition",
-            BindingFlags.Static | BindingFlags.Public,
-            null,
-            s_navMeshHitType == null ? null : new[] { typeof(Vector3), s_navMeshHitType.MakeByRefType(), typeof(float), typeof(int) },
-            null);
-        private static readonly PropertyInfo? s_navMeshHitPositionProperty = s_navMeshHitType?.GetProperty("position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        private static readonly FieldInfo? s_navMeshHitPositionField = s_navMeshHitType?.GetField("position", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        private static readonly MethodInfo? s_navMeshCalculatePathMethod = s_navMeshType?.GetMethod(
-            "CalculatePath",
-            BindingFlags.Static | BindingFlags.Public,
-            null,
-            s_navMeshPathType == null ? null : new[] { typeof(Vector3), typeof(Vector3), typeof(int), s_navMeshPathType },
-            null);
-        private static readonly PropertyInfo? s_navMeshPathCornersProperty = s_navMeshPathType?.GetProperty("corners", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        private static readonly FieldInfo? s_playerAvatarLastNavmeshPositionField = AccessTools.Field(typeof(PlayerAvatar), "LastNavmeshPosition");
-        
         private readonly struct DynamicTimerInputs
         {
             internal DynamicTimerInputs(
@@ -631,10 +578,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             SemiFunc.StatSetRunCurrency(newCurrency);
             NormalizeDirectorsBeforeShopReturn();
 
-            if (RunManagerPreviousRunLevelField != null)
-            {
-                RunManagerPreviousRunLevelField.SetValue(runMgr, runMgr.levelCurrent);
-            }
+            runMgr.previousRunLevel = runMgr.levelCurrent;
 
             TryLogShopReturnSnapshot(runMgr, newCurrency, "before-change-level");
             runMgr.ChangeLevel(false, false, RunManager.ChangeLevelType.Shop);
@@ -646,16 +590,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             {
                 if (RoundDirector.instance != null)
                 {
-                    RoundDirectorAllExtractionField?.SetValue(RoundDirector.instance, false);
-                    RoundDirectorExtractionPointActiveField?.SetValue(RoundDirector.instance, false);
-                    RoundDirectorExtractionPointCurrentField?.SetValue(RoundDirector.instance, null);
+                    RoundDirector.instance.allExtractionPointsCompleted = false;
+                    RoundDirector.instance.extractionPointActive = false;
+                    RoundDirector.instance.extractionPointCurrent = null;
                 }
 
-                if (EnemyDirector.instance != null && EnemyDirectorExtractionsDoneStateField != null)
+                if (EnemyDirector.instance != null)
                 {
-                    var stateType = EnemyDirectorExtractionsDoneStateField.FieldType;
-                    var startRoom = System.Enum.ToObject(stateType, 0);
-                    EnemyDirectorExtractionsDoneStateField.SetValue(EnemyDirector.instance, startRoom);
+                    EnemyDirector.instance.extractionsDoneState = EnemyDirector.ExtractionsDoneState.StartRoom;
                 }
             }
             catch (Exception ex)
@@ -674,23 +616,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             try
             {
                 var levelCurrent = runMgr.levelCurrent != null ? runMgr.levelCurrent.name : "<null>";
-                var previousRunLevelName = "<n/a>";
-                if (RunManagerPreviousRunLevelField != null)
-                {
-                    if (RunManagerPreviousRunLevelField.GetValue(runMgr) is Level previousRunLevel && previousRunLevel != null)
-                    {
-                        previousRunLevelName = previousRunLevel.name;
-                    }
-                    else
-                    {
-                        previousRunLevelName = "<null>";
-                    }
-                }
+                var previousRunLevelName = runMgr.previousRunLevel != null ? runMgr.previousRunLevel.name : "<null>";
 
                 var extractionDone = RoundDirector.instance != null &&
-                                     RoundDirectorAllExtractionField != null &&
-                                     RoundDirectorAllExtractionField.GetValue(RoundDirector.instance) is bool b &&
-                                     b;
+                                     RoundDirector.instance.allExtractionPointsCompleted;
 
                 Debug.Log(
                     $"[LastChance] ShopReturn snapshot phase={phase} " +
@@ -2275,39 +2204,34 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             truckPosition = Vector3.zero;
             try
             {
-                if (s_levelGeneratorInstanceField == null)
-                {
-                    return false;
-                }
-
-                var levelGenerator = s_levelGeneratorInstanceField.GetValue(null);
+                var levelGenerator = LevelGenerator.Instance;
                 if (levelGenerator == null)
                 {
                     return false;
                 }
 
-                if (s_levelPathTruckField != null)
+                if (levelGenerator.LevelPathTruck != null)
                 {
-                    var candidate = s_levelPathTruckField.GetValue(levelGenerator);
+                    var candidate = levelGenerator.LevelPathTruck;
                     if (TryGetTransformPosition(candidate, out truckPosition))
                     {
                         return true;
                     }
                 }
 
-                if (s_levelPathPointsField?.GetValue(levelGenerator) is not System.Collections.IEnumerable points || s_levelPointTruckField == null)
+                if (levelGenerator.LevelPathPoints == null)
                 {
                     return false;
                 }
 
-                foreach (var point in points)
+                foreach (var point in levelGenerator.LevelPathPoints)
                 {
                     if (point == null)
                     {
                         continue;
                     }
 
-                    if (s_levelPointTruckField.GetValue(point) is bool isTruck && isTruck && TryGetTransformPosition(point, out truckPosition))
+                    if (point.Truck && TryGetTransformPosition(point, out truckPosition))
                     {
                         return true;
                     }
@@ -2336,13 +2260,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     position = comp.transform.position;
                     return true;
                 }
-
-                var transformProperty = obj.GetType().GetProperty("transform", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (transformProperty?.GetValue(obj) is Transform transform)
-                {
-                    position = transform.position;
-                    return true;
-                }
             }
             catch (Exception ex)
             {
@@ -2357,26 +2274,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             sampledPosition = Vector3.zero;
             try
             {
-                if (s_navMeshHitType == null || s_navMeshSamplePositionMethod == null)
+                if (NavMesh.SamplePosition(source, out var navHit, maxDistance, NavMesh.AllAreas))
                 {
-                    return false;
-                }
-
-                s_reusableNavMeshHitBoxed ??= Activator.CreateInstance(s_navMeshHitType);
-                if (s_reusableNavMeshHitBoxed == null)
-                {
-                    return false;
-                }
-
-                var args = new object[] { source, s_reusableNavMeshHitBoxed, maxDistance, -1 };
-                if (s_navMeshSamplePositionMethod.Invoke(null, args) is not bool success || !success)
-                {
-                    return false;
-                }
-
-                if (TryGetNavHitPosition(args[1], out var hit))
-                {
-                    sampledPosition = hit;
+                    sampledPosition = navHit.position;
                     return true;
                 }
             }
@@ -2388,61 +2288,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             return false;
         }
 
-        private static bool TryGetNavHitPosition(object navHit, out Vector3 position)
-        {
-            position = Vector3.zero;
-            try
-            {
-                if (navHit == null)
-                {
-                    return false;
-                }
-
-                if (s_navMeshHitPositionProperty != null && s_navMeshHitPositionProperty.GetValue(navHit) is Vector3 propPos)
-                {
-                    position = propPos;
-                    return true;
-                }
-
-                if (s_navMeshHitPositionField != null && s_navMeshHitPositionField.GetValue(navHit) is Vector3 fieldPos)
-                {
-                    position = fieldPos;
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogReflectionHotPathException("TryGetNavHitPosition", ex);
-            }
-
-            return false;
-        }
-
         private static bool TryCalculateNavMeshPathCorners(Vector3 from, Vector3 to, out Vector3[] corners)
         {
             corners = Array.Empty<Vector3>();
             try
             {
-                if (s_navMeshPathType == null || s_navMeshCalculatePathMethod == null || s_navMeshPathCornersProperty == null)
+                var path = new NavMeshPath();
+                if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, path))
                 {
                     return false;
                 }
 
-                s_reusableNavMeshPath ??= Activator.CreateInstance(s_navMeshPathType);
-                if (s_reusableNavMeshPath == null)
+                if (path.corners.Length > 0)
                 {
-                    return false;
-                }
-
-                var args = new object[] { from, to, -1, s_reusableNavMeshPath };
-                if (s_navMeshCalculatePathMethod.Invoke(null, args) is not bool success || !success)
-                {
-                    return false;
-                }
-
-                if (s_navMeshPathCornersProperty.GetValue(s_reusableNavMeshPath) is Vector3[] pathCorners && pathCorners.Length > 0)
-                {
-                    corners = pathCorners;
+                    corners = path.corners;
                     return true;
                 }
             }
@@ -2509,10 +2368,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             var message = "[LastChance] TruckState:";
-            var extractionDone = RoundDirectorAllExtractionField != null &&
-                RoundDirector.instance != null &&
-                RoundDirectorAllExtractionField.GetValue(RoundDirector.instance) is bool extraction &&
-                extraction;
+            var extractionDone = RoundDirector.instance != null &&
+                RoundDirector.instance.allExtractionPointsCompleted;
             message += $" extractionDone={extractionDone}";
             foreach (var player in director.PlayerList)
             {
@@ -2535,12 +2392,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 var deathHead = player.playerDeathHead;
                 var dhRoom = deathHead != null ? GetDeathHeadRoomVolumeCheck(deathHead) : null;
                 var dhRoomInTruck = dhRoom != null && IsRoomVolumeInTruck(dhRoom);
-                var inTruckField = deathHead != null ? GetDeathHeadInTruckField(deathHead.GetType()) : null;
-                var dhInTruck = false;
-                if (deathHead != null && inTruckField != null && inTruckField.GetValue(deathHead) is bool b)
-                {
-                    dhInTruck = b;
-                }
+                var dhInTruck = deathHead != null && deathHead.inTruck;
                 message += $" {name}(deadHead,roomInTruck={dhRoomInTruck},inTruck={dhInTruck})";
             }
 
@@ -2555,11 +2407,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static string GetPlayerName(PlayerAvatar player)
         {
-            if (PlayerAvatarNameField != null &&
-                PlayerAvatarNameField.GetValue(player) is string name &&
-                !string.IsNullOrWhiteSpace(name))
+            if (!string.IsNullOrWhiteSpace(player.playerName))
             {
-                return name;
+                return player.playerName;
             }
 
             return player.GetType().Name;
@@ -2567,71 +2417,27 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static bool IsRunStarted(RunManager runMgr)
         {
-            if (RunManagerRunStartedField == null)
-            {
-                return false;
-            }
-
-            return RunManagerRunStartedField.GetValue(runMgr) is bool started && started;
+            return runMgr.runStarted;
         }
 
         private static bool IsRestarting(RunManager runMgr)
         {
-            if (RunManagerRestartingField == null)
-            {
-                return false;
-            }
-
-            return RunManagerRestartingField.GetValue(runMgr) is bool restarting && restarting;
+            return runMgr.restarting;
         }
 
         private static bool IsPlayerDisabled(PlayerAvatar player)
         {
-            if (PlayerAvatarIsDisabledField == null)
-            {
-                return false;
-            }
-
-            return PlayerAvatarIsDisabledField.GetValue(player) is bool disabled && disabled;
+            return player.isDisabled;
         }
 
-        private static object? GetRoomVolumeCheck(PlayerAvatar player)
+        private static RoomVolumeCheck? GetRoomVolumeCheck(PlayerAvatar player)
         {
-            if (PlayerAvatarRoomVolumeCheckField == null)
-            {
-                return null;
-            }
-
-            return PlayerAvatarRoomVolumeCheckField.GetValue(player);
+            return player.RoomVolumeCheck;
         }
 
-        private static bool IsRoomVolumeInTruck(object roomVolumeCheck)
+        private static bool IsRoomVolumeInTruck(RoomVolumeCheck roomVolumeCheck)
         {
-            if (roomVolumeCheck == null)
-            {
-                return false;
-            }
-
-            var field = s_roomVolumeCheckInTruckField;
-            if (field == null || field.DeclaringType != roomVolumeCheck.GetType())
-            {
-                field = AccessTools.Field(roomVolumeCheck.GetType(), "inTruck");
-                s_roomVolumeCheckInTruckField = field;
-            }
-
-            return field != null && field.GetValue(roomVolumeCheck) is bool inTruck && inTruck;
-        }
-
-        private static FieldInfo? GetDeathHeadInTruckField(Type deathHeadType)
-        {
-            var field = s_deathHeadInTruckField;
-            if (field == null || field.DeclaringType != deathHeadType)
-            {
-                field = AccessTools.Field(deathHeadType, "inTruck");
-                s_deathHeadInTruckField = field;
-            }
-
-            return field;
+            return roomVolumeCheck.inTruck;
         }
 
         private static bool? GetDeathHeadInTruckStatus(PlayerDeathHead deathHead)
@@ -2647,25 +2453,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return IsRoomVolumeInTruck(roomVolume);
             }
 
-            var inTruckField = GetDeathHeadInTruckField(deathHead.GetType());
-            if (inTruckField != null && inTruckField.GetValue(deathHead) is bool inTruck)
-            {
-                return inTruck;
-            }
-
-            return null;
+            return deathHead.inTruck;
         }
 
-        private static object? GetDeathHeadRoomVolumeCheck(PlayerDeathHead deathHead)
+        private static RoomVolumeCheck? GetDeathHeadRoomVolumeCheck(PlayerDeathHead deathHead)
         {
-            var field = s_deathHeadRoomVolumeCheckField;
-            if (field == null || field.DeclaringType != deathHead.GetType())
-            {
-                field = AccessTools.Field(deathHead.GetType(), "roomVolumeCheck");
-                s_deathHeadRoomVolumeCheckField = field;
-            }
-
-            return field?.GetValue(deathHead);
+            return deathHead.roomVolumeCheck;
         }
 
         private static float GetConfiguredSeconds()

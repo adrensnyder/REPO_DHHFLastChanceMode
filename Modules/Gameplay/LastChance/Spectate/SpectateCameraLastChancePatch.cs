@@ -1,44 +1,25 @@
 #nullable enable
 
 using System;
-using System.Reflection;
+using DeathHeadHopper.DeathHead;
+using DeathHeadHopper.Helpers;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
-using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
 {
     internal static class LastChanceSpectateHelper
     {
-        private static readonly FieldInfo? s_playerIsDisabledField =
-            AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
         private const string ForceSpectateLogKey = "LastChance.ForceDeathHeadSpectate";
         private const string DebugStateLogKey = "LastChance.SpectateState";
-        private static bool s_warnedMissingDhh;
         private static bool s_forceComplete;
-        private static Type? s_dhhFuncType;
-        private static MethodInfo? s_localDeathHeadActiveMethod;
-        private static MethodInfo? s_getLocalDeathHeadControllerMethod;
-        private static MethodInfo? s_isDeathHeadSpectatableMethod;
-        private static MethodInfo? s_setSpectatedMethod;
-        private static MethodInfo? s_updateSpectatedMethod;
-        private static FieldInfo? s_controllerSpectatedField;
-        private static object? s_cachedController;
-        private static FieldInfo? s_spectatePlayerField;
-        private static bool s_checkedDhhAccessors;
-        private static bool s_missingDhhAccessors;
-        private static bool s_warnedAccessorFailure;
+        private static DeathHeadController? s_cachedController;
         private static string? s_lastSpectateDebugMessage;
 
         internal static bool AllPlayersDisabled()
         {
             var director = GameDirector.instance;
             if (director == null || director.PlayerList == null || director.PlayerList.Count == 0)
-            {
-                return false;
-            }
-
-            if (s_playerIsDisabledField == null)
             {
                 return false;
             }
@@ -50,7 +31,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
                     continue;
                 }
 
-                if (s_playerIsDisabledField.GetValue(player) is bool disabled && !disabled)
+                if (!player.isDisabled)
                 {
                     return false;
                 }
@@ -76,42 +57,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
                 return;
             }
 
-            var funcType = s_dhhFuncType ??= AccessTools.TypeByName("DeathHeadHopper.Helpers.DHHFunc");
-            if (funcType == null)
-            {
-                if (FeatureFlags.DebugLogging && !s_warnedMissingDhh)
-                {
-                    s_warnedMissingDhh = true;
-                    UnityEngine.Debug.LogWarning("[LastChance] DeathHeadHopper.Helpers.DHHFunc not found; cannot force spectate.");
-                }
-                return;
-            }
-
-            if (!s_checkedDhhAccessors)
-            {
-                s_checkedDhhAccessors = true;
-                s_localDeathHeadActiveMethod = AccessTools.Method(funcType, "LocalDeathHeadActive", Type.EmptyTypes);
-                s_getLocalDeathHeadControllerMethod = AccessTools.Method(funcType, "GetLocalDeathHeadController", Type.EmptyTypes);
-                s_isDeathHeadSpectatableMethod = AccessTools.Method(funcType, "IsDeathHeadSpectatable", new[] { typeof(PlayerAvatar) });
-                s_missingDhhAccessors = s_localDeathHeadActiveMethod == null || s_getLocalDeathHeadControllerMethod == null;
-            }
-
-            if (s_missingDhhAccessors)
-            {
-                return;
-            }
-
-            if (s_localDeathHeadActiveMethod != null &&
-                InvokeDhhAccessor(s_localDeathHeadActiveMethod, null) is bool active &&
-                !active)
+            if (!DHHFunc.LocalDeathHeadActive())
             {
                 return;
             }
 
             var localAvatar = PlayerAvatar.instance;
-            if (localAvatar != null && s_isDeathHeadSpectatableMethod != null)
+            if (localAvatar != null)
             {
-                if (InvokeDhhAccessor(s_isDeathHeadSpectatableMethod, new object[] { localAvatar }) is bool spectatable && !spectatable)
+                if (!DHHFunc.IsDeathHeadSpectatable(localAvatar))
                 {
                     return;
                 }
@@ -124,11 +78,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             }
             s_cachedController = controller;
 
-            var controllerType = controller.GetType();
-            s_setSpectatedMethod ??= AccessTools.Method(controllerType, "SetSpectated", new[] { typeof(bool) });
-            s_updateSpectatedMethod ??= AccessTools.Method(controllerType, "UpdateSpectated", Type.EmptyTypes);
-            s_controllerSpectatedField ??= AccessTools.Field(controllerType, "spectated");
-
             if (IsSpectated(controller))
             {
                 s_forceComplete = true;
@@ -138,15 +87,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             var spectate = SpectateCamera.instance;
             if (spectate != null)
             {
-                s_spectatePlayerField ??= AccessTools.Field(typeof(SpectateCamera), "player");
-                if (s_spectatePlayerField != null && PlayerAvatar.instance != null)
+                if (PlayerAvatar.instance != null)
                 {
-                    s_spectatePlayerField.SetValue(spectate, PlayerAvatar.instance);
+                    spectate.player = PlayerAvatar.instance;
                 }
             }
 
-            s_setSpectatedMethod?.Invoke(controller, new object[] { true });
-            s_updateSpectatedMethod?.Invoke(controller, null);
+            controller.SetSpectated(true);
+            controller.UpdateSpectated();
 
             if (IsSpectated(controller))
             {
@@ -159,16 +107,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             s_forceComplete = false;
         }
 
-        private static bool IsSpectated(object controller)
+        private static bool IsSpectated(DeathHeadController controller)
         {
-            if (s_controllerSpectatedField != null &&
-                s_controllerSpectatedField.GetValue(controller) is bool spectated &&
-                spectated)
-            {
-                return true;
-            }
-
-            return false;
+            return controller.spectated;
         }
 
         internal static bool IsDeathHeadSpectated()
@@ -180,9 +121,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             }
 
             s_cachedController = controller;
-            var controllerType = controller.GetType();
-            s_controllerSpectatedField ??= AccessTools.Field(controllerType, "spectated");
-
             return IsSpectated(controller);
         }
 
@@ -200,11 +138,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
                 return;
             }
 
-            s_spectatePlayerField ??= AccessTools.Field(typeof(SpectateCamera), "player");
             var local = PlayerAvatar.instance;
-            if (s_spectatePlayerField != null && local != null)
+            if (local != null)
             {
-                s_spectatePlayerField.SetValue(spectate, local);
+                spectate.player = local;
             }
         }
 
@@ -216,44 +153,25 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             }
 
             var local = PlayerAvatar.instance;
-            var spectatePlayer = (spectate != null && s_spectatePlayerField != null)
-                ? s_spectatePlayerField.GetValue(spectate) as PlayerAvatar
-                : null;
+            var spectatePlayer = spectate != null ? spectate.player : null;
             var isSpectateLocal = spectatePlayer != null && local != null && ReferenceEquals(spectatePlayer, local);
 
             bool? localActive = null;
             bool? spectatable = null;
             bool? spectated = null;
 
-            if (s_localDeathHeadActiveMethod != null)
-            {
-                var activeObj = InvokeDhhAccessor(s_localDeathHeadActiveMethod, null);
-                if (activeObj is bool activeBool)
-                {
-                    localActive = activeBool;
-                }
-            }
+            localActive = DHHFunc.LocalDeathHeadActive();
 
-            if (local != null && s_isDeathHeadSpectatableMethod != null)
+            if (local != null)
             {
-                var spectObj = InvokeDhhAccessor(s_isDeathHeadSpectatableMethod, new object[] { local });
-                if (spectObj is bool spectBool)
-                {
-                    spectatable = spectBool;
-                }
+                spectatable = DHHFunc.IsDeathHeadSpectatable(local);
             }
 
             var controller = s_cachedController ?? TryGetLocalDeathHeadController();
             if (controller != null)
             {
                 s_cachedController = controller;
-                var controllerType = controller.GetType();
-                s_controllerSpectatedField ??= AccessTools.Field(controllerType, "spectated");
-                if (s_controllerSpectatedField != null &&
-                    s_controllerSpectatedField.GetValue(controller) is bool spectatedBool)
-                {
-                    spectated = spectatedBool;
-                }
+                spectated = controller.spectated;
             }
 
             var spName = spectatePlayer != null ? spectatePlayer.GetType().Name : "null";
@@ -286,7 +204,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             return true;
         }
 
-        private static object? TryGetLocalDeathHeadController()
+        private static DeathHeadController? TryGetLocalDeathHeadController()
         {
             var local = PlayerAvatar.instance;
             if (local == null || local.playerDeathHead == null)
@@ -294,46 +212,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
                 return null;
             }
 
-            return InvokeDhhAccessor(s_getLocalDeathHeadControllerMethod, null);
-        }
-
-        private static object? InvokeDhhAccessor(MethodInfo? method, object?[]? args)
-        {
-            if (method == null || s_missingDhhAccessors)
-            {
-                return null;
-            }
-
-            try
-            {
-                return method.Invoke(null, args);
-            }
-            catch (TargetInvocationException ex)
-            {
-                HandleAccessorFailure(ex);
-            }
-            catch (Exception ex)
-            {
-                HandleAccessorFailure(ex);
-            }
-
-            return null;
-        }
-
-        private static void HandleAccessorFailure(Exception? ex)
-        {
-            if (s_missingDhhAccessors)
-            {
-                return;
-            }
-
-            s_missingDhhAccessors = true;
-            if (!s_warnedAccessorFailure && FeatureFlags.DebugLogging && LogLimiter.ShouldLog(DebugStateLogKey, 120))
-            {
-                s_warnedAccessorFailure = true;
-                var message = ex?.InnerException?.Message ?? ex?.Message ?? "unknown";
-                UnityEngine.Debug.LogWarning($"[LastChance] DHHSpectate helper failed: {message}");
-            }
+            return DHHFunc.GetLocalDeathHeadController();
         }
     }
 }

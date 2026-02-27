@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Reflection;
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
@@ -15,15 +14,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
     internal static class LastChanceHeadPupilVisualModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Eyes");
-        private static readonly FieldInfo? HeadPlayerAvatarField = AccessTools.Field(typeof(PlayerDeathHead), "playerAvatar");
-        private static readonly FieldInfo? HeadPlayerEyesField = AccessTools.Field(typeof(PlayerDeathHead), "playerEyes");
-        private static readonly FieldInfo? HeadPupilScaleTransformRightField = AccessTools.Field(typeof(PlayerDeathHead), "pupilScaleTransformRight");
-        private static readonly FieldInfo? HeadPupilScaleTransformLeftField = AccessTools.Field(typeof(PlayerDeathHead), "pupilScaleTransformLeft");
-        private static readonly FieldInfo? HeadPupilScaleDefaultField = AccessTools.Field(typeof(PlayerDeathHead), "pupilScaleDefault");
-        private static readonly FieldInfo? HeadPupilMaterialField = AccessTools.Field(typeof(PlayerDeathHead), "pupilMaterial");
-        private static readonly FieldInfo? HeadEyeMaterialField = AccessTools.Field(typeof(PlayerDeathHead), "eyeMaterial");
-        private static readonly FieldInfo? HeadEyeMaterialAmountField = AccessTools.Field(typeof(PlayerDeathHead), "eyeMaterialAmount");
-        private static readonly FieldInfo? HeadEyeMaterialColorField = AccessTools.Field(typeof(PlayerDeathHead), "eyeMaterialColor");
         private static readonly Dictionary<int, Color> LastEyeColorByHeadId = new();
 
         internal static void ResetRuntimeState()
@@ -39,7 +29,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            var player = HeadPlayerAvatarField?.GetValue(__instance) as PlayerAvatar;
+            var player = __instance.playerAvatar;
             if (!LastChancePupilGate.TryGetEligibleHead(player, out _, out var gateReason))
             {
                 DebugLog("Skip.Gate", $"reason={gateReason} playerId={GetPlayerId(player)}");
@@ -53,15 +43,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void ForcePupilsVisible(PlayerDeathHead head)
         {
-            var right = HeadPupilScaleTransformRightField?.GetValue(head) as Transform;
-            var left = HeadPupilScaleTransformLeftField?.GetValue(head) as Transform;
+            var right = head.pupilScaleTransformRight;
+            var left = head.pupilScaleTransformLeft;
             if (right == null || left == null)
             {
                 DebugLog("Pupil.Visible.MissingTransforms", $"headId={head.GetInstanceID()}");
                 return;
             }
 
-            var defaultScale = HeadPupilScaleDefaultField?.GetValue(head) as Vector3? ?? Vector3.one;
+            var defaultScale = head.pupilScaleDefault;
             if (!right.gameObject.activeSelf)
             {
                 right.gameObject.SetActive(true);
@@ -81,18 +71,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void ForcePupilOverlayVisible(PlayerDeathHead head)
         {
-            var pupilMaterial = HeadPupilMaterialField?.GetValue(head) as Material;
+            var pupilMaterial = head.pupilMaterial;
             if (pupilMaterial == null)
             {
                 DebugLog("Pupil.Overlay.MissingMaterial", $"headId={head.GetInstanceID()}");
                 return;
             }
 
-            var amountPropertyId = HeadEyeMaterialAmountField?.GetValue(head) as int? ?? Shader.PropertyToID("_ColorOverlayAmount");
-            var colorPropertyId = HeadEyeMaterialColorField?.GetValue(head) as int? ?? Shader.PropertyToID("_ColorOverlay");
+            var amountPropertyId = head.eyeMaterialAmount;
+            var colorPropertyId = head.eyeMaterialColor;
             pupilMaterial.SetFloat(amountPropertyId, 1f);
 
-            var eyeMaterial = HeadEyeMaterialField?.GetValue(head) as Material;
+            var eyeMaterial = head.eyeMaterial;
             var headId = head.GetInstanceID();
             if (eyeMaterial != null)
             {
@@ -138,7 +128,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void ForceEyeLookPipeline(PlayerDeathHead head)
         {
-            var eyes = HeadPlayerEyesField?.GetValue(head) as PlayerEyes;
+            var eyes = head.playerEyes;
             if (eyes == null)
             {
                 DebugLog("Eyes.MissingPlayerEyes", $"headId={head.GetInstanceID()}");
