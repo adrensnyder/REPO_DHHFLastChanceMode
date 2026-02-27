@@ -2,23 +2,14 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
-using HarmonyLib;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
     internal static class LastChanceMonstersTargetProxyHelper
     {
-        private static readonly FieldInfo? s_playerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
-        private static readonly FieldInfo? s_deathHeadTriggeredField = AccessTools.Field(typeof(PlayerDeathHead), "triggered");
-        private static readonly FieldInfo? s_deathHeadPhysGrabObjectField = AccessTools.Field(typeof(PlayerDeathHead), "physGrabObject");
-        private static readonly FieldInfo? s_physGrabObjectCenterPointField = AccessTools.Field(typeof(PhysGrabObject), "centerPoint");
-        private static readonly FieldInfo? s_deathHeadPlayerEyesField = AccessTools.Field(typeof(PlayerDeathHead), "playerEyes");
-        private static readonly FieldInfo? s_playerControllerAvatarField = AccessTools.Field(typeof(PlayerController), "playerAvatarScript");
-
         internal static bool IsRuntimeEnabled()
         {
             return FeatureFlags.LastChanceMonstersSearchEnabled &&
@@ -33,12 +24,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 
         internal static bool IsDisabled(PlayerAvatar? player)
         {
-            if (player == null || s_playerIsDisabledField == null)
-            {
-                return false;
-            }
-
-            return s_playerIsDisabledField.GetValue(player) is bool disabled && disabled;
+            return player != null && player.isDisabled;
         }
 
         internal static bool IsHeadProxyActive(PlayerAvatar? player)
@@ -54,14 +40,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            if (s_deathHeadTriggeredField != null && s_deathHeadTriggeredField.GetValue(head) is bool triggered)
-            {
-                return triggered;
-            }
-
-            // Fallback: if reflection fails, accept either disabled state or a valid head phys object.
-            // This keeps compatibility with both vanilla-disabled flow and LastChance "alive + active head" flow.
-            return IsDisabled(player) || s_deathHeadPhysGrabObjectField?.GetValue(head) is PhysGrabObject;
+            return head.triggered || IsDisabled(player) || head.physGrabObject != null;
         }
 
         internal static bool TryGetHeadCenter(PlayerAvatar? player, out Vector3 center)
@@ -78,15 +57,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            var phys = s_deathHeadPhysGrabObjectField?.GetValue(head) as PhysGrabObject;
-            if (phys != null && s_physGrabObjectCenterPointField != null)
+            var phys = head.physGrabObject;
+            if (phys != null)
             {
-                var value = s_physGrabObjectCenterPointField.GetValue(phys);
-                if (value is Vector3 p)
-                {
-                    center = p;
-                    return true;
-                }
+                center = phys.centerPoint;
+                return true;
             }
 
             center = head.transform.position;
@@ -107,10 +82,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            var eyes = s_deathHeadPlayerEyesField?.GetValue(player.playerDeathHead);
-            if (eyes is Component eyesComponent)
+            var eyes = player.playerDeathHead.playerEyes;
+            if (eyes != null)
             {
-                point = eyesComponent.transform.position;
+                point = eyes.transform.position;
                 return true;
             }
 
@@ -137,7 +112,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            physGrabObject = s_deathHeadPhysGrabObjectField?.GetValue(player.playerDeathHead) as PhysGrabObject;
+            physGrabObject = player.playerDeathHead.physGrabObject;
             return physGrabObject != null;
         }
 
@@ -177,7 +152,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             var controller = transform.GetComponentInParent<PlayerController>();
             if (controller != null)
             {
-                var fromController = s_playerControllerAvatarField?.GetValue(controller) as PlayerAvatar;
+                var fromController = controller.playerAvatarScript;
                 if (fromController != null)
                 {
                     player = fromController;

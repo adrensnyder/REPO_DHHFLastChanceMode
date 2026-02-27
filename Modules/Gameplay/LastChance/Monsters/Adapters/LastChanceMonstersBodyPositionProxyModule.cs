@@ -2,8 +2,6 @@
 
 using HarmonyLib;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
@@ -11,10 +9,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
     [HarmonyPatch(typeof(EnemyDirector), "Update")]
     internal static class LastChanceMonstersBodyPositionProxyModule
     {
-        private static readonly Dictionary<Type, FieldInfo?> PlayerTargetFieldCache = new();
-        private static readonly FieldInfo? EnemyAnimalPlayerTargetField =
-            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyAnimal), "playerTarget");
-
         [HarmonyPostfix]
         private static void Postfix()
         {
@@ -69,8 +63,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                     continue;
                 }
 
-                var type = enemy.GetType();
-                if (TryGetPlayerTarget(enemy, type) == player)
+                if (enemy.TargetPlayerAvatar == player)
                 {
                     return true;
                 }
@@ -86,24 +79,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                     continue;
                 }
 
-                if (EnemyAnimalPlayerTargetField?.GetValue(animal) as PlayerAvatar == player)
+                if (animal.playerTarget == player)
                 {
                     return true;
                 }
             }
 
             return false;
-        }
-
-        private static PlayerAvatar? TryGetPlayerTarget(Enemy enemy, Type type)
-        {
-            if (!PlayerTargetFieldCache.TryGetValue(type, out var field))
-            {
-                field = LastChanceMonstersReflectionHelper.FindFieldInHierarchy(type, "playerTarget");
-                PlayerTargetFieldCache[type] = field;
-            }
-
-            return field?.GetValue(enemy) as PlayerAvatar;
         }
     }
 }
