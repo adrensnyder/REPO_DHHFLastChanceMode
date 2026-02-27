@@ -1,7 +1,6 @@
 #nullable enable
 
 using HarmonyLib;
-using System.Reflection;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
@@ -26,7 +25,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
     internal sealed class LastChanceEnemyVisionHeadProxyRuntime : MonoBehaviour
     {
-        private static readonly FieldInfo? s_enemyVisionMaskField = AccessTools.Field(typeof(Enemy), "VisionMask");
         private EnemyVision? _vision;
         private Enemy? _enemy;
         private float _tick;
@@ -75,11 +73,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            var visionMask = s_enemyVisionMaskField?.GetValue(_enemy) as LayerMask?;
-            if (visionMask == null)
-            {
-                return;
-            }
+            var visionMask = _enemy.VisionMask;
 
             for (var i = 0; i < players.Count; i++)
             {
@@ -104,7 +98,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                if (!LastChanceMonstersTargetProxyHelper.IsLineOfSightToHead(origin, headCenter, visionMask.Value, player!))
+                if (!LastChanceMonstersTargetProxyHelper.IsLineOfSightToHead(origin, headCenter, visionMask, player!))
                 {
                     continue;
                 }
