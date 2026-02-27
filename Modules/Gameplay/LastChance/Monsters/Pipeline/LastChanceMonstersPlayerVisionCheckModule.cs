@@ -1,53 +1,44 @@
 #nullable enable
 
-using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
 using BepInEx.Logging;
-using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch]
     internal static class LastChanceMonstersPlayerVisionCheckModule
     {
         private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersPlayerVisionCheck";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.CeilingEye");
-        private static readonly HashSet<MethodBase> s_patchedMethods = new();
+        private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods = CreateTargetMethods();
         private static Harmony? s_harmony;
+
+        private static readonly System.Reflection.MethodInfo? s_playerVisionCheckVanilla = AccessTools.Method(
+            typeof(SemiFunc),
+            nameof(SemiFunc.PlayerVisionCheck),
+            new[] { typeof(Vector3), typeof(float), typeof(PlayerAvatar), typeof(bool) });
+
+        private static readonly System.Reflection.MethodInfo? s_playerVisionCheckPositionVanilla = AccessTools.Method(
+            typeof(SemiFunc),
+            nameof(SemiFunc.PlayerVisionCheckPosition),
+            new[] { typeof(Vector3), typeof(Vector3), typeof(float), typeof(PlayerAvatar), typeof(bool) });
+
+        private static readonly System.Reflection.MethodInfo? s_playerVisionCheckProxy = AccessTools.Method(
+            typeof(LastChanceMonstersPlayerVisionCheckModule),
+            nameof(PlayerVisionCheckLastChanceAware));
+
+        private static readonly System.Reflection.MethodInfo? s_playerVisionCheckPositionProxy = AccessTools.Method(
+            typeof(LastChanceMonstersPlayerVisionCheckModule),
+            nameof(PlayerVisionCheckPositionLastChanceAware));
 
         internal static void ResetRuntimeState()
         {
             LastChanceMonstersCeilingEyeLockCoordinator.ResetRuntimeState();
-        }
-
-        private static readonly MethodInfo? s_playerVisionCheckVanilla = AccessTools.Method(
-            typeof(SemiFunc),
-            "PlayerVisionCheck",
-            new[] { typeof(Vector3), typeof(float), typeof(PlayerAvatar), typeof(bool) });
-
-        private static readonly MethodInfo? s_playerVisionCheckPositionVanilla = AccessTools.Method(
-            typeof(SemiFunc),
-            "PlayerVisionCheckPosition",
-            new[] { typeof(Vector3), typeof(Vector3), typeof(float), typeof(PlayerAvatar), typeof(bool) });
-
-        private static readonly MethodInfo? s_playerVisionCheckProxy = AccessTools.Method(
-            typeof(LastChanceMonstersPlayerVisionCheckModule),
-            nameof(PlayerVisionCheckLastChanceAware));
-
-        private static readonly MethodInfo? s_playerVisionCheckPositionProxy = AccessTools.Method(
-            typeof(LastChanceMonstersPlayerVisionCheckModule),
-            nameof(PlayerVisionCheckPositionLastChanceAware));
-
-        [HarmonyPrepare]
-        private static bool Prepare()
-        {
-            return false;
         }
 
         internal static void Apply()
@@ -59,8 +50,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             s_harmony = new Harmony(PatchId);
             var transpiler = new HarmonyMethod(typeof(LastChanceMonstersPlayerVisionCheckModule), nameof(ReplaceVisionChecks));
-            var methods = TargetMethods();
-            foreach (var method in methods)
+            foreach (var method in s_targetMethods)
             {
                 if (method == null || s_patchedMethods.Contains(method))
                 {
@@ -93,49 +83,26 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             ResetRuntimeState();
         }
 
-        [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private static List<System.Reflection.MethodBase> CreateTargetMethods()
         {
-            var methods = new List<MethodBase>();
-            Type[] types;
-            try
-            {
-                types = typeof(Enemy).Assembly.GetTypes();
-            }
-            catch
-            {
-                return methods;
-            }
-
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                if (type == null || type.Name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-
-                const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                var typeMethods = type.GetMethods(flags);
-                for (var m = 0; m < typeMethods.Length; m++)
-                {
-                    var method = typeMethods[m];
-                    if (method == null || method.IsAbstract || method.GetMethodBody() == null)
-                    {
-                        continue;
-                    }
-
-                    if (MethodCallsVisionChecks(method))
-                    {
-                        methods.Add(method);
-                    }
-                }
-            }
-
+            var methods = new List<System.Reflection.MethodBase>();
+            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
+            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.OnVisionTrigger));
+            AddMethod(methods, typeof(EnemySpinny), "HasLineOfSight");
             return methods;
         }
 
-        [HarmonyTranspiler]
+        private static void AddMethod(List<System.Reflection.MethodBase> methods, System.Type declaringType, string methodName, params System.Type[] argumentTypes)
+        {
+            var method = argumentTypes.Length == 0
+                ? AccessTools.DeclaredMethod(declaringType, methodName)
+                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
+            if (method != null)
+            {
+                methods.Add(method);
+            }
+        }
+
         private static IEnumerable<CodeInstruction> ReplaceVisionChecks(IEnumerable<CodeInstruction> instructions)
         {
             if (s_playerVisionCheckVanilla == null || s_playerVisionCheckPositionVanilla == null || s_playerVisionCheckProxy == null || s_playerVisionCheckPositionProxy == null)
@@ -147,71 +114,31 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if (ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt)
+                if (ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt)
                 {
                     continue;
                 }
 
-                if (ins.operand is not MethodInfo called)
+                if (ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
 
                 if (called == s_playerVisionCheckVanilla)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_playerVisionCheckProxy;
                     continue;
                 }
 
                 if (called == s_playerVisionCheckPositionVanilla)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_playerVisionCheckPositionProxy;
                 }
             }
 
             return list;
-        }
-
-        private static bool MethodCallsVisionChecks(MethodBase method)
-        {
-            if (method == null || s_playerVisionCheckVanilla == null || s_playerVisionCheckPositionVanilla == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var body = method.GetMethodBody();
-                var il = body?.GetILAsByteArray();
-                if (il == null || il.Length < 5)
-                {
-                    return false;
-                }
-
-                var checkToken = s_playerVisionCheckVanilla.MetadataToken;
-                var checkPosToken = s_playerVisionCheckPositionVanilla.MetadataToken;
-                for (var i = 0; i <= il.Length - 5; i++)
-                {
-                    var op = il[i];
-                    if (op != 0x28 && op != 0x6F)
-                    {
-                        continue;
-                    }
-
-                    var token = BitConverter.ToInt32(il, i + 1);
-                    if (token == checkToken || token == checkPosToken)
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
         }
 
         internal static bool PlayerVisionCheckLastChanceAware(Vector3 position, float range, PlayerAvatar player, bool previouslySeen)
@@ -249,11 +176,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return allow;
         }
 
-
         private static bool HeadProxyVisionCheckPosition(Vector3 startPosition, Vector3 endPosition, float range, PlayerAvatar player)
         {
-            // Ceiling-eye specific resilience: test a few vertical samples so near-floor head proxies
-            // are still detectable when floor geometry clips the direct center ray.
             var candidatePoints = new[]
             {
                 endPosition,
@@ -317,8 +241,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                // If the obstruction is extremely close to target point, treat it as endpoint grazing
-                // (common when target is on/near floor).
                 var hitToTarget = Vector3.Distance(hits[i].point, endPosition);
                 if (hitToTarget <= 0.35f)
                 {
@@ -331,13 +253,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return true;
         }
 
-        private static void DebugVision(
-            string reason,
-            Vector3 startPosition,
-            Vector3 endPosition,
-            PlayerAvatar player,
-            float now,
-            bool decision)
+        private static void DebugVision(string reason, Vector3 startPosition, Vector3 endPosition, PlayerAvatar player, float now, bool decision)
         {
             if (!InternalDebugFlags.DebugLastChanceCeilingEyeFlow)
             {
@@ -356,4 +272,3 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
     }
 }
-
