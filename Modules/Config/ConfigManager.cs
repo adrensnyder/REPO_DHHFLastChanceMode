@@ -771,24 +771,7 @@ namespace DHHFLastChanceMode.Modules.Config
 
         private static Type? GetEntrySettingType(ConfigEntryBase entry)
         {
-            if (entry == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                var property = entry.GetType().GetProperty("SettingType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (property?.GetValue(entry) is Type settingType)
-                {
-                    return settingType;
-                }
-            }
-            catch
-            {
-            }
-
-            return entry.BoxedValue?.GetType();
+            return entry?.SettingType ?? entry?.BoxedValue?.GetType();
         }
 
         private static bool TryConvertForEntry(object? value, Type targetType, out object converted)
