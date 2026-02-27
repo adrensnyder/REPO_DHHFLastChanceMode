@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
@@ -9,14 +8,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch(typeof(EnemyTriggerAttack), "OnTriggerStay")]
     internal static class LastChanceMonstersTriggerAttackModule
     {
-        private static readonly FieldInfo? s_triggerCheckTimerSetField = AccessTools.Field(typeof(EnemyTriggerAttack), "TriggerCheckTimerSet");
-        private static readonly FieldInfo? s_triggerCheckTimerField = AccessTools.Field(typeof(EnemyTriggerAttack), "TriggerCheckTimer");
-        private static readonly FieldInfo? s_enemyStateLookUnderField = AccessTools.Field(typeof(Enemy), "StateLookUnder");
-        private static readonly FieldInfo? s_enemyStateChaseField = AccessTools.Field(typeof(Enemy), "StateChase");
-        private static readonly FieldInfo? s_enemyVisionField = AccessTools.Field(typeof(Enemy), "Vision");
-        private static readonly FieldInfo? s_enemyTriggerAttackAttackField = AccessTools.Field(typeof(EnemyTriggerAttack), "Attack");
-        private static readonly FieldInfo? s_stateLookUnderWaitDoneField = AccessTools.Field(typeof(EnemyStateLookUnder), "WaitDone");
-
         [HarmonyPrefix]
         private static bool OnTriggerStayPrefix(EnemyTriggerAttack __instance, Collider other)
         {
@@ -51,13 +42,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return false;
             }
 
-            var timer = s_triggerCheckTimerField?.GetValue(__instance) as float? ?? 0f;
+            var timer = __instance.TriggerCheckTimer;
             if (timer > 0f)
             {
                 return false;
             }
 
-            s_triggerCheckTimerSetField?.SetValue(__instance, true);
+            __instance.TriggerCheckTimerSet = true;
 
             var enemy = __instance.Enemy;
             if (enemy == null)
@@ -67,7 +58,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             if (enemy.GetComponent<EnemyAnimal>() != null)
             {
-                s_enemyTriggerAttackAttackField?.SetValue(__instance, true);
+                __instance.Attack = true;
                 return false;
             }
 
@@ -76,12 +67,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return false;
             }
 
-            var lookUnder = s_enemyStateLookUnderField?.GetValue(enemy) as EnemyStateLookUnder;
-            var chase = s_enemyStateChaseField?.GetValue(enemy) as EnemyStateChase;
-            var vision = s_enemyVisionField?.GetValue(enemy) as EnemyVision;
+            var lookUnder = enemy.StateLookUnder;
+            var chase = enemy.StateChase;
+            var vision = enemy.Vision;
             var lookUnderReady = enemy.CurrentState == EnemyState.LookUnder &&
                                  lookUnder != null &&
-                                 s_stateLookUnderWaitDoneField?.GetValue(lookUnder) as bool? == true;
+                                 lookUnder.WaitDone;
             var chaseCanReach = chase != null && chase.ChaseCanReach;
 
             var viewId = player.photonView.ViewID;
@@ -119,7 +110,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             if (allowAttack)
             {
-                s_enemyTriggerAttackAttackField?.SetValue(__instance, true);
+                __instance.Attack = true;
             }
 
             return false;
