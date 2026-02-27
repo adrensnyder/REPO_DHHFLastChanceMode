@@ -2,9 +2,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Reflection.Emit;
 using DHHFLastChanceMode.Modules.Config;
+using DeathHeadHopper.DeathHead;
 using HarmonyLib;
 using UnityEngine;
 
@@ -15,22 +15,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     {
         private static readonly Dictionary<int, float> OriginalAudioSourceVolumeByViewId = new();
         private static readonly Dictionary<int, float> OriginalTtsVolumeByViewId = new();
-        private static readonly FieldInfo? VoicePlayerAvatarField =
-            AccessTools.Field(typeof(PlayerVoiceChat), "playerAvatar");
-        private static readonly FieldInfo? VoicePhotonViewField =
-            AccessTools.Field(typeof(PlayerVoiceChat), "photonView");
-        private static readonly FieldInfo? VoiceAudioSourceField =
-            AccessTools.Field(typeof(PlayerVoiceChat), "audioSource");
-        private static readonly FieldInfo? VoiceTtsAudioSourceField =
-            AccessTools.Field(typeof(PlayerVoiceChat), "ttsAudioSource");
-        private static readonly FieldInfo? VoiceOverrideNoTalkAnimationTimerField =
-            AccessTools.Field(typeof(PlayerVoiceChat), "overrideNoTalkAnimationTimer");
-        private static readonly FieldInfo? HeadSpectatedField =
-            AccessTools.Field(typeof(PlayerDeathHead), "spectated");
-        private static readonly Type? DhhControllerType =
-            AccessTools.TypeByName("DeathHeadHopper.DeathHead.DeathHeadController");
-        private static readonly FieldInfo? DhhControllerSpectatedField =
-            DhhControllerType == null ? null : AccessTools.Field(DhhControllerType, "spectated");
 
         internal static void ResetRuntimeState()
         {
@@ -43,7 +27,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                     continue;
                 }
 
-                var photonView = VoicePhotonViewField?.GetValue(voiceChat) as Photon.Pun.PhotonView;
+                var photonView = voiceChat.photonView;
                 var viewId = photonView?.ViewID ?? -1;
                 RestoreVolumes(voiceChat, viewId);
             }
@@ -60,8 +44,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return;
             }
 
-            var playerAvatar = VoicePlayerAvatarField?.GetValue(__instance) as PlayerAvatar;
-            var photonView = VoicePhotonViewField?.GetValue(__instance) as Photon.Pun.PhotonView;
+            var playerAvatar = __instance.playerAvatar;
+            var photonView = __instance.photonView;
             if (playerAvatar == null || photonView == null)
             {
                 return;
@@ -82,11 +66,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-            if (HeadSpectatedField == null)
-            {
-                return instructions;
-            }
-
             var replacement = AccessTools.Method(typeof(LastChanceMonstersVoiceEnemyOnlyModule), nameof(GetEffectiveHeadSpectated));
             if (replacement == null)
             {
@@ -97,7 +76,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if (ins.opcode == OpCodes.Ldfld && ins.operand is FieldInfo f && f == HeadSpectatedField)
+                if (ins.opcode == OpCodes.Ldfld && ins.operand is System.Reflection.FieldInfo f && f.Name == nameof(PlayerDeathHead.spectated) && f.DeclaringType == typeof(PlayerDeathHead))
                 {
                     ins.opcode = OpCodes.Call;
                     ins.operand = replacement;
@@ -122,7 +101,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
 
             // Vanilla State.Head path.
-            if (HeadSpectatedField?.GetValue(head) is bool vanillaSpectated && vanillaSpectated)
+            if (head.spectated)
             {
                 return true;
             }
@@ -134,13 +113,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
 
             // DHH path: SpectateCamera Head is blocked, but DHH controller can still be spectated.
-            if (DhhControllerType != null && DhhControllerSpectatedField != null)
+            if (head.TryGetComponent<DeathHeadController>(out var controller) && controller != null && controller.spectated)
             {
-                var controller = head.GetComponent(DhhControllerType);
-                if (controller != null && DhhControllerSpectatedField.GetValue(controller) is bool dhhSpectated && dhhSpectated)
-                {
-                    return true;
-                }
+                return true;
             }
 
             return false;
@@ -148,7 +123,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
         private static void ApplyEnemyOnlyVoiceMix(PlayerVoiceChat voiceChat, int viewId)
         {
-            var audioSource = VoiceAudioSourceField?.GetValue(voiceChat) as AudioSource;
+            var audioSource = voiceChat.audioSource;
             if (audioSource != null)
             {
                 if (!OriginalAudioSourceVolumeByViewId.ContainsKey(viewId))
@@ -159,7 +134,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 audioSource.volume = 0f;
             }
 
-            var ttsAudioSource = VoiceTtsAudioSourceField?.GetValue(voiceChat) as AudioSource;
+            var ttsAudioSource = voiceChat.ttsAudioSource;
             if (ttsAudioSource != null)
             {
                 if (!OriginalTtsVolumeByViewId.ContainsKey(viewId))
@@ -173,24 +148,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
         private static void ForceTalkAnimationEnabled(PlayerVoiceChat voiceChat)
         {
-            if (VoiceOverrideNoTalkAnimationTimerField == null)
-            {
-                return;
-            }
-
-            VoiceOverrideNoTalkAnimationTimerField.SetValue(voiceChat, 0f);
+            voiceChat.overrideNoTalkAnimationTimer = 0f;
         }
 
         private static void RestoreVolumes(PlayerVoiceChat voiceChat, int viewId)
         {
-            var audioSource = VoiceAudioSourceField?.GetValue(voiceChat) as AudioSource;
+            var audioSource = voiceChat.audioSource;
             if (audioSource != null && OriginalAudioSourceVolumeByViewId.TryGetValue(viewId, out var originalVolume))
             {
                 audioSource.volume = originalVolume;
                 OriginalAudioSourceVolumeByViewId.Remove(viewId);
             }
 
-            var ttsAudioSource = VoiceTtsAudioSourceField?.GetValue(voiceChat) as AudioSource;
+            var ttsAudioSource = voiceChat.ttsAudioSource;
             if (ttsAudioSource != null && OriginalTtsVolumeByViewId.TryGetValue(viewId, out var originalTtsVolume))
             {
                 ttsAudioSource.volume = originalTtsVolume;
