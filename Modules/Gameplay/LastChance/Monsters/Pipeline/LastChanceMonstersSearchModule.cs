@@ -2,8 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
@@ -16,20 +14,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     internal static class LastChanceMonstersSearchModule
     {
         private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersSearch";
-        private const BindingFlags AnyInstanceField = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        private static readonly FieldInfo? s_playerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
-        private static readonly AccessTools.FieldRef<PlayerAvatar, bool>? s_playerIsDisabledGetter =
-            s_playerIsDisabledField != null ? AccessTools.FieldRefAccess<PlayerAvatar, bool>(s_playerIsDisabledField.Name) : null;
-        private static readonly FieldInfo? s_enemyParentSpawnedField = typeof(EnemyParent).GetField("Spawned", AnyInstanceField);
-        private static readonly FieldInfo? s_enemyParentForceLeaveField = typeof(EnemyParent).GetField("forceLeave", AnyInstanceField);
-        private static readonly FieldInfo? s_enemyParentEnemyField =
-            typeof(EnemyParent).GetField("Enemy", AnyInstanceField) ??
-            typeof(EnemyParent).GetField("enemy", AnyInstanceField);
+        private static readonly AccessTools.FieldRef<PlayerAvatar, bool> s_playerIsDisabledGetter =
+            AccessTools.FieldRefAccess<PlayerAvatar, bool>(nameof(PlayerAvatar.isDisabled));
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
-        private static readonly HashSet<MethodBase> s_patchedMethods = new HashSet<MethodBase>();
-        private static readonly Dictionary<Assembly, List<MethodBase>> s_discoveredMethodsByAssembly = new();
+        private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
+        private static readonly List<System.Reflection.MethodBase> s_patchTargets = CreatePatchTargets();
         private static Harmony? s_harmony;
-        private static bool s_assemblyLoadHooked;
         private static float s_runtimeStateCachedAt;
         private static bool s_runtimeStateEnabled;
         private static bool s_loggedActivationSnapshot;
@@ -43,21 +33,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             s_lastSelfCheckAt = 0f;
         }
 
-        internal static void Apply(Harmony harmony, Assembly asm)
+        internal static void Apply(Harmony harmony, System.Reflection.Assembly asm)
         {
-            if (s_harmony != null || harmony == null || s_playerIsDisabledField == null)
+            if (s_harmony != null || harmony == null)
             {
                 return;
             }
 
             s_harmony = new Harmony(PatchId);
-            PatchAllLoadedAssemblies();
-
-            if (!s_assemblyLoadHooked)
-            {
-                AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
-                s_assemblyLoadHooked = true;
-            }
+            PatchExplicitTargets();
         }
 
         internal static void Unapply()
@@ -76,85 +60,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 // Best-effort unpatch.
             }
 
-            if (s_assemblyLoadHooked)
-            {
-                AppDomain.CurrentDomain.AssemblyLoad -= OnAssemblyLoad;
-                s_assemblyLoadHooked = false;
-            }
-
             s_patchedMethods.Clear();
-            s_discoveredMethodsByAssembly.Clear();
             s_harmony = null;
             ResetRuntimeState();
-        }
-
-        private static void PatchAllLoadedAssemblies()
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (var i = 0; i < assemblies.Length; i++)
-            {
-                TryPatchAssembly(assemblies[i]);
-            }
-        }
-
-        private static void OnAssemblyLoad(object? sender, AssemblyLoadEventArgs args)
-        {
-            TryPatchAssembly(args.LoadedAssembly);
-        }
-
-        private static void TryPatchAssembly(Assembly? asm)
-        {
-            if (asm == null || asm.IsDynamic || s_harmony == null || s_playerIsDisabledField == null)
-            {
-                return;
-            }
-
-            var methods = DiscoverPatchableMethods(asm);
-            if (methods.Count == 0)
-            {
-                return;
-            }
-
-            var transpiler = new HarmonyMethod(typeof(LastChanceMonstersSearchModule), nameof(ReplaceDisabledChecksTranspiler));
-            var patchedNow = 0;
-            for (var i = 0; i < methods.Count; i++)
-            {
-                var method = methods[i];
-                if (method == null || s_patchedMethods.Contains(method))
-                {
-                    continue;
-                }
-
-                s_harmony.Patch(method, transpiler: transpiler);
-                s_patchedMethods.Add(method);
-                patchedNow++;
-            }
-
-            if (patchedNow > 0 && FeatureFlags.DebugLogging)
-            {
-                Log.LogInfo($"[LastChance] MonstersSearch patched methods in {asm.GetName().Name}: {patchedNow}.");
-            }
-        }
-
-        private static List<MethodBase> DiscoverPatchableMethods(Assembly asm)
-        {
-            if (s_discoveredMethodsByAssembly.TryGetValue(asm, out var cached))
-            {
-                return cached;
-            }
-
-            List<MethodBase> discovered;
-            try
-            {
-                discovered = CollectEnemyMethodsUsingIsDisabled(asm);
-            }
-            catch
-            {
-                discovered = new List<MethodBase>();
-            }
-
-            s_discoveredMethodsByAssembly[asm] = discovered;
-            return discovered;
         }
 
         internal static int GetAliveSearchMonsterCount()
@@ -184,143 +92,143 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return count;
         }
 
-        private static bool IsActiveEnemy(EnemyParent enemyParent)
+        private static void PatchExplicitTargets()
         {
-            var spawned = s_enemyParentSpawnedField != null && s_enemyParentSpawnedField.GetValue(enemyParent) is bool spawnedValue && spawnedValue;
-            if (!spawned)
+            if (s_harmony == null)
             {
-                return false;
+                return;
             }
 
-            var forceLeave = s_enemyParentForceLeaveField != null && s_enemyParentForceLeaveField.GetValue(enemyParent) is bool forceLeaveValue && forceLeaveValue;
-            return !forceLeave;
-        }
-
-        private static List<MethodBase> CollectEnemyMethodsUsingIsDisabled(Assembly asm)
-        {
-            var methods = new List<MethodBase>();
-            var types = asm.GetTypes();
-            for (var i = 0; i < types.Length; i++)
+            var transpiler = new HarmonyMethod(typeof(LastChanceMonstersSearchModule), nameof(ReplaceDisabledChecksTranspiler));
+            var patchedNow = 0;
+            foreach (var method in s_patchTargets)
             {
-                var type = types[i];
-                if (type == null || !IsMonsterRelatedType(type) || IsSharedEnemyBaseType(type))
+                if (method == null || s_patchedMethods.Contains(method))
                 {
                     continue;
                 }
 
-                var flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                var typeMethods = type.GetMethods(flags);
-                for (var j = 0; j < typeMethods.Length; j++)
-                {
-                    var method = typeMethods[j];
-                    if (method == null || method.IsAbstract || method.GetMethodBody() == null)
-                    {
-                        continue;
-                    }
-
-                    if (!MethodReadsPlayerIsDisabled(method))
-                    {
-                        continue;
-                    }
-
-                    methods.Add(method);
-                }
+                s_harmony.Patch(method, transpiler: transpiler);
+                s_patchedMethods.Add(method);
+                patchedNow++;
             }
 
-            return methods;
+            if (patchedNow > 0 && FeatureFlags.DebugLogging)
+            {
+                Log.LogInfo($"[LastChance] MonstersSearch patched explicit methods: {patchedNow}.");
+            }
         }
 
-        private static bool IsMonsterRelatedType(Type type)
+        private static bool IsActiveEnemy(EnemyParent enemyParent)
         {
-            if (type.Name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            if (typeof(Enemy).IsAssignableFrom(type) || typeof(EnemyParent).IsAssignableFrom(type))
-            {
-                return true;
-            }
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-            var fields = type.GetFields(flags);
-            for (var i = 0; i < fields.Length; i++)
-            {
-                var fieldType = fields[i].FieldType;
-                if (typeof(Enemy).IsAssignableFrom(fieldType) || typeof(EnemyParent).IsAssignableFrom(fieldType))
-                {
-                    return true;
-                }
-            }
-
-            var properties = type.GetProperties(flags);
-            for (var i = 0; i < properties.Length; i++)
-            {
-                var propertyType = properties[i].PropertyType;
-                if (typeof(Enemy).IsAssignableFrom(propertyType) || typeof(EnemyParent).IsAssignableFrom(propertyType))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsSharedEnemyBaseType(Type type)
-        {
-            return type == typeof(Enemy) ||
-                   type == typeof(EnemyParent) ||
-                   type == typeof(EnemyState) ||
-                   type == typeof(EnemyType);
-        }
-
-        private static bool MethodReadsPlayerIsDisabled(MethodBase method)
-        {
-            if (method == null || s_playerIsDisabledField == null)
+            if (!enemyParent.Spawned)
             {
                 return false;
             }
 
-            try
+            return !enemyParent.forceLeave;
+        }
+
+        private static List<System.Reflection.MethodBase> CreatePatchTargets()
+        {
+            var methods = new List<System.Reflection.MethodBase>();
+
+            AddMethod(methods, typeof(Enemy), nameof(Enemy.SetChaseTarget), typeof(PlayerAvatar));
+            AddMethod(methods, typeof(Enemy), nameof(Enemy.OnPhotonSerializeView), typeof(Photon.Pun.PhotonStream), typeof(Photon.Pun.PhotonMessageInfo));
+            AddMethod(methods, typeof(EnemyBangDirector), "StateAttackPlayer");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "Update");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "CheckIfPlayersNearbyPop", typeof(Vector3));
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "PlayerNearby");
+            AddMethod(methods, typeof(EnemyBombThrower), "StateGotoPlayer");
+            AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayPlayer");
+            AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayHead");
+            AddMethod(methods, typeof(EnemyBombThrowerAnim), "HeadLookAtLogic");
+            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateSpawn", typeof(bool));
+            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateActive", typeof(bool));
+            AddMethod(methods, typeof(EnemyBombThrowerHead), "EyeLogic");
+            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
+            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.TargetFailSafe));
+            AddMethod(methods, typeof(EnemyDuck), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemyDuck), "StateGoToPlayerUnder");
+            AddMethod(methods, typeof(EnemyDuck), "StateGoToPlayerOver");
+            AddMethod(methods, typeof(EnemyDuck), "StateStun");
+            AddMethod(methods, typeof(EnemyDuck), "HeadLookAtLogic");
+            AddMethod(methods, typeof(EnemyDuck), "ChaseStop");
+            AddMethod(methods, typeof(EnemyElsa), "Update");
+            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerSmall");
+            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerUnderSmall");
+            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerOverBig");
+            AddMethod(methods, typeof(EnemyElsa), "StateLookUnderBig");
+            AddMethod(methods, typeof(EnemyElsa), "ChaseStop");
+            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackPlayer");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "GotoLogic");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "GotoOverLogic");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "DeathHeadLogic");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "GetClosestDeathHead", typeof(float));
+            AddMethod(methods, typeof(EnemyHeadUp), "Update");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerGoTo");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerPickup");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerMove");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerRelease");
+            AddMethod(methods, typeof(EnemyHidden), "PlayerTumbleLogic");
+            AddMethod(methods, typeof(EnemyOnScreen), "Logic");
+            AddMethod(methods, typeof(EnemyOogly), "FixedUpdate");
+            AddMethod(methods, typeof(EnemyOogly), "CheckSinglePlayerNearby");
+            AddMethod(methods, typeof(EnemyOogly), "StatePlayerSpotted");
+            AddMethod(methods, typeof(EnemyOogly), "StateWrestlePlayer");
+            AddMethod(methods, typeof(EnemyParent), "PlayerCloseLogic");
+            AddMethod(methods, typeof(EnemyPlayerDistance), "Logic");
+            AddMethod(methods, typeof(EnemyPlayerRoom), "Logic");
+            AddMethod(methods, typeof(EnemyRobe), "StateLookUnderAttack");
+            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer));
+            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver));
+            AddMethod(methods, typeof(EnemyShadow), "Update");
+            AddMethod(methods, typeof(EnemyShadow), "StateChooseTarget");
+            AddMethod(methods, typeof(EnemyShadow), "PlayerTargetTell");
+            AddMethod(methods, typeof(EnemyShadow), "PlayerTargetStopTell");
+            AddMethod(methods, typeof(EnemySlowMouth), "DetatchLogic");
+            AddMethod(methods, typeof(EnemySlowMouth), "StateAttached", typeof(bool));
+            AddMethod(methods, typeof(EnemySlowMouth), "StateDetach", typeof(bool));
+            AddMethod(methods, typeof(EnemySlowMouth), "StateGoToPlayerOver", typeof(bool));
+            AddMethod(methods, typeof(EnemySlowMouth), "StateGoToPlayerUnder", typeof(bool));
+            AddMethod(methods, typeof(EnemySlowMouth), "TargettingPlayer");
+            AddMethod(methods, typeof(EnemySlowMouth), "IsPossessedBySeveral");
+            AddMethod(methods, typeof(EnemySlowMouthAttaching), "Update");
+            AddMethod(methods, typeof(EnemySlowMouthAttaching), "AttachToPlayer");
+            AddMethod(methods, typeof(EnemySlowMouthPlayerAvatarAttached), "OnDisable");
+            AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack));
+            AddMethod(methods, typeof(EnemySpinny), "Update");
+            AddMethod(methods, typeof(EnemyStateChase), "Update");
+            AddMethod(methods, typeof(EnemyStateChaseBegin), "Update");
+            AddMethod(methods, typeof(EnemyStateRoaming), "PlayerTurn");
+            AddMethod(methods, typeof(EnemyStateSneak), "Update");
+            AddMethod(methods, typeof(EnemyThinMan), "StateStand");
+            AddMethod(methods, typeof(EnemyTick), "Update");
+            AddMethod(methods, typeof(EnemyTricycle), "StateStateBeforeAttack");
+            AddMethod(methods, typeof(EnemyTricycle), "StateAttackDive");
+            AddMethod(methods, typeof(EnemyTricycle), "FixedUpdateAttackDive");
+            AddMethod(methods, typeof(EnemyTricycle), "FixedUpdateAttack");
+            AddMethod(methods, typeof(EnemyTricycle), "RotationFollowTargetOrVelocity");
+            AddMethod(methods, typeof(EnemyTriggerAttack), "OnTriggerStay", typeof(Collider));
+            AddMethod(methods, typeof(EnemyValuableThrower), "TargetFailsafe");
+            AddMethod(methods, typeof(EnemyVision), "Vision");
+
+            return methods;
+        }
+
+        private static void AddMethod(List<System.Reflection.MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)
+        {
+            var method = argumentTypes.Length == 0
+                ? AccessTools.DeclaredMethod(declaringType, methodName)
+                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
+            if (method != null)
             {
-                var body = method.GetMethodBody();
-                var il = body?.GetILAsByteArray();
-                if (il == null || il.Length < 5)
-                {
-                    return false;
-                }
-
-                var targetToken = s_playerIsDisabledField.MetadataToken;
-                for (var i = 0; i <= il.Length - 5; i++)
-                {
-                    var op = il[i];
-                    if (op != 0x7B && op != 0x7C) // ldfld / ldflda
-                    {
-                        continue;
-                    }
-
-                    var token = BitConverter.ToInt32(il, i + 1);
-                    if (token == targetToken)
-                    {
-                        return true;
-                    }
-                }
+                methods.Add(method);
             }
-            catch
-            {
-                // IL probe is optional and can fail on non-standard method bodies.
-            }
-
-            return false;
         }
 
         private static IEnumerable<CodeInstruction> ReplaceDisabledChecksTranspiler(IEnumerable<CodeInstruction> instructions)
         {
-            if (s_playerIsDisabledField == null)
-            {
-                return instructions;
-            }
-
             var list = new List<CodeInstruction>(instructions);
             var remapMethod = AccessTools.Method(typeof(LastChanceMonstersSearchModule), nameof(RemapMonsterDisabledCheck));
             if (remapMethod == null)
@@ -331,11 +239,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < list.Count; i++)
             {
                 var instruction = list[i];
-                if ((instruction.opcode == OpCodes.Ldfld || instruction.opcode == OpCodes.Ldflda) &&
-                    instruction.operand is FieldInfo field &&
-                    field == s_playerIsDisabledField)
+                if ((instruction.opcode == System.Reflection.Emit.OpCodes.Ldfld || instruction.opcode == System.Reflection.Emit.OpCodes.Ldflda) &&
+                    instruction.operand is System.Reflection.FieldInfo field &&
+                    string.Equals(field.Name, nameof(PlayerAvatar.isDisabled), StringComparison.Ordinal) &&
+                    field.DeclaringType == typeof(PlayerAvatar))
                 {
-                    instruction.opcode = OpCodes.Call;
+                    instruction.opcode = System.Reflection.Emit.OpCodes.Call;
                     instruction.operand = remapMethod;
                 }
             }
@@ -345,7 +254,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         private static bool RemapMonsterDisabledCheck(PlayerAvatar? player)
         {
-            if (player == null || s_playerIsDisabledGetter == null)
+            if (player == null)
             {
                 return false;
             }
@@ -410,11 +319,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                if (s_playerIsDisabledGetter == null)
-                {
-                    return;
-                }
-
                 var rawDisabled = s_playerIsDisabledGetter(player);
                 var remapped = RemapMonsterDisabledCheck(player);
                 var expected = s_runtimeStateEnabled ? false : rawDisabled;
@@ -454,11 +358,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                var enemy = s_enemyParentEnemyField?.GetValue(parent);
+                var enemy = parent.Enemy;
                 var typeName = GetConcreteEnemyTypeName(enemy);
-                var spawned = s_enemyParentSpawnedField != null && s_enemyParentSpawnedField.GetValue(parent) is bool spawnedValue && spawnedValue;
-                var forceLeave = s_enemyParentForceLeaveField != null && s_enemyParentForceLeaveField.GetValue(parent) is bool forceLeaveValue && forceLeaveValue;
-                Log.LogInfo($"[LastChance] MonstersSearch enemy[{i}] type={typeName} spawned={spawned} forceLeave={forceLeave}");
+                Log.LogInfo($"[LastChance] MonstersSearch enemy[{i}] type={typeName} spawned={parent.Spawned} forceLeave={parent.forceLeave}");
             }
         }
 
@@ -495,4 +397,3 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
     }
 }
-
