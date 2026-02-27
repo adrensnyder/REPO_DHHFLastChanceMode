@@ -1,7 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
 using System.Reflection.Emit;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using HarmonyLib;
@@ -12,19 +11,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch(typeof(EnemyHidden), "StatePlayerMove")]
     internal static class LastChanceMonstersHiddenDestinationModule
     {
-        private static readonly MethodInfo? s_levelPointGetPlayerDistanceVanilla =
+        private static readonly System.Reflection.MethodInfo? s_levelPointGetPlayerDistanceVanilla =
             AccessTools.Method(typeof(SemiFunc), "LevelPointGetPlayerDistance", new[] { typeof(Vector3), typeof(float), typeof(float), typeof(bool) });
 
-        private static readonly MethodInfo? s_levelPointGetFurthestFromPlayerVanilla =
+        private static readonly System.Reflection.MethodInfo? s_levelPointGetFurthestFromPlayerVanilla =
             AccessTools.Method(typeof(SemiFunc), "LevelPointGetFurthestFromPlayer", new[] { typeof(Vector3), typeof(float) });
 
-        private static readonly MethodInfo? s_levelPointGetVanilla =
-            AccessTools.Method(typeof(SemiFunc), "LevelPointGet", new[] { typeof(Vector3), typeof(float), typeof(float) });
-
-        private static readonly MethodInfo? s_levelPointGetPlayerDistanceProxy =
+        private static readonly System.Reflection.MethodInfo? s_levelPointGetPlayerDistanceProxy =
             AccessTools.Method(typeof(LastChanceMonstersHiddenDestinationModule), nameof(LevelPointGetPlayerDistanceLastChanceAware));
 
-        private static readonly MethodInfo? s_levelPointGetFurthestFromPlayerProxy =
+        private static readonly System.Reflection.MethodInfo? s_levelPointGetFurthestFromPlayerProxy =
             AccessTools.Method(typeof(LastChanceMonstersHiddenDestinationModule), nameof(LevelPointGetFurthestFromPlayerLastChanceAware));
 
         [HarmonyTranspiler]
@@ -42,7 +38,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not MethodInfo called)
+                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
@@ -74,9 +70,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             // In LastChance all players may be "disabled" for this selector.
             // Keep vanilla first, then fallback to a generic reachable point search.
-            return s_levelPointGetVanilla != null
-                ? SemiFunc.LevelPointGet(position, 8f, 999f)
-                : point;
+            return SemiFunc.LevelPointGet(position, 8f, 999f);
         }
 
         internal static LevelPoint? LevelPointGetFurthestFromPlayerLastChanceAware(Vector3 position, float minDistance)
@@ -87,9 +81,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return point;
             }
 
-            return s_levelPointGetVanilla != null
-                ? SemiFunc.LevelPointGet(position, 8f, 999f)
-                : point;
+            return SemiFunc.LevelPointGet(position, 8f, 999f);
         }
     }
 }
