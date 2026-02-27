@@ -1,7 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
@@ -12,12 +11,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     {
         private const float ProbeInterval = 0.2f;
         private static readonly Dictionary<int, float> NextProbeAtByAnimal = new();
-
-        private static readonly FieldInfo? AnimalEnemyField = AccessTools.Field(typeof(EnemyAnimal), "enemy");
-        private static readonly FieldInfo? EnemyVisionField = AccessTools.Field(typeof(Enemy), "Vision");
-        private static readonly FieldInfo? EnemyVisionMaskField = AccessTools.Field(typeof(Enemy), "VisionMask");
-        private static readonly FieldInfo? VisionOnTriggeredPlayerField = AccessTools.Field(typeof(EnemyVision), "onVisionTriggeredPlayer");
-        private static readonly FieldInfo? VisionOnTriggeredIdField = AccessTools.Field(typeof(EnemyVision), "onVisionTriggeredID");
 
         [HarmonyPostfix]
         private static void UpdatePostfix(EnemyAnimal __instance)
@@ -44,8 +37,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             NextProbeAtByAnimal[key] = now + ProbeInterval;
 
-            var enemy = AnimalEnemyField?.GetValue(__instance) as Enemy;
-            var vision = EnemyVisionField?.GetValue(enemy) as EnemyVision;
+            var enemy = __instance.enemy;
+            var vision = enemy?.Vision;
             var visionTransform = vision?.VisionTransform;
             if (enemy == null || vision == null || visionTransform == null)
             {
@@ -58,11 +51,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            var visionMask = EnemyVisionMaskField?.GetValue(enemy) as LayerMask?;
-            if (visionMask == null)
-            {
-                return;
-            }
+            var visionMask = enemy.VisionMask;
 
             for (var i = 0; i < players.Count; i++)
             {
@@ -92,13 +81,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                if (!LastChanceMonstersTargetProxyHelper.IsLineOfSightToHead(visionTransform, headCenter, visionMask.Value, player))
+                if (!LastChanceMonstersTargetProxyHelper.IsLineOfSightToHead(visionTransform, headCenter, visionMask, player))
                 {
                     continue;
                 }
 
-                VisionOnTriggeredPlayerField?.SetValue(vision, player);
-                VisionOnTriggeredIdField?.SetValue(vision, player.photonView != null ? player.photonView.ViewID : player.GetInstanceID());
+                vision.onVisionTriggeredPlayer = player;
+                vision.onVisionTriggeredID = player.photonView != null ? player.photonView.ViewID : player.GetInstanceID();
                 LastChanceMonstersTargetProxyHelper.EnsureVisionTriggered(vision, player, near);
                 __instance.OnVision();
                 return;
