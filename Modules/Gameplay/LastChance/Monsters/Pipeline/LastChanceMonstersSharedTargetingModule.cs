@@ -1,9 +1,6 @@
 #nullable enable
 
-using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 
@@ -12,61 +9,32 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedPlayerSearchModule
     {
-        private static readonly MethodInfo? s_getAllVanillaMethod = AccessTools.Method(
+        private static readonly System.Reflection.MethodInfo? s_getAllVanillaMethod = AccessTools.Method(
             typeof(SemiFunc),
-            "PlayerGetAllPlayerAvatarWithinRange",
+            nameof(SemiFunc.PlayerGetAllPlayerAvatarWithinRange),
             new[] { typeof(float), typeof(Vector3), typeof(bool), typeof(LayerMask) });
 
-        private static readonly MethodInfo? s_getNearestVanillaMethod = AccessTools.Method(
+        private static readonly System.Reflection.MethodInfo? s_getNearestVanillaMethod = AccessTools.Method(
             typeof(SemiFunc),
-            "PlayerGetNearestPlayerAvatarWithinRange",
+            nameof(SemiFunc.PlayerGetNearestPlayerAvatarWithinRange),
             new[] { typeof(float), typeof(Vector3), typeof(bool), typeof(LayerMask) });
 
-        private static readonly MethodInfo? s_getAllProxyMethod =
+        private static readonly System.Reflection.MethodInfo? s_getAllProxyMethod =
             AccessTools.Method(typeof(LastChanceMonstersSharedPlayerSearchModule), nameof(GetAllPlayersWithinRangeLastChanceAware));
 
-        private static readonly MethodInfo? s_getNearestProxyMethod =
+        private static readonly System.Reflection.MethodInfo? s_getNearestProxyMethod =
             AccessTools.Method(typeof(LastChanceMonstersSharedPlayerSearchModule), nameof(GetNearestPlayerWithinRangeLastChanceAware));
 
         [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new List<MethodBase>();
-            Type[] types;
-            try
-            {
-                types = typeof(Enemy).Assembly.GetTypes();
-            }
-            catch
-            {
-                return methods;
-            }
-
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                if (type == null || !IsMonsterRelatedType(type) || IsTricycleType(type))
-                {
-                    continue;
-                }
-
-                const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                var typeMethods = type.GetMethods(flags);
-                for (var m = 0; m < typeMethods.Length; m++)
-                {
-                    var method = typeMethods[m];
-                    if (method == null || method.IsAbstract || method.GetMethodBody() == null)
-                    {
-                        continue;
-                    }
-
-                    if (MethodCallsSharedPlayerSearch(method))
-                    {
-                        methods.Add(method);
-                    }
-                }
-            }
-
+            var methods = new List<System.Reflection.MethodBase>();
+            AddMethod(methods, typeof(EnemyElsa), "StateStunSmall");
+            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnHurt));
+            AddMethod(methods, typeof(EnemyHeadGrabber), "StateBackToNavmesh");
+            AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.FindLevelPointAndCreateCeilingRoamPoints));
+            AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.OnInvestigate));
+            AddMethod(methods, typeof(EnemyOogly), "StateCeilingRoam");
             return methods;
         }
 
@@ -82,26 +50,26 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if (ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt)
+                if (ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt)
                 {
                     continue;
                 }
 
-                if (ins.operand is not MethodInfo called)
+                if (ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
 
                 if (called == s_getAllVanillaMethod)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_getAllProxyMethod;
                     continue;
                 }
 
                 if (called == s_getNearestVanillaMethod)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_getNearestProxyMethod;
                 }
             }
@@ -109,89 +77,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return list;
         }
 
-        private static bool IsMonsterRelatedType(Type type)
+        private static void AddMethod(List<System.Reflection.MethodBase> methods, System.Type declaringType, string methodName, params System.Type[] argumentTypes)
         {
-            if (type.Name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) >= 0)
+            var method = argumentTypes.Length == 0
+                ? AccessTools.DeclaredMethod(declaringType, methodName)
+                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
+            if (method != null)
             {
-                return true;
+                methods.Add(method);
             }
-
-            if (typeof(Enemy).IsAssignableFrom(type) || typeof(EnemyParent).IsAssignableFrom(type))
-            {
-                return true;
-            }
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-            var fields = type.GetFields(flags);
-            for (var i = 0; i < fields.Length; i++)
-            {
-                var fieldType = fields[i].FieldType;
-                if (typeof(Enemy).IsAssignableFrom(fieldType) || typeof(EnemyParent).IsAssignableFrom(fieldType))
-                {
-                    return true;
-                }
-            }
-
-            var properties = type.GetProperties(flags);
-            for (var i = 0; i < properties.Length; i++)
-            {
-                var propertyType = properties[i].PropertyType;
-                if (typeof(Enemy).IsAssignableFrom(propertyType) || typeof(EnemyParent).IsAssignableFrom(propertyType))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsTricycleType(Type type)
-        {
-            return type.Name.IndexOf("Tricycle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   (type.FullName?.IndexOf("Tricycle", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
-                   type.Name.IndexOf("Animal", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   (type.FullName?.IndexOf("Animal", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0;
-        }
-
-        private static bool MethodCallsSharedPlayerSearch(MethodBase method)
-        {
-            if (method == null || s_getAllVanillaMethod == null || s_getNearestVanillaMethod == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var body = method.GetMethodBody();
-                var il = body?.GetILAsByteArray();
-                if (il == null || il.Length < 5)
-                {
-                    return false;
-                }
-
-                var allToken = s_getAllVanillaMethod.MetadataToken;
-                var nearestToken = s_getNearestVanillaMethod.MetadataToken;
-
-                for (var i = 0; i <= il.Length - 5; i++)
-                {
-                    var op = il[i];
-                    if (op != 0x28 && op != 0x6F)
-                    {
-                        continue;
-                    }
-
-                    var token = BitConverter.ToInt32(il, i + 1);
-                    if (token == allToken || token == nearestToken)
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
         }
 
         private static List<PlayerAvatar> GetAllPlayersWithinRangeLastChanceAware(float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
@@ -304,51 +198,102 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersEffectiveTargetPointModule
     {
-        private static readonly MethodInfo? s_transformGetPositionMethod =
+        private static readonly System.Reflection.MethodInfo? s_transformGetPositionMethod =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
 
-        private static readonly MethodInfo? s_effectiveTransformPositionMethod =
+        private static readonly System.Reflection.MethodInfo? s_effectiveTransformPositionMethod =
             AccessTools.Method(typeof(LastChanceMonstersEffectiveTargetPointModule), nameof(GetEffectiveTransformPosition));
 
         [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new List<MethodBase>();
-            Type[] types;
-            try
-            {
-                types = typeof(Enemy).Assembly.GetTypes();
-            }
-            catch
-            {
-                return methods;
-            }
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                if (type == null || !IsMonsterRelatedType(type) || IsTricycleType(type))
-                {
-                    continue;
-                }
-
-                var typeMethods = type.GetMethods(flags);
-                for (var m = 0; m < typeMethods.Length; m++)
-                {
-                    var method = typeMethods[m];
-                    if (method == null || method.IsAbstract || method.GetMethodBody() == null)
-                    {
-                        continue;
-                    }
-
-                    if (MethodUsesPlayerTargetTransformPosition(method))
-                    {
-                        methods.Add(method);
-                    }
-                }
-            }
-
+            var methods = new List<System.Reflection.MethodBase>();
+            AddMethod(methods, typeof(EnemyBangDirector), "StateAttackPlayer");
+            AddMethod(methods, typeof(EnemyBeamer), "StateAttackStart");
+            AddMethod(methods, typeof(EnemyBeamer), "StateMeleeStart");
+            AddMethod(methods, typeof(EnemyBeamer), nameof(EnemyBeamer.OnVision));
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateGoToPlayerAngry");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttack");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttackUnder");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttackOver");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "PlayerOnNavMesh");
+            AddMethod(methods, typeof(EnemyBombThrower), "StateGotoPlayer");
+            AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayPlayer");
+            AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayHead");
+            AddMethod(methods, typeof(EnemyBombThrower), "RotationStateSet", typeof(EnemyBombThrower.RotationState));
+            AddMethod(methods, typeof(EnemyBombThrower), "AttackSetLogic");
+            AddMethod(methods, typeof(EnemyBombThrower), "MeleeLogic");
+            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateActive", typeof(bool));
+            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.Update));
+            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
+            AddMethod(methods, typeof(EnemyCeilingEye), "RotationAnimation");
+            AddMethod(methods, typeof(EnemyDuck), "StateChaseNavmesh");
+            AddMethod(methods, typeof(EnemyDuck), "TargetPositionLogic");
+            AddMethod(methods, typeof(EnemyDuck), "RotationLogic");
+            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerSmall");
+            AddMethod(methods, typeof(EnemyElsa), "StateLookUnderStartBig");
+            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnVision));
+            AddMethod(methods, typeof(EnemyElsa), "TargetPositionLogic");
+            AddMethod(methods, typeof(EnemyElsa), "RotationLogic");
+            AddMethod(methods, typeof(EnemyElsa), "AnnoyingJumpCheck");
+            AddMethod(methods, typeof(EnemyFloater), "StateNotice");
+            AddMethod(methods, typeof(EnemyFloater), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemyFloater), "StateSneak");
+            AddMethod(methods, typeof(EnemyFloater), "RotationLogic");
+            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackSet");
+            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackPlayer");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "RotationLogic");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "GotoLogic");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "GotoOverLogic");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerGoTo");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerMove");
+            AddMethod(methods, typeof(EnemyHidden), "StatePlayerRelease");
+            AddMethod(methods, typeof(EnemyHidden), "RotationLogic");
+            AddMethod(methods, typeof(EnemyOogly), "VisionBlocked");
+            AddMethod(methods, typeof(EnemyOogly), "StatePlayerSpotted");
+            AddMethod(methods, typeof(EnemyOogly), "StateDive");
+            AddMethod(methods, typeof(EnemyRobe), "StateTargetPlayer");
+            AddMethod(methods, typeof(EnemyRobe), "StateLookUnderStart");
+            AddMethod(methods, typeof(EnemyRobe), "StateLookUnder");
+            AddMethod(methods, typeof(EnemyRobe), nameof(EnemyRobe.OnVision));
+            AddMethod(methods, typeof(EnemyRobe), "MoveTowardPlayer");
+            AddMethod(methods, typeof(EnemyRobe), "RotationLogic");
+            AddMethod(methods, typeof(EnemyRunner), "StateSneak");
+            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer));
+            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver));
+            AddMethod(methods, typeof(EnemyRunner), "StateLookUnderStart");
+            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.OnVision));
+            AddMethod(methods, typeof(EnemyRunner), "RotationLogic");
+            AddMethod(methods, typeof(EnemyShadow), nameof(EnemyShadow.Update));
+            AddMethod(methods, typeof(EnemyShadow), "StateFollow");
+            AddMethod(methods, typeof(EnemyShadow), "UpdateHandPositionTo", typeof(Transform));
+            AddMethod(methods, typeof(EnemyShadow), "GetHandTarget", typeof(bool));
+            AddMethod(methods, typeof(EnemyShadow), "PlayerTargetTell");
+            AddMethod(methods, typeof(EnemyShadow), "DistanceFromPlayer");
+            AddMethod(methods, typeof(EnemySlowMouth), "TargetPositionLogic");
+            AddMethod(methods, typeof(EnemySlowWalker), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemySlowWalker), "StateSneak");
+            AddMethod(methods, typeof(EnemySlowWalker), "StateLookUnderStart");
+            AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack));
+            AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.OnVision));
+            AddMethod(methods, typeof(EnemySlowWalker), "RotationLogic");
+            AddMethod(methods, typeof(EnemySpinny), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemySpinny), "LerpToFaceTargetPlayer", typeof(float));
+            AddMethod(methods, typeof(EnemySpinny), "CloseToPlayerTarget", typeof(float));
+            AddMethod(methods, typeof(EnemySpinnyAnim), nameof(EnemySpinnyAnim.Update));
+            AddMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+            AddMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
+            AddMethod(methods, typeof(EnemyThinMan), "StateDamage");
+            AddMethod(methods, typeof(EnemyThinManAnim), nameof(EnemyThinManAnim.Update));
+            AddMethod(methods, typeof(EnemyThinManAnim), "NoticeSet", typeof(bool));
+            AddMethod(methods, typeof(EnemyTick), "RotationLogic");
+            AddMethod(methods, typeof(EnemyTick), "Suck");
+            AddMethod(methods, typeof(EnemyTumbler), "StateMoveToPlayer");
+            AddMethod(methods, typeof(EnemyTumbler), "StateTumble");
+            AddMethod(methods, typeof(EnemyUpscream), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemyUpscreamAnim), "AttackImpulse");
+            AddMethod(methods, typeof(EnemyValuableThrower), "StateGetValuable");
+            AddMethod(methods, typeof(EnemyValuableThrower), "StateTargetPlayer");
             return methods;
         }
 
@@ -375,14 +320,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not MethodInfo called)
+                if ((ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
 
                 if (called == s_transformGetPositionMethod)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_effectiveTransformPositionMethod;
                 }
             }
@@ -390,64 +335,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return list;
         }
 
-        private static bool MethodUsesPlayerTargetTransformPosition(MethodBase method)
+        private static void AddMethod(List<System.Reflection.MethodBase> methods, System.Type declaringType, string methodName, params System.Type[] argumentTypes)
         {
-            if (method == null || s_transformGetPositionMethod == null)
+            var method = argumentTypes.Length == 0
+                ? AccessTools.DeclaredMethod(declaringType, methodName)
+                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
+            if (method != null)
             {
-                return false;
+                methods.Add(method);
             }
-
-            try
-            {
-                var body = method.GetMethodBody();
-                var il = body?.GetILAsByteArray();
-                if (il == null || il.Length < 5)
-                {
-                    return false;
-                }
-
-                var positionToken = s_transformGetPositionMethod.MetadataToken;
-                var hasPositionRead = false;
-                for (var i = 0; i <= il.Length - 5; i++)
-                {
-                    var op = il[i];
-                    if (op != 0x28 && op != 0x6F)
-                    {
-                        continue;
-                    }
-
-                    if (BitConverter.ToInt32(il, i + 1) == positionToken)
-                    {
-                        hasPositionRead = true;
-                        break;
-                    }
-                }
-
-                if (!hasPositionRead)
-                {
-                    return false;
-                }
-
-                var fields = method.DeclaringType?.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (fields == null)
-                {
-                    return false;
-                }
-
-                for (var i = 0; i < fields.Length; i++)
-                {
-                    var f = fields[i];
-                    if (typeof(PlayerAvatar).IsAssignableFrom(f.FieldType))
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
         }
 
         private static Vector3 GetEffectiveTransformPosition(Transform transform)
@@ -470,29 +366,5 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             return transform.position;
         }
-
-        private static bool IsMonsterRelatedType(Type type)
-        {
-            if (type.Name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            if (typeof(Enemy).IsAssignableFrom(type) || typeof(EnemyParent).IsAssignableFrom(type))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsTricycleType(Type type)
-        {
-            return type.Name.IndexOf("Tricycle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   (type.FullName?.IndexOf("Tricycle", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
-                   type.Name.IndexOf("Animal", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   (type.FullName?.IndexOf("Animal", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0;
-        }
-
     }
 }
