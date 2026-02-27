@@ -2,13 +2,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
@@ -27,105 +24,51 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             internal string LastState = string.Empty;
         }
 
-        private static readonly FieldInfo? DeathHeadPhysGrabObjectField = AccessTools.Field(typeof(PlayerDeathHead), "physGrabObject");
-        private static readonly FieldInfo? PhysGrabObjectRbField = AccessTools.Field(typeof(PhysGrabObject), "rb");
-        private static readonly FieldInfo? PhysGrabObjectCenterPointField = AccessTools.Field(typeof(PhysGrabObject), "centerPoint");
-        private static readonly FieldInfo? PhysGrabObjectPlayerGrabbingField = AccessTools.Field(typeof(PhysGrabObject), "playerGrabbing");
-        private static readonly Dictionary<Type, CarryReflection> ReflectionCache = new();
         private static readonly Dictionary<int, CarryAnchorState> AnchorByCarrier = new();
 
-        private sealed class CarryReflection
-        {
-            internal FieldInfo? CurrentStateField;
-            internal FieldInfo? PlayerTargetField;
-            internal FieldInfo? PlayerPickupTransformField;
-        }
-
         [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var results = new List<MethodBase>();
-            Type[] types;
-            try
-            {
-                types = typeof(Enemy).Assembly.GetTypes();
-            }
-            catch
-            {
-                return results;
-            }
-
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                if (type == null || type.Name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-
-                const BindingFlags methodFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                var method = type.GetMethod("PlayerTumbleLogic", methodFlags, null, Type.EmptyTypes, null);
-                if (method == null || method.GetMethodBody() == null)
-                {
-                    continue;
-                }
-
-                var cache = GetCarryReflection(type);
-                if (cache.PlayerTargetField == null || cache.PlayerPickupTransformField == null || cache.CurrentStateField == null)
-                {
-                    continue;
-                }
-
-                // Only keep methods that reference tumble in IL, to stay on carry-like pipelines.
-                if (!MethodMentionsTumble(method))
-                {
-                    continue;
-                }
-
-                results.Add(method);
-            }
-
-            return results;
+            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), "PlayerTumbleLogic");
         }
 
         [HarmonyPrefix]
-        private static bool Prefix(object __instance)
+        private static bool Prefix(EnemyHidden __instance)
         {
             if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
                 return true;
             }
 
-            var cache = GetCarryReflection(__instance.GetType());
-            var player = cache.PlayerTargetField?.GetValue(__instance) as PlayerAvatar;
+            var player = __instance.playerTarget;
             if (player == null || !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
             {
                 ClearPickupOrigin(__instance);
                 return true;
             }
 
-            if (!IsCarryState(__instance, cache))
+            if (!IsCarryState(__instance))
             {
                 ClearPickupOrigin(__instance);
                 return true;
             }
 
             var head = player.playerDeathHead;
-            var phys = head != null ? DeathHeadPhysGrabObjectField?.GetValue(head) as PhysGrabObject : null;
-            var rb = phys != null ? PhysGrabObjectRbField?.GetValue(phys) as Rigidbody : null;
-            var centerPoint = phys != null && PhysGrabObjectCenterPointField?.GetValue(phys) is Vector3 center ? center : head != null ? head.transform.position : Vector3.zero;
-            var pickupTransform = cache.PlayerPickupTransformField?.GetValue(__instance) as Transform;
+            var phys = head?.physGrabObject;
+            var rb = phys?.rb;
+            var centerPoint = phys != null ? phys.centerPoint : head != null ? head.transform.position : Vector3.zero;
+            var pickupTransform = __instance.playerPickupTransform;
             if (head == null || phys == null || rb == null || pickupTransform == null)
             {
                 return true;
             }
 
-            UpdatePickupOrigin(__instance, player, GetCurrentStateName(__instance, cache), centerPoint);
+            UpdatePickupOrigin(__instance, player, GetCurrentStateName(__instance), centerPoint);
 
             if (InternalDebugFlags.DebugLastChanceHiddenCarryFlow && LogLimiter.ShouldLog("HiddenCarry.PrefixState", 120))
             {
                 Log.LogInfo(
-                    $"[HiddenCarry][Prefix] state={GetCurrentStateName(__instance, cache)} " +
+                    $"[HiddenCarry][Prefix] state={GetCurrentStateName(__instance)} " +
                     $"headCenter={centerPoint} bodyPos={player.transform.position} pickupPos={pickupTransform.position}");
             }
 
@@ -135,11 +78,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             phys.OverrideDrag(1f, 0.1f);
 
             var strength = 1f;
-            if (PhysGrabObjectPlayerGrabbingField?.GetValue(phys) is System.Collections.ICollection grabbing && grabbing.Count > 0)
+            if (phys.playerGrabbing.Count > 0)
             {
                 strength = 0.5f;
             }
-            else if (IsState(__instance, cache, "PlayerRelease") || IsState(__instance, cache, "PlayerPickup"))
+            else if (IsState(__instance, EnemyHidden.State.PlayerRelease) || IsState(__instance, EnemyHidden.State.PlayerPickup))
             {
                 strength = 0.75f;
             }
@@ -185,78 +128,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             return true;
         }
 
-        private static CarryReflection GetCarryReflection(Type type)
+        private static bool IsCarryState(EnemyHidden instance)
         {
-            if (ReflectionCache.TryGetValue(type, out var cached))
-            {
-                return cached;
-            }
-
-            var built = new CarryReflection
-            {
-                CurrentStateField = LastChanceMonstersReflectionHelper.FindFieldInHierarchy(type, "currentState"),
-                PlayerTargetField = LastChanceMonstersReflectionHelper.FindFieldInHierarchy(type, "playerTarget"),
-                PlayerPickupTransformField = LastChanceMonstersReflectionHelper.FindFieldInHierarchy(type, "playerPickupTransform")
-            };
-
-            ReflectionCache[type] = built;
-            return built;
+            return IsState(instance, EnemyHidden.State.PlayerPickup) ||
+                   IsState(instance, EnemyHidden.State.PlayerMove) ||
+                   IsState(instance, EnemyHidden.State.PlayerRelease);
         }
 
-        private static bool MethodMentionsTumble(MethodBase method)
+        private static string GetCurrentStateName(EnemyHidden instance)
         {
-            try
-            {
-                var body = method.GetMethodBody();
-                var il = body?.GetILAsByteArray();
-                if (il == null || il.Length == 0)
-                {
-                    return false;
-                }
-
-                var tumbleField = AccessTools.Field(typeof(PlayerAvatar), "tumble");
-                if (tumbleField == null)
-                {
-                    return false;
-                }
-
-                var token = tumbleField.MetadataToken;
-                for (var i = 0; i <= il.Length - 5; i++)
-                {
-                    var op = il[i];
-                    if (op != OpCodes.Ldfld.Value && op != OpCodes.Ldflda.Value)
-                    {
-                        continue;
-                    }
-
-                    if (BitConverter.ToInt32(il, i + 1) == token)
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return false;
-        }
-
-        private static bool IsCarryState(object instance, CarryReflection cache)
-        {
-            return IsState(instance, cache, "PlayerPickup") ||
-                   IsState(instance, cache, "PlayerMove") ||
-                   IsState(instance, cache, "PlayerRelease");
-        }
-
-        private static string GetCurrentStateName(object instance, CarryReflection cache)
-        {
-            if (instance == null || cache.CurrentStateField == null)
+            if (instance == null)
             {
                 return string.Empty;
             }
 
-            return cache.CurrentStateField.GetValue(instance)?.ToString() ?? string.Empty;
+            return instance.currentState.ToString();
         }
 
         private static void UpdatePickupOrigin(object carrierInstance, PlayerAvatar player, string stateName, Vector3 currentHeadCenter)
@@ -318,16 +204,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             return player.GetInstanceID();
         }
 
-        private static bool IsState(object instance, CarryReflection cache, string stateName)
+        private static bool IsState(EnemyHidden instance, EnemyHidden.State state)
         {
-            if (instance == null || cache.CurrentStateField == null || string.IsNullOrWhiteSpace(stateName))
+            if (instance == null)
             {
                 return false;
             }
 
-            var value = cache.CurrentStateField.GetValue(instance);
-            var current = value?.ToString();
-            return string.Equals(current, stateName, StringComparison.Ordinal);
+            return instance.currentState == state;
         }
     }
 }
