@@ -4,49 +4,28 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Reflection;
 using BepInEx.Configuration;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Config
 {
-    [AttributeUsage(AttributeTargets.Field)]
-    internal sealed class FeatureConfigEntryAttribute : Attribute
-    {
-        public FeatureConfigEntryAttribute(string section, string description)
-        {
-            Section = section;
-            Description = description;
-        }
-
-        public string Section { get; }
-        public string Description { get; }
-        public string Key { get; set; } = string.Empty;
-        public float Min { get; set; } = float.NaN;
-        public float Max { get; set; } = float.NaN;
-        public string[]? Options { get; set; }
-        public bool HostControlled { get; set; } = true;
-
-        public bool HasRange => !float.IsNaN(Min) && !float.IsNaN(Max);
-    }
-
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
-    internal sealed class FeatureConfigAliasAttribute : Attribute
-    {
-        public FeatureConfigAliasAttribute(string oldSection, string oldKey)
-        {
-            OldSection = oldSection ?? string.Empty;
-            OldKey = oldKey ?? string.Empty;
-        }
-
-        public string OldSection { get; }
-        public string OldKey { get; }
-    }
-
     internal static class ConfigManager
     {
         private struct RangeF { public float Min, Max; }
         private struct RangeI { public int Min, Max; }
+        private sealed class HostControlledAccessor
+        {
+            public HostControlledAccessor(Type valueType, Func<object?> getter, Action<object?> setter)
+            {
+                ValueType = valueType;
+                Getter = getter;
+                Setter = setter;
+            }
+
+            public Type ValueType { get; }
+            public Func<object?> Getter { get; }
+            public Action<object?> Setter { get; }
+        }
 
         private static bool s_initialized;
         private static readonly char[] ColorSeparators = { ',', ';' };
@@ -54,7 +33,7 @@ namespace DHHFLastChanceMode.Modules.Config
         private static readonly Dictionary<string, RangeI> s_intRanges = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, HashSet<string>> s_stringOptions = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> s_stringDefaults = new(StringComparer.Ordinal);
-        private static readonly Dictionary<string, FieldInfo> s_hostControlledFields = new(StringComparer.Ordinal);
+        private static readonly Dictionary<string, HostControlledAccessor> s_hostControlledAccessors = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, ConfigEntryBase> s_hostControlledEntries = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> s_hostRuntimeOverrides = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, string> s_localHostControlledBaseline = new(StringComparer.Ordinal);
@@ -71,139 +50,70 @@ namespace DHHFLastChanceMode.Modules.Config
             }
 
             s_initialized = true;
-            BindConfigEntries(config, typeof(FeatureFlags), "General");
-            ConfigMigrationManager.Apply(config, typeof(FeatureFlags), "General");
+            BindConfigEntries(config);
+            ConfigMigrationManager.Apply(config);
             CaptureLocalHostControlledBaseline();
         }
 
-        private static void BindConfigEntries(ConfigFile config, Type targetType, string defaultSection)
+        private static void BindConfigEntries(ConfigFile config)
         {
-            foreach (var field in targetType.GetFields(BindingFlags.Public | BindingFlags.Static))
+            foreach (var definition in ConfigMetadata.FeatureFlagEntries)
             {
-                var attribute = field.GetCustomAttribute<FeatureConfigEntryAttribute>();
-                if (attribute == null)
+                if (definition is ConfigMetadata.BoolEntryDefinition boolDefinition)
                 {
+                    var entry = config.Bind(
+                        boolDefinition.Section,
+                        boolDefinition.Key,
+                        (bool)boolDefinition.GetValue(),
+                        new ConfigDescription(boolDefinition.Description, new AcceptableValueList<bool>(false, true)));
+                    RegisterHostControlledAccessor(boolDefinition);
+                    RegisterHostControlledEntry(boolDefinition, entry);
+                    ApplyAndWatch(entry, BuildRangeKey(boolDefinition.Section, boolDefinition.Key), value => boolDefinition.Setter(value), boolDefinition.HostControlled);
                     continue;
                 }
 
-                var section = string.IsNullOrWhiteSpace(attribute.Section) ? defaultSection : attribute.Section;
-                var key = string.IsNullOrWhiteSpace(attribute.Key) ? field.Name : attribute.Key;
-                var rangeKey = BuildRangeKey(section, key);
-                var description = attribute.Description ?? string.Empty;
-
-                if (field.FieldType == typeof(bool))
+                if (definition is ConfigMetadata.IntEntryDefinition intDefinition)
                 {
-                    var defaultValue = (bool)field.GetValue(null)!;
-                    var entry = config.Bind(section, key, defaultValue,
-                        new ConfigDescription(description, new AcceptableValueList<bool>(false, true)));
-                    RegisterHostControlledField(attribute, key, field);
-                    RegisterHostControlledEntry(attribute, key, entry);
-                    ApplyAndWatch(entry, rangeKey, value => field.SetValue(null, value), attribute.HostControlled);
+                    var entry = config.Bind(
+                        intDefinition.Section,
+                        intDefinition.Key,
+                        (int)intDefinition.GetValue(),
+                        new ConfigDescription(intDefinition.Description, new AcceptableValueRange<int>(intDefinition.Min, intDefinition.Max)));
+                    RegisterIntRange(BuildRangeKey(intDefinition.Section, intDefinition.Key), intDefinition.Min, intDefinition.Max);
+                    RegisterHostControlledAccessor(intDefinition);
+                    RegisterHostControlledEntry(intDefinition, entry);
+                    ApplyAndWatch(entry, BuildRangeKey(intDefinition.Section, intDefinition.Key), value => intDefinition.Setter(value), intDefinition.HostControlled);
                     continue;
                 }
 
-                if (field.FieldType == typeof(int))
+                if (definition is ConfigMetadata.FloatEntryDefinition floatDefinition)
                 {
-                    var defaultValue = (int)field.GetValue(null)!;
-                    ConfigEntry<int> entry;
-                    if (attribute.HasRange)
-                    {
-                        var min = GetIntRangeStart(attribute);
-                        var max = GetIntRangeEnd(attribute);
-                        entry = config.Bind(section, key, defaultValue,
-                            new ConfigDescription(description, new AcceptableValueRange<int>(min, max)));
-                        RegisterIntRange(rangeKey, min, max);
-                    }
-                    else
-                    {
-                        entry = config.Bind(section, key, defaultValue, description);
-                    }
-
-                    ApplyAndWatch(entry, rangeKey, value => field.SetValue(null, value), attribute.HostControlled);
-                    RegisterHostControlledField(attribute, key, field);
-                    RegisterHostControlledEntry(attribute, key, entry);
+                    var entry = config.Bind(
+                        floatDefinition.Section,
+                        floatDefinition.Key,
+                        (float)floatDefinition.GetValue(),
+                        new ConfigDescription(floatDefinition.Description, new AcceptableValueRange<float>(floatDefinition.Min, floatDefinition.Max)));
+                    RegisterFloatRange(BuildRangeKey(floatDefinition.Section, floatDefinition.Key), floatDefinition.Min, floatDefinition.Max);
+                    RegisterHostControlledAccessor(floatDefinition);
+                    RegisterHostControlledEntry(floatDefinition, entry);
+                    ApplyAndWatch(entry, BuildRangeKey(floatDefinition.Section, floatDefinition.Key), value => floatDefinition.Setter(value), floatDefinition.HostControlled);
                     continue;
                 }
 
-                if (field.FieldType == typeof(float))
+                if (definition is ConfigMetadata.StringEntryDefinition stringDefinition)
                 {
-                    var defaultValue = (float)field.GetValue(null)!;
-                    ConfigEntry<float> entry;
-                    if (attribute.HasRange)
-                    {
-                        var min = Math.Min(attribute.Min, attribute.Max);
-                        var max = Math.Max(attribute.Min, attribute.Max);
-                        entry = config.Bind(section, key, defaultValue,
-                            new ConfigDescription(description, new AcceptableValueRange<float>(min, max)));
-                        RegisterFloatRange(rangeKey, min, max);
-                    }
-                    else
-                    {
-                        entry = config.Bind(section, key, defaultValue, description);
-                    }
-
-                    ApplyAndWatch(entry, rangeKey, value => field.SetValue(null, value), attribute.HostControlled);
-                    RegisterHostControlledField(attribute, key, field);
-                    RegisterHostControlledEntry(attribute, key, entry);
-                    continue;
-                }
-
-                if (field.FieldType == typeof(string))
-                {
-                    var defaultValue = field.GetValue(null) as string ?? string.Empty;
-                    RegisterStringOptions(rangeKey, attribute.Options, defaultValue);
-                    ConfigEntry<string> entry;
-                    if (attribute.Options != null && attribute.Options.Length > 0)
-                    {
-                        entry = config.Bind(section, key, defaultValue,
-                            new ConfigDescription(description, new AcceptableValueList<string>(attribute.Options)));
-                    }
-                    else
-                    {
-                        entry = config.Bind(section, key, defaultValue, description);
-                    }
-                    RegisterHostControlledField(attribute, key, field);
-                    RegisterHostControlledEntry(attribute, key, entry);
-                    ApplyAndWatch(entry, rangeKey, value => field.SetValue(null, value), attribute.HostControlled);
-                    continue;
-                }
-
-                if (field.FieldType == typeof(Color))
-                {
-                    var defaultValue = (Color)field.GetValue(null)!;
-                    var entry = config.Bind(section, key, ColorToString(defaultValue), description);
-                    RegisterHostControlledField(attribute, key, field);
-                    RegisterHostControlledEntry(attribute, key, entry);
-                    ApplyAndWatch(entry, ColorFromString, value => field.SetValue(null, value), attribute.HostControlled);
+                    var defaultValue = (string)stringDefinition.GetValue();
+                    var rangeKey = BuildRangeKey(stringDefinition.Section, stringDefinition.Key);
+                    RegisterStringOptions(rangeKey, stringDefinition.Options.Count > 0 ? new List<string>(stringDefinition.Options).ToArray() : null, defaultValue);
+                    ConfigEntry<string> entry = stringDefinition.Options.Count > 0
+                        ? config.Bind(stringDefinition.Section, stringDefinition.Key, defaultValue, new ConfigDescription(stringDefinition.Description, new AcceptableValueList<string>(new List<string>(stringDefinition.Options).ToArray())))
+                        : config.Bind(stringDefinition.Section, stringDefinition.Key, defaultValue, stringDefinition.Description);
+                    RegisterHostControlledAccessor(stringDefinition);
+                    RegisterHostControlledEntry(stringDefinition, entry);
+                    ApplyAndWatch(entry, rangeKey, value => stringDefinition.Setter(value), stringDefinition.HostControlled);
                     continue;
                 }
             }
-        }
-
-        private static int GetIntRangeStart(FeatureConfigEntryAttribute attribute)
-        {
-            ValidateIntegerRange(attribute);
-            return (int)Math.Min(attribute.Min, attribute.Max);
-        }
-
-        private static int GetIntRangeEnd(FeatureConfigEntryAttribute attribute)
-        {
-            ValidateIntegerRange(attribute);
-            return (int)Math.Max(attribute.Min, attribute.Max);
-        }
-
-        private static void ValidateIntegerRange(FeatureConfigEntryAttribute attribute)
-        {
-            if (!IsWholeNumber(attribute.Min) || !IsWholeNumber(attribute.Max))
-            {
-                throw new InvalidOperationException("FeatureConfigEntryAttribute integer range values must be whole numbers.");
-            }
-        }
-
-        private static bool IsWholeNumber(float value)
-        {
-            double truncated = Math.Truncate(value);
-            return Math.Abs(value - truncated) < float.Epsilon;
         }
 
         private static void ApplyAndWatch<T>(ConfigEntry<T> entry, string rangeKey, Action<T> setter, bool notifyHostControlled)
@@ -279,30 +189,30 @@ namespace DHHFLastChanceMode.Modules.Config
             };
         }
 
-        private static void RegisterHostControlledField(FeatureConfigEntryAttribute attribute, string key, FieldInfo field)
+        private static void RegisterHostControlledAccessor(ConfigMetadata.EntryDefinition definition)
         {
-            if (!attribute.HostControlled)
+            if (!definition.HostControlled)
             {
                 return;
             }
 
-            s_hostControlledFields[key] = field;
+            s_hostControlledAccessors[definition.Key] = new HostControlledAccessor(definition.ValueType, definition.GetValue, definition.SetValue);
         }
 
-        private static void RegisterHostControlledEntry(FeatureConfigEntryAttribute attribute, string key, ConfigEntryBase entry)
+        private static void RegisterHostControlledEntry(ConfigMetadata.EntryDefinition definition, ConfigEntryBase entry)
         {
-            if (!attribute.HostControlled || entry == null)
+            if (!definition.HostControlled || entry == null)
             {
                 return;
             }
 
-            s_hostControlledEntries[key] = entry;
+            s_hostControlledEntries[definition.Key] = entry;
         }
 
         internal static Dictionary<string, string> SnapshotHostControlled()
         {
             var snapshot = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var kvp in s_hostControlledFields)
+            foreach (var kvp in s_hostControlledAccessors)
             {
                 if (s_hostRuntimeOverrides.TryGetValue(kvp.Key, out var overrideValue))
                 {
@@ -310,9 +220,7 @@ namespace DHHFLastChanceMode.Modules.Config
                     continue;
                 }
 
-                var field = kvp.Value;
-                var value = field.GetValue(null);
-                snapshot[kvp.Key] = SerializeValue(value, field.FieldType);
+                snapshot[kvp.Key] = SerializeValue(kvp.Value.Getter(), kvp.Value.ValueType);
             }
 
             return snapshot;
@@ -333,7 +241,7 @@ namespace DHHFLastChanceMode.Modules.Config
                     continue;
                 }
 
-                if (!s_hostControlledFields.TryGetValue(key, out var field))
+                if (!s_hostControlledAccessors.TryGetValue(key, out var accessor))
                 {
                     continue;
                 }
@@ -344,8 +252,7 @@ namespace DHHFLastChanceMode.Modules.Config
                     continue;
                 }
 
-                var value = field.GetValue(null);
-                snapshot[key] = SerializeValue(value, field.FieldType);
+                snapshot[key] = SerializeValue(accessor.Getter(), accessor.ValueType);
             }
 
             return snapshot;
@@ -359,7 +266,7 @@ namespace DHHFLastChanceMode.Modules.Config
             }
 
             var normalized = key.Trim();
-            if (!s_hostControlledFields.ContainsKey(normalized))
+            if (!s_hostControlledAccessors.ContainsKey(normalized))
             {
                 return;
             }
@@ -404,20 +311,20 @@ namespace DHHFLastChanceMode.Modules.Config
             var entries = new List<KeyValuePair<string, string>>(snapshot);
             foreach (var kvp in entries)
             {
-                if (!s_hostControlledFields.TryGetValue(kvp.Key, out var field))
+                if (!s_hostControlledAccessors.TryGetValue(kvp.Key, out var accessor))
                 {
                     continue;
                 }
 
-                var parsed = DeserializeValue(kvp.Value, field.FieldType);
+                var parsed = DeserializeValue(kvp.Value, accessor.ValueType);
                 if (parsed != null)
                 {
-                    var current = field.GetValue(null);
+                    var current = accessor.Getter();
                     if (current == null || !current.Equals(parsed))
                     {
                         changed = true;
                     }
-                    field.SetValue(null, parsed);
+                    accessor.Setter(parsed);
                 }
 
                 SetHostControlledEntryValue(kvp.Key, kvp.Value);
@@ -677,13 +584,12 @@ namespace DHHFLastChanceMode.Modules.Config
                 return;
             }
 
-            if (!s_hostControlledFields.TryGetValue(key, out var field))
+            if (!s_hostControlledAccessors.TryGetValue(key, out var accessor))
             {
                 return;
             }
 
-            var value = field.GetValue(null);
-            s_localHostControlledBaseline[key] = SerializeValue(value, field.FieldType);
+            s_localHostControlledBaseline[key] = SerializeValue(accessor.Getter(), accessor.ValueType);
         }
 
         private static bool ShouldRejectClientHostControlledWrite(string key, out string authoritativeSerialized)
@@ -701,12 +607,12 @@ namespace DHHFLastChanceMode.Modules.Config
                 return false;
             }
 
-            if (!s_hostControlledFields.TryGetValue(key, out var field))
+            if (!s_hostControlledAccessors.TryGetValue(key, out var accessor))
             {
                 return false;
             }
 
-            authoritativeSerialized = SerializeValue(field.GetValue(null), field.FieldType);
+            authoritativeSerialized = SerializeValue(accessor.Getter(), accessor.ValueType);
             return true;
         }
 
