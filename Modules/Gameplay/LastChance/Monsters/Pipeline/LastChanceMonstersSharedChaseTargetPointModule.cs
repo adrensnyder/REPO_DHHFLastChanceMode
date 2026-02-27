@@ -1,8 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
@@ -17,20 +15,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Headman");
-        private static readonly MethodInfo? s_transformGetPositionMethod =
+        private static readonly System.Reflection.MethodInfo? s_transformGetPositionMethod =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
 
-        private static readonly MethodInfo? s_effectiveTransformPositionMethod =
+        private static readonly System.Reflection.MethodInfo? s_effectiveTransformPositionMethod =
             AccessTools.Method(typeof(LastChanceMonstersSharedChaseTargetPointModule), nameof(GetEffectiveTransformPosition));
 
         [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new List<MethodBase>();
+            var methods = new List<System.Reflection.MethodBase>();
 
-            AddIfFound(methods, typeof(EnemyStateChase), "Update");
-            AddIfFound(methods, typeof(EnemyStateChaseBegin), "Update");
-            AddIfFound(methods, typeof(EnemyStateChaseSlow), "Update");
+            AddIfFound(methods, typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
+            AddIfFound(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+            AddIfFound(methods, typeof(EnemyStateChaseSlow), nameof(EnemyStateChaseSlow.Update));
 
             return methods;
         }
@@ -53,14 +51,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not MethodInfo called)
+                if ((ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
 
                 if (called == s_transformGetPositionMethod)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_effectiveTransformPositionMethod;
                 }
             }
@@ -93,15 +91,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                             $"body={transform.position} head={headCenter}");
                     }
                 }
+
                 return headCenter;
             }
 
             return transform.position;
         }
 
-        private static void AddIfFound(List<MethodBase> methods, System.Type type, string methodName)
+        private static void AddIfFound(List<System.Reflection.MethodBase> methods, System.Type type, string methodName)
         {
-            var method = AccessTools.Method(type, methodName);
+            var method = AccessTools.DeclaredMethod(type, methodName);
             if (method != null)
             {
                 methods.Add(method);
