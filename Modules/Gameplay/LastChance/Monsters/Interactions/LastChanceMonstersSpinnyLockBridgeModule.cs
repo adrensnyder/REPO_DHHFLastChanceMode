@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
@@ -13,30 +12,13 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch]
+    [HarmonyPatch(typeof(EnemySpinny), "LockInPlayer")]
     internal static class LastChanceMonstersSpinnyLockBridgeModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spinny");
-        private static readonly Type? EnemySpinnyType = AccessTools.TypeByName("EnemySpinny");
-        private static readonly FieldInfo? PlayerTargetField = EnemySpinnyType != null ? AccessTools.Field(EnemySpinnyType, "playerTarget") : null;
-        private static readonly FieldInfo? CurrentStateField = EnemySpinnyType != null ? AccessTools.Field(EnemySpinnyType, "currentState") : null;
-        private static readonly FieldInfo? PlayerLockPointField = EnemySpinnyType != null ? AccessTools.Field(EnemySpinnyType, "playerLockPoint") : null;
-        private static readonly FieldInfo? OffLockPointTimerField = EnemySpinnyType != null ? AccessTools.Field(EnemySpinnyType, "offLockPointTimer") : null;
-        private static readonly FieldInfo? PlayerTumbleRbField = AccessTools.Field(typeof(PlayerTumble), "rb");
-
-        [HarmonyTargetMethod]
-        private static MethodBase? TargetMethod()
-        {
-            if (EnemySpinnyType == null)
-            {
-                return null;
-            }
-
-            return AccessTools.Method(EnemySpinnyType, "LockInPlayer", new[] { typeof(bool), typeof(bool) });
-        }
 
         [HarmonyPostfix]
-        private static void Postfix(object __instance, bool _horizontalPull = false, bool _fixedUpdate = false)
+        private static void Postfix(EnemySpinny __instance, bool _horizontalPull = false, bool _fixedUpdate = false)
         {
             if (__instance == null)
             {
@@ -48,19 +30,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return;
             }
 
-            if (!IsSpinnyLockState(__instance))
+            if (!IsSpinnyLockState(__instance.currentState))
             {
                 return;
             }
 
-            var player = PlayerTargetField?.GetValue(__instance) as PlayerAvatar;
+            var player = __instance.playerTarget;
             if (!LastChanceMonstersLockBridgeCore.IsHeadProxyRuntimeApplicable(player))
             {
                 return;
             }
 
             var tumble = player!.tumble;
-            var tumbleRb = PlayerTumbleRbField?.GetValue(tumble) as Rigidbody;
+            var tumbleRb = tumble.rb;
             if (tumbleRb == null)
             {
                 DebugLog("Bridge.Skip.NoTumbleRb", $"enemyId={GetInstanceKey(__instance)} player={GetPlayerId(player)}");
@@ -85,17 +67,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             DebugLog(
                 "Bridge.Apply",
-                $"enemyId={GetInstanceKey(__instance)} player={GetPlayerId(player)} state={ReadState(__instance)} dist={couple.Distance:0.00} follow={couple.ForceMagnitude:0.00} fixed={_fixedUpdate} horizontal={_horizontalPull}");
+                $"enemyId={GetInstanceKey(__instance)} player={GetPlayerId(player)} state={__instance.currentState} dist={couple.Distance:0.00} follow={couple.ForceMagnitude:0.00} fixed={_fixedUpdate} horizontal={_horizontalPull}");
         }
 
-        private static void StabilizeTumbleAtLockPoint(object instance, Rigidbody tumbleRb, bool fixedUpdate)
+        private static void StabilizeTumbleAtLockPoint(EnemySpinny instance, Rigidbody tumbleRb, bool fixedUpdate)
         {
-            if (!fixedUpdate || !string.Equals(ReadState(instance), "WaitForRoulette", StringComparison.Ordinal))
+            if (!fixedUpdate || instance.currentState != EnemySpinny.State.WaitForRoulette)
             {
                 return;
             }
 
-            var lockPoint = PlayerLockPointField?.GetValue(instance) as Transform;
+            var lockPoint = instance.playerLockPoint;
             if (lockPoint == null)
             {
                 return;
@@ -104,7 +86,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             var result = LastChanceMonstersLockBridgeCore.StabilizeTargetAtLockPoint(
                 tumbleRb,
                 lockPoint,
-                ReadFloat(instance, OffLockPointTimerField),
+                instance.offLockPointTimer,
                 fixedUpdate,
                 isPrimaryLockState: true);
             if (!result.Applied)
@@ -130,19 +112,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
         }
 
-        private static bool IsSpinnyLockState(object instance)
+        private static bool IsSpinnyLockState(EnemySpinny.State state)
         {
-            var state = ReadState(instance);
-            return string.Equals(state, "WaitForRoulette", StringComparison.Ordinal) ||
-                   string.Equals(state, "Roulette", StringComparison.Ordinal) ||
-                   string.Equals(state, "RouletteEndPause", StringComparison.Ordinal) ||
-                   string.Equals(state, "RouletteEnd", StringComparison.Ordinal) ||
-                   string.Equals(state, "RouletteEffect", StringComparison.Ordinal);
-        }
-
-        private static string ReadState(object instance)
-        {
-            return CurrentStateField?.GetValue(instance)?.ToString() ?? "n/a";
+            return state == EnemySpinny.State.WaitForRoulette ||
+                   state == EnemySpinny.State.Roulette ||
+                   state == EnemySpinny.State.RouletteEndPause ||
+                   state == EnemySpinny.State.RouletteEnd ||
+                   state == EnemySpinny.State.RouletteEffect;
         }
 
         private static void DebugLog(string reason, string detail)
@@ -165,31 +141,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             return player.photonView != null ? player.photonView.ViewID : player.GetInstanceID();
         }
 
-        private static int GetInstanceKey(object instance)
+        private static int GetInstanceKey(EnemySpinny instance)
         {
-            if (instance is UnityEngine.Object unityObject)
-            {
-                return unityObject.GetInstanceID();
-            }
-
-            return instance.GetHashCode();
-        }
-
-        private static float ReadFloat(object instance, FieldInfo? field)
-        {
-            if (field == null || field.FieldType != typeof(float))
-            {
-                return 0f;
-            }
-
-            try
-            {
-                return (float)field.GetValue(instance)!;
-            }
-            catch
-            {
-                return 0f;
-            }
+            return instance.GetInstanceID();
         }
     }
 }
