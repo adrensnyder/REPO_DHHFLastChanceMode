@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -25,39 +24,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTargetMethods]
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            Type[] types;
-            try
-            {
-                types = typeof(Enemy).Assembly.GetTypes();
-            }
-            catch
-            {
-                yield break;
-            }
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                if (type == null || type.Name.IndexOf("Enemy", System.StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-
-                // Behavior-based selection:
-                // methods that maintain gas victim tracking and are expected to read PlayerAvatar.transform.position.
-                var playersInGasLogic = type.GetMethod("PlayersInGasLogic", flags, null, System.Type.EmptyTypes, null);
-                if (playersInGasLogic?.GetMethodBody() != null)
-                {
-                    yield return playersInGasLogic;
-                }
-
-                var playerInGas = type.GetMethod("PlayerInGas", flags, null, new[] { typeof(PlayerAvatar) }, null);
-                if (playerInGas?.GetMethodBody() != null)
-                {
-                    yield return playerInGas;
-                }
-            }
+            yield return AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayersInGasLogic");
+            yield return AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayerInGas", new[] { typeof(PlayerAvatar) });
         }
 
         [HarmonyTranspiler]
