@@ -1,20 +1,15 @@
 #nullable enable
 
 using System.Collections.Generic;
-using BepInEx.Logging;
-using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
-using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
-using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Headman");
         private static readonly System.Reflection.MethodInfo? s_transformGetPositionMethod =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
 
@@ -81,17 +76,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             LastChanceMonstersTargetProxyHelper.TryResolvePlayerAvatarFromTransform(transform, out var player);
             if (player != null && LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
             {
-                if (InternalDebugFlags.DebugLastChanceHeadmanFlow)
-                {
-                    var key = $"Headman.TargetPointProxy.{player.GetInstanceID()}";
-                    if (InternalDebugFlags.DebugLastChanceHeadmanVerbose || LogLimiter.ShouldLog(key, 15))
-                    {
-                        Log.LogInfo(
-                            $"[Headman][TargetPointProxy] runtime=True player={player.name} playerId={player.GetInstanceID()} " +
-                            $"body={transform.position} head={headCenter}");
-                    }
-                }
-
                 return headCenter;
             }
 
