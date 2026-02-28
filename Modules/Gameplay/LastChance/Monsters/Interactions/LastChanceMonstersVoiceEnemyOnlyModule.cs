@@ -87,8 +87,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
         private static bool ShouldApply(PlayerAvatar player)
         {
-            return FeatureFlags.LastChanceMonstersVoiceEnemyOnlyEnabled &&
-                   LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() &&
+            return LastChanceMonstersTargetProxyHelper.IsRuntimeFeatureEnabled(FeatureFlags.LastChanceMonstersVoiceEnemyOnlyEnabled) &&
                    LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
         }
 
@@ -106,7 +105,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
 
             // Outside LastChance, keep vanilla behavior unchanged.
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !FeatureFlags.LastChanceMonstersVoiceEnemyOnlyEnabled)
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeFeatureEnabled(FeatureFlags.LastChanceMonstersVoiceEnemyOnlyEnabled))
             {
                 return false;
             }

@@ -10,11 +10,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
     internal static class LastChanceMonstersTargetProxyHelper
     {
-        internal static bool IsRuntimeEnabled()
+        private static bool IsRuntimeGateEnabled()
         {
             return FeatureFlags.LastChanceMonstersSearchEnabled &&
                    FeatureFlags.LastChangeMode &&
                    LastChanceRuntimeOrchestrator.IsRuntimeActive;
+        }
+
+        internal static bool IsRuntimeEnabled()
+        {
+            return IsRuntimeGateEnabled();
         }
 
         internal static bool IsMasterContext()
@@ -25,6 +30,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
         internal static bool IsRuntimeMasterContextEnabled()
         {
             return IsRuntimeEnabled() && IsMasterContext();
+        }
+
+        internal static bool IsRuntimeFeatureEnabled(bool featureEnabled)
+        {
+            return featureEnabled && IsRuntimeEnabled();
+        }
+
+        internal static bool IsRuntimeMasterFeatureEnabled(bool featureEnabled)
+        {
+            return featureEnabled && IsRuntimeMasterContextEnabled();
         }
 
         internal static bool IsDisabled(PlayerAvatar? player)
