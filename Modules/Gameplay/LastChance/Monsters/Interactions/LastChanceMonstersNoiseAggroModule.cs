@@ -29,9 +29,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             s_lastAggroByPlayerViewId.Clear();
         }
 
-        internal static void Apply(Harmony harmony, System.Reflection.Assembly asm)
+        internal static void Apply(Harmony harmony)
         {
-            if (s_applied || harmony == null || asm == null)
+            if (s_applied || harmony == null)
             {
                 return;
             }

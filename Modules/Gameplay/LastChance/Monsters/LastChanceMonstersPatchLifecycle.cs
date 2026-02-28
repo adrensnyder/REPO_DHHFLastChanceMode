@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Reflection;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline;
 using HarmonyLib;
@@ -11,26 +10,26 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters
     {
         private static bool s_pipelineApplied;
 
-        internal static void ReconcilePipeline(bool enable, Harmony harmony, Assembly asm)
+        internal static void ReconcilePipeline(bool enable, Harmony harmony)
         {
             if (enable)
             {
-                ApplyPipeline(harmony, asm);
+                ApplyPipeline(harmony);
                 return;
             }
 
             UnapplyPipeline();
         }
 
-        internal static void ApplyPipeline(Harmony harmony, Assembly asm)
+        internal static void ApplyPipeline(Harmony harmony)
         {
             if (s_pipelineApplied)
             {
                 return;
             }
 
-            LastChanceMonstersSearchModule.Apply(harmony, asm);
-            LastChanceMonstersNoiseAggroModule.Apply(harmony, asm);
+            LastChanceMonstersSearchModule.Apply(harmony);
+            LastChanceMonstersNoiseAggroModule.Apply(harmony);
             LastChanceMonstersPlayerVisionCheckModule.Apply();
             LastChanceMonstersCameraForceLockModule.Apply();
             s_pipelineApplied = true;

@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using DHHFLastChanceMode.Modules.Config;
 using UnityEngine;
@@ -19,13 +18,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private static Component? s_floatingLabel;
         private static RectTransform? s_floatingRect;
 
-        private static PropertyInfo? s_textProperty;
-        private static PropertyInfo? s_colorProperty;
-        private static PropertyInfo? s_alignmentProperty;
-        private static PropertyInfo? s_fontSizeProperty;
-        private static PropertyInfo? s_autoSizeProperty;
-        private static PropertyInfo? s_wordWrapProperty;
-        private static PropertyInfo? s_richTextProperty;
+        private static System.Reflection.PropertyInfo? s_textProperty;
+        private static System.Reflection.PropertyInfo? s_colorProperty;
+        private static System.Reflection.PropertyInfo? s_alignmentProperty;
+        private static System.Reflection.PropertyInfo? s_fontSizeProperty;
+        private static System.Reflection.PropertyInfo? s_autoSizeProperty;
+        private static System.Reflection.PropertyInfo? s_wordWrapProperty;
+        private static System.Reflection.PropertyInfo? s_richTextProperty;
 
         private static object? s_centerAlignment;
         private static float s_timerFontSize;
@@ -46,13 +45,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             RectTransform? timerRect,
             Component? timerLabel,
             Type? labelType,
-            PropertyInfo? textProperty,
-            PropertyInfo? colorProperty,
-            PropertyInfo? alignmentProperty,
-            PropertyInfo? fontSizeProperty,
-            PropertyInfo? autoSizeProperty,
-            PropertyInfo? wordWrapProperty,
-            PropertyInfo? richTextProperty,
+            System.Reflection.PropertyInfo? textProperty,
+            System.Reflection.PropertyInfo? colorProperty,
+            System.Reflection.PropertyInfo? alignmentProperty,
+            System.Reflection.PropertyInfo? fontSizeProperty,
+            System.Reflection.PropertyInfo? autoSizeProperty,
+            System.Reflection.PropertyInfo? wordWrapProperty,
+            System.Reflection.PropertyInfo? richTextProperty,
             object? centerAlignment,
             float timerFontSize)
         {

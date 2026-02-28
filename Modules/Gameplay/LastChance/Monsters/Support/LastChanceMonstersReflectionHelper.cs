@@ -1,16 +1,18 @@
 #nullable enable
 
 using System;
-using System.Reflection;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
 {
     internal static class LastChanceMonstersReflectionHelper
     {
-        internal static FieldInfo? FindFieldInHierarchy(Type type, string name)
+        internal static System.Reflection.FieldInfo? FindFieldInHierarchy(Type type, string name)
         {
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            const System.Reflection.BindingFlags flags =
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic;
             for (var current = type; current != null; current = current.BaseType)
             {
                 var field = current.GetField(name, flags);
@@ -23,9 +25,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
             return null;
         }
 
-        internal static MethodInfo? FindMethodInHierarchy(Type type, string name, Type[] parameterTypes)
+        internal static System.Reflection.MethodInfo? FindMethodInHierarchy(Type type, string name, Type[] parameterTypes)
         {
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            const System.Reflection.BindingFlags flags =
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic;
             for (var current = type; current != null; current = current.BaseType)
             {
                 var method = current.GetMethod(name, flags, null, parameterTypes, null);

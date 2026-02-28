@@ -1,7 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging;
@@ -16,8 +15,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     internal static class LastChanceMonstersAnimalWreakHavocHeadRoomProxyModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.AnimalRoomProxy");
-        private static readonly FieldInfo? RoomVolumeCheckPlayerField = AccessTools.Field(typeof(RoomVolumeCheck), "player");
-        private static readonly FieldInfo? PlayerNameField = AccessTools.Field(typeof(PlayerAvatar), "playerName");
         private static int s_animalWreakHavocDepth;
 
         [HarmonyPatch(typeof(EnemyAnimal), "StateWreakHavoc")]
@@ -169,7 +166,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return direct;
             }
 
-            return RoomVolumeCheckPlayerField?.GetValue(target) as PlayerAvatar;
+            return target.player;
         }
 
         private static HashSet<RoomVolume> CollectHeadRooms(Vector3 headCenter)
@@ -201,10 +198,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return "n/a";
             }
 
-            var reflected = PlayerNameField?.GetValue(player) as string;
-            if (!string.IsNullOrWhiteSpace(reflected))
+            if (!string.IsNullOrWhiteSpace(player.playerName))
             {
-                return reflected!;
+                return player.playerName;
             }
 
             return player.photonView != null ? $"view:{player.photonView.ViewID}" : "n/a";

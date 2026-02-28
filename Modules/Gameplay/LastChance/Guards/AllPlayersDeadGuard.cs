@@ -1,8 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
@@ -16,7 +14,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         private const string ModuleTag = "[DHHFLastChanceMode] [Gameplay]";
         private const string LogKey = "SuppressAllDeadTransition";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
-        private static readonly FieldInfo? AllPlayersDeadField = typeof(RunManager).GetField("allPlayersDead", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        private static readonly System.Reflection.FieldInfo? AllPlayersDeadField =
+            AccessTools.Field(typeof(RunManager), "allPlayersDead");
         private static Harmony? _harmony;
         private static bool s_suppressedLogged;
         private static bool s_allowAllPlayersDead;
@@ -28,7 +27,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
                 return;
             }
 
-            var changeLevelMethod = typeof(RunManager).GetMethod(nameof(RunManager.ChangeLevel), new[] { typeof(bool), typeof(bool), typeof(RunManager.ChangeLevelType) });
+            var changeLevelMethod = AccessTools.Method(
+                typeof(RunManager),
+                nameof(RunManager.ChangeLevel),
+                new[] { typeof(bool), typeof(bool), typeof(RunManager.ChangeLevelType) });
             if (changeLevelMethod == null)
             {
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey))
@@ -42,7 +44,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             // This transpiler intentionally coexists with RunManagerUpdateLastChanceTimerPatch.Postfix.
             // It owns only the guard of vanilla allPlayersDead assignment flow.
             _harmony.Patch(
-                typeof(RunManager).GetMethod("Update", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic),
+                AccessTools.Method(typeof(RunManager), "Update"),
                 transpiler: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(UpdateTranspiler)));
             _harmony.Patch(changeLevelMethod, prefix: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(ChangeLevelPrefix)));
 
@@ -135,7 +137,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
                 yield break;
             }
 
-            var guardMethod = typeof(AllPlayersDeadGuard).GetMethod(nameof(GuardAllPlayersDead), BindingFlags.Static | BindingFlags.NonPublic);
+            var guardMethod = AccessTools.Method(typeof(AllPlayersDeadGuard), nameof(GuardAllPlayersDead));
             if (guardMethod == null)
             {
                 foreach (var instruction in instructions)
@@ -147,9 +149,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand is FieldInfo field && field == AllPlayersDeadField)
+                if (instruction.opcode == System.Reflection.Emit.OpCodes.Stfld &&
+                    instruction.operand is System.Reflection.FieldInfo field &&
+                    field == AllPlayersDeadField)
                 {
-                    yield return new CodeInstruction(OpCodes.Call, guardMethod);
+                    yield return new CodeInstruction(System.Reflection.Emit.OpCodes.Call, guardMethod);
                 }
 
                 yield return instruction;

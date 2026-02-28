@@ -33,7 +33,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             s_lastSelfCheckAt = 0f;
         }
 
-        internal static void Apply(Harmony harmony, System.Reflection.Assembly asm)
+        internal static void Apply(Harmony harmony)
         {
             if (s_harmony != null || harmony == null)
             {

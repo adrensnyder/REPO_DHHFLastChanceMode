@@ -1,8 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using HarmonyLib;
 using UnityEngine;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
@@ -12,17 +10,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch]
     internal static class LastChanceMonstersGasVictimPositionModule
     {
-        private static readonly MethodInfo? s_componentGetTransform =
+        private static readonly System.Reflection.MethodInfo? s_componentGetTransform =
             AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));
 
-        private static readonly MethodInfo? s_transformGetPosition =
+        private static readonly System.Reflection.MethodInfo? s_transformGetPosition =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
 
-        private static readonly MethodInfo? s_getEffectivePosition =
+        private static readonly System.Reflection.MethodInfo? s_getEffectivePosition =
             AccessTools.Method(typeof(LastChanceMonstersGasVictimPositionModule), nameof(GetEffectivePlayerPosition));
 
         [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
             yield return AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayersInGasLogic");
             yield return AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayerInGas", new[] { typeof(PlayerAvatar) });
@@ -46,19 +44,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                     continue;
                 }
 
-                a.opcode = OpCodes.Nop;
+                a.opcode = System.Reflection.Emit.OpCodes.Nop;
                 a.operand = null;
-                b.opcode = OpCodes.Call;
+                b.opcode = System.Reflection.Emit.OpCodes.Call;
                 b.operand = s_getEffectivePosition;
             }
 
             return list;
         }
 
-        private static bool CallsMethod(CodeInstruction instruction, MethodInfo method)
+        private static bool CallsMethod(CodeInstruction instruction, System.Reflection.MethodInfo method)
         {
-            return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) &&
-                   instruction.operand is MethodInfo called &&
+            return (instruction.opcode == System.Reflection.Emit.OpCodes.Call || instruction.opcode == System.Reflection.Emit.OpCodes.Callvirt) &&
+                   instruction.operand is System.Reflection.MethodInfo called &&
                    called == method;
         }
 

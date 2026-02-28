@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections;
-using System.Reflection;
 using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
@@ -24,10 +23,7 @@ namespace DHHFLastChanceMode
         private const string PluginGuid = "AdrenSnyder.DHHFLastChanceMode";
         private const string PluginName = "DHHF LastChance Mode";
         private const string PluginVersion = "0.1.0";
-        private const string TargetAssemblyName = "DeathHeadHopper";
-
         private Harmony? _harmony;
-        private Assembly? _targetAssembly;
         private bool _runtimeInitialized;
         private Coroutine? _deferredBootstrapRoutine;
         private static ManualLogSource? s_log;
@@ -73,15 +69,6 @@ namespace DHHFLastChanceMode
                 return true;
             }
 
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                var asmName = asm.GetName().Name;
-                if (string.Equals(asmName, "DeathHeadHopperFix", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
             return false;
         }
 
@@ -116,15 +103,12 @@ namespace DHHFLastChanceMode
             SceneManager.sceneLoaded += OnSceneLoaded;
             ConfigManager.HostControlledChanged += OnHostControlledChanged;
 
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                TryPatchIfTargetAssembly(asm);
-            }
+            ReconcileConditionalMonsterPatches();
         }
 
-        private void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+        private void OnAssemblyLoad(object sender, System.AssemblyLoadEventArgs args)
         {
-            TryPatchIfTargetAssembly(args.LoadedAssembly);
+            ReconcileConditionalMonsterPatches();
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -177,29 +161,10 @@ namespace DHHFLastChanceMode
             return true;
         }
 
-        private void TryPatchIfTargetAssembly(Assembly asm)
-        {
-            if (asm == null || _targetAssembly != null)
-            {
-                return;
-            }
-
-            var name = asm.GetName().Name;
-            if (!string.Equals(name, TargetAssemblyName, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            _targetAssembly = asm;
-            ReconcileConditionalMonsterPatches();
-            s_log?.LogInfo($"Detected {TargetAssemblyName} assembly load for LastChance patches.");
-        }
-
         private void ReconcileConditionalMonsterPatches()
         {
             var harmony = _harmony;
-            var asm = _targetAssembly;
-            if (harmony == null || asm == null)
+            if (harmony == null)
             {
                 return;
             }
@@ -208,7 +173,7 @@ namespace DHHFLastChanceMode
                 FeatureFlags.LastChangeMode &&
                 FeatureFlags.LastChanceMonstersSearchEnabled;
 
-            LastChanceMonstersPatchLifecycle.ReconcilePipeline(enableMonsterPipelinePatches, harmony, asm);
+            LastChanceMonstersPatchLifecycle.ReconcilePipeline(enableMonsterPipelinePatches, harmony);
         }
     }
 }
