@@ -46,6 +46,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters
             LastChanceMonstersPlayerVisionCheckModule.Unapply();
             LastChanceMonstersNoiseAggroModule.Unapply();
             LastChanceMonstersSearchModule.Unapply();
+            LastChanceMonstersAnimalHeadVisionFallbackModule.ResetRuntimeState();
+            LastChanceMonstersCarryProxyModule.ResetRuntimeState();
+            LastChanceMonstersOnScreenCameraModule.ResetRuntimeState();
+            LastChanceMonstersThinManStandModule.ResetRuntimeState();
             s_pipelineApplied = false;
         }
     }

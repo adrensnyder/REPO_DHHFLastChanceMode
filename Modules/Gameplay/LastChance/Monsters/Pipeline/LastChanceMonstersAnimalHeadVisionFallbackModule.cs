@@ -12,6 +12,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private const float ProbeInterval = 0.2f;
         private static readonly Dictionary<int, float> NextProbeAtByAnimal = new();
 
+        internal static void ResetRuntimeState()
+        {
+            NextProbeAtByAnimal.Clear();
+        }
+
         [HarmonyPostfix]
         private static void UpdatePostfix(EnemyAnimal __instance)
         {

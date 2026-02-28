@@ -16,6 +16,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.ThinMan");
         private static readonly System.Collections.Generic.Dictionary<string, bool> s_lastBoolStateByKey = new();
 
+        internal static void ResetRuntimeState()
+        {
+            s_lastBoolStateByKey.Clear();
+        }
+
         [HarmonyPostfix]
         private static void AwakePostfix(EnemyOnScreen __instance)
         {

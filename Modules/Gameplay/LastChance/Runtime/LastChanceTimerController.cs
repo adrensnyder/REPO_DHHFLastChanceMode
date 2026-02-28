@@ -261,6 +261,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             LastChanceMonstersVoiceEnemyOnlyModule.ResetRuntimeState();
             LastChanceMonstersCameraForceLockModule.ResetRuntimeState();
             LastChanceMonstersPlayerVisionCheckModule.ResetRuntimeState();
+            LastChanceMonstersAnimalHeadVisionFallbackModule.ResetRuntimeState();
+            LastChanceMonstersCarryProxyModule.ResetRuntimeState();
+            LastChanceMonstersOnScreenCameraModule.ResetRuntimeState();
+            LastChanceMonstersThinManStandModule.ResetRuntimeState();
             LastChanceHeadPupilVisualModule.ResetRuntimeState();
             LastChanceHeadEyesOverrideBypassModule.ResetRuntimeState();
         }
@@ -2859,6 +2863,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             LastChanceMonstersVoiceEnemyOnlyModule.ResetRuntimeState();
             LastChanceMonstersCameraForceLockModule.ResetRuntimeState();
             LastChanceMonstersPlayerVisionCheckModule.ResetRuntimeState();
+            LastChanceMonstersAnimalHeadVisionFallbackModule.ResetRuntimeState();
+            LastChanceMonstersCarryProxyModule.ResetRuntimeState();
+            LastChanceMonstersOnScreenCameraModule.ResetRuntimeState();
+            LastChanceMonstersThinManStandModule.ResetRuntimeState();
             LastChanceHeadPupilVisualModule.ResetRuntimeState();
             LastChanceHeadEyesOverrideBypassModule.ResetRuntimeState();
         }
@@ -2870,6 +2878,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             LastChanceMonstersVoiceEnemyOnlyModule.ResetRuntimeState();
             LastChanceMonstersCameraForceLockModule.ResetRuntimeState();
             LastChanceMonstersPlayerVisionCheckModule.ResetRuntimeState();
+            LastChanceMonstersAnimalHeadVisionFallbackModule.ResetRuntimeState();
+            LastChanceMonstersCarryProxyModule.ResetRuntimeState();
+            LastChanceMonstersOnScreenCameraModule.ResetRuntimeState();
+            LastChanceMonstersThinManStandModule.ResetRuntimeState();
             LastChanceHeadPupilVisualModule.ResetRuntimeState();
             LastChanceHeadEyesOverrideBypassModule.ResetRuntimeState();
             LastChanceSpectateHelper.ResetForceState();

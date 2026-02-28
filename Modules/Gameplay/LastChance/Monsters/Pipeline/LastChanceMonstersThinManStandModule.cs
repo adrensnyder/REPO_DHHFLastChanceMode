@@ -12,6 +12,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     {
         private static readonly System.Collections.Generic.Dictionary<int, int> s_lastTransitionFrameByEnemy = new();
 
+        internal static void ResetRuntimeState()
+        {
+            s_lastTransitionFrameByEnemy.Clear();
+        }
+
         [HarmonyPostfix]
         private static void Postfix(EnemyThinMan __instance)
         {

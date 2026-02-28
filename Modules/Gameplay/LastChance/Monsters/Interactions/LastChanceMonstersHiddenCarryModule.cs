@@ -26,6 +26,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
         private static readonly Dictionary<int, CarryAnchorState> AnchorByCarrier = new();
 
+        internal static void ResetRuntimeState()
+        {
+            AnchorByCarrier.Clear();
+        }
+
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
