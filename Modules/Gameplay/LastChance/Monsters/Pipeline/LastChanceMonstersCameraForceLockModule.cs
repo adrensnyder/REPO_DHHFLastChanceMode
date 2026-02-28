@@ -1,12 +1,11 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
-using BepInEx.Logging;
-using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
@@ -14,167 +13,69 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersCameraForceLockModule
     {
-        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersCameraForceLock";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.CeilingEye");
-        private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
-        private static Harmony? s_harmony;
-
-        private static readonly System.Reflection.MethodInfo? s_aimTargetSoftSetVanilla =
-            AccessTools.Method(typeof(CameraAim), nameof(CameraAim.AimTargetSoftSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(float), typeof(GameObject), typeof(int) });
-
-        private static readonly System.Reflection.MethodInfo? s_aimTargetSetVanilla =
-            AccessTools.Method(typeof(CameraAim), nameof(CameraAim.AimTargetSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(GameObject), typeof(int) });
-
-        private static readonly System.Reflection.MethodInfo? s_aimTargetSoftSetProxy =
-            AccessTools.Method(typeof(LastChanceMonstersCameraForceLockModule), nameof(AimTargetSoftSetLastChanceAware));
-
-        private static readonly System.Reflection.MethodInfo? s_aimTargetSetProxy =
-            AccessTools.Method(typeof(LastChanceMonstersCameraForceLockModule), nameof(AimTargetSetLastChanceAware));
 
         internal static void Apply()
         {
-            if (s_harmony != null)
-            {
-                return;
-            }
-
-            s_harmony = new Harmony(PatchId);
-            var transpiler = new HarmonyMethod(typeof(LastChanceMonstersCameraForceLockModule), nameof(ReplaceCameraAimCalls));
-            var methods = TargetMethods();
-            foreach (var method in methods)
-            {
-                if (method == null || s_patchedMethods.Contains(method))
-                {
-                    continue;
-                }
-
-                s_harmony.Patch(method, transpiler: transpiler);
-                s_patchedMethods.Add(method);
-            }
+            // Patches are registered through explicit bootstrap registry; keep lifecycle callsite compatible.
+            ResetRuntimeState();
         }
 
         internal static void Unapply()
         {
-            if (s_harmony == null)
-            {
-                return;
-            }
-
-            try
-            {
-                s_harmony.UnpatchSelf();
-            }
-            catch
-            {
-                // Best-effort unpatch.
-            }
-
-            s_patchedMethods.Clear();
-            s_harmony = null;
+            // Patches remain loaded but become NOOP outside runtime gates.
             ResetRuntimeState();
         }
 
-        [HarmonyTargetMethods]
-        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+        [HarmonyPatch(typeof(CameraAim), nameof(CameraAim.AimTargetSoftSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(float), typeof(GameObject), typeof(int) })]
+        [HarmonyPrefix]
+        private static bool AimTargetSoftSetPrefix(Vector3 position, GameObject source)
         {
-            var methods = new System.Reflection.MethodBase?[]
-            {
-                AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.JumpScareAtChompStartForceLookAtHead)),
-                AccessTools.DeclaredMethod(typeof(EnemyThinManAnim), nameof(EnemyThinManAnim.Scream)),
-                AccessTools.DeclaredMethod(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update)),
-                AccessTools.DeclaredMethod(typeof(EnemyOogly), nameof(EnemyOogly.Update)),
-                AccessTools.DeclaredMethod(typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.Update)),
-                AccessTools.DeclaredMethod(typeof(EnemySpinny), nameof(EnemySpinny.OverrideTargetPlayerCameraAim)),
-                AccessTools.DeclaredMethod(typeof(EnemyUpscream), nameof(EnemyUpscream.Update))
-            };
-
-            for (var i = 0; i < methods.Length; i++)
-            {
-                if (methods[i] != null)
-                {
-                    yield return methods[i]!;
-                }
-            }
+            return HandleCameraAimRequest(position, source);
         }
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> ReplaceCameraAimCalls(IEnumerable<CodeInstruction> instructions)
+        [HarmonyPatch(typeof(CameraAim), nameof(CameraAim.AimTargetSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(GameObject), typeof(int) })]
+        [HarmonyPrefix]
+        private static bool AimTargetSetPrefix(Vector3 position, GameObject source)
         {
-            if (s_aimTargetSoftSetVanilla == null || s_aimTargetSetVanilla == null || s_aimTargetSoftSetProxy == null || s_aimTargetSetProxy == null)
-            {
-                return instructions;
-            }
-
-            var list = new List<CodeInstruction>(instructions);
-            for (var i = 0; i < list.Count; i++)
-            {
-                var ins = list[i];
-                if ((ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
-                {
-                    continue;
-                }
-
-                if (called == s_aimTargetSoftSetVanilla)
-                {
-                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
-                    ins.operand = s_aimTargetSoftSetProxy;
-                    continue;
-                }
-
-                if (called == s_aimTargetSetVanilla)
-                {
-                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
-                    ins.operand = s_aimTargetSetProxy;
-                }
-            }
-
-            return list;
+            return HandleCameraAimRequest(position, source);
         }
 
-        internal static void AimTargetSoftSetLastChanceAware(CameraAim? cameraAim, Vector3 position, float inSpeed, float outSpeed, float strengthNoAim, GameObject source, int prio)
+        private static bool HandleCameraAimRequest(Vector3 position, GameObject? source)
         {
-            var target = cameraAim ?? CameraAim.Instance;
-            if (target == null)
+            if (!IsSupportedCameraSource(source))
             {
-                return;
+                return true;
             }
 
             if (!IsLastChanceCameraContextActive())
             {
-                target.AimTargetSoftSet(position, inSpeed, outSpeed, strengthNoAim, source, prio);
-                return;
+                return true;
             }
 
             if (!ShouldApplyCameraForce(source))
             {
-                return;
+                return false;
             }
 
             TryForceSpectateAimTo(position, source);
-            target.AimTargetSoftSet(position, inSpeed, outSpeed, strengthNoAim, source, prio);
+            return true;
         }
 
-        internal static void AimTargetSetLastChanceAware(CameraAim? cameraAim, Vector3 position, float inSpeed, float outSpeed, GameObject source, int prio)
+        private static bool IsSupportedCameraSource(GameObject? source)
         {
-            var target = cameraAim ?? CameraAim.Instance;
-            if (target == null)
+            if (source == null)
             {
-                return;
+                return false;
             }
 
-            if (!IsLastChanceCameraContextActive())
-            {
-                target.AimTargetSet(position, inSpeed, outSpeed, source, prio);
-                return;
-            }
-
-            if (!ShouldApplyCameraForce(source))
-            {
-                return;
-            }
-
-            TryForceSpectateAimTo(position, source);
-            target.AimTargetSet(position, inSpeed, outSpeed, source, prio);
+            return source.GetComponentInParent<EnemyHeartHugger>() != null ||
+                   source.GetComponentInParent<EnemyThinManAnim>() != null ||
+                   source.GetComponentInParent<EnemySlowMouthAttaching>() != null ||
+                   source.GetComponentInParent<EnemyOogly>() != null ||
+                   source.GetComponentInParent<EnemyCeilingEye>() != null ||
+                   source.GetComponentInParent<EnemySpinny>() != null ||
+                   source.GetComponentInParent<EnemyUpscream>() != null;
         }
 
         private static bool IsLastChanceCameraContextActive()
@@ -268,4 +169,3 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
     }
 }
-
