@@ -18,8 +18,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AccessTools.Field(typeof(PlayerAvatar), nameof(PlayerAvatar.isDisabled));
         private static readonly AccessTools.FieldRef<PlayerAvatar, bool> s_playerIsDisabledGetter =
             AccessTools.FieldRefAccess<PlayerAvatar, bool>(nameof(PlayerAvatar.isDisabled));
-        private static readonly System.Reflection.Emit.OpCode[] s_singleByteOpcodes = BuildSingleByteOpcodeMap();
-        private static readonly System.Reflection.Emit.OpCode[] s_doubleByteOpcodes = BuildDoubleByteOpcodeMap();
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
         private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
         private static readonly List<System.Reflection.MethodBase> s_patchTargets = CreatePatchTargets();
@@ -105,17 +103,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             var transpiler = new HarmonyMethod(typeof(LastChanceMonstersSearchModule), nameof(ReplaceDisabledChecksTranspiler));
             var patchedNow = 0;
-            var skippedNoField = 0;
             foreach (var method in s_patchTargets)
             {
                 if (method == null || s_patchedMethods.Contains(method))
                 {
-                    continue;
-                }
-
-                if (s_playerIsDisabledField != null && !MethodLoadsPlayerDisabledField(method, s_playerIsDisabledField))
-                {
-                    skippedNoField++;
                     continue;
                 }
 
@@ -127,182 +118,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             if (patchedNow > 0 && FeatureFlags.DebugLogging)
             {
                 Log.LogInfo($"[LastChance] MonstersSearch patched explicit methods: {patchedNow}.");
-                if (skippedNoField > 0)
-                {
-                    Log.LogInfo($"[LastChance] MonstersSearch skipped methods without direct {nameof(PlayerAvatar.isDisabled)} load: {skippedNoField}.");
-                }
             }
-        }
-
-        private static bool MethodLoadsPlayerDisabledField(System.Reflection.MethodBase method, System.Reflection.FieldInfo targetField)
-        {
-            var body = method.GetMethodBody();
-            var il = body?.GetILAsByteArray();
-            if (il == null || il.Length == 0)
-            {
-                return false;
-            }
-
-            var position = 0;
-            while (position < il.Length)
-            {
-                var opcode = ReadOpcode(il, ref position);
-                if (opcode.Equals(default(System.Reflection.Emit.OpCode)))
-                {
-                    return false;
-                }
-
-                if (opcode.OperandType == System.Reflection.Emit.OperandType.InlineField)
-                {
-                    if (position + 4 > il.Length)
-                    {
-                        return false;
-                    }
-
-                    var token = BitConverter.ToInt32(il, position);
-                    position += 4;
-
-                    if ((opcode == System.Reflection.Emit.OpCodes.Ldfld || opcode == System.Reflection.Emit.OpCodes.Ldflda) &&
-                        TryResolveField(method, token, out var field) &&
-                        field == targetField)
-                    {
-                        return true;
-                    }
-
-                    continue;
-                }
-
-                if (!AdvanceOperand(il, ref position, opcode.OperandType))
-                {
-                    return false;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryResolveField(System.Reflection.MethodBase method, int metadataToken, out System.Reflection.FieldInfo? field)
-        {
-            field = null;
-            try
-            {
-                var typeArgs = method.DeclaringType?.GetGenericArguments();
-                var methodArgs = method is System.Reflection.MethodInfo info ? info.GetGenericArguments() : null;
-                field = method.Module.ResolveField(metadataToken, typeArgs, methodArgs);
-                return field != null;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static System.Reflection.Emit.OpCode ReadOpcode(byte[] il, ref int position)
-        {
-            if (position >= il.Length)
-            {
-                return default;
-            }
-
-            var b = il[position++];
-            if (b != 0xFE)
-            {
-                return s_singleByteOpcodes[b];
-            }
-
-            if (position >= il.Length)
-            {
-                return default;
-            }
-
-            var b2 = il[position++];
-            return s_doubleByteOpcodes[b2];
-        }
-
-        private static bool AdvanceOperand(byte[] il, ref int position, System.Reflection.Emit.OperandType operandType)
-        {
-            switch (operandType)
-            {
-                case System.Reflection.Emit.OperandType.InlineNone:
-                    return true;
-                case System.Reflection.Emit.OperandType.ShortInlineBrTarget:
-                case System.Reflection.Emit.OperandType.ShortInlineI:
-                case System.Reflection.Emit.OperandType.ShortInlineVar:
-                    position += 1;
-                    return position <= il.Length;
-                case System.Reflection.Emit.OperandType.InlineVar:
-                    position += 2;
-                    return position <= il.Length;
-                case System.Reflection.Emit.OperandType.InlineBrTarget:
-                case System.Reflection.Emit.OperandType.InlineI:
-                case System.Reflection.Emit.OperandType.InlineMethod:
-                case System.Reflection.Emit.OperandType.InlineSig:
-                case System.Reflection.Emit.OperandType.InlineString:
-                case System.Reflection.Emit.OperandType.InlineTok:
-                case System.Reflection.Emit.OperandType.InlineType:
-                    position += 4;
-                    return position <= il.Length;
-                case System.Reflection.Emit.OperandType.InlineI8:
-                case System.Reflection.Emit.OperandType.InlineR:
-                    position += 8;
-                    return position <= il.Length;
-                case System.Reflection.Emit.OperandType.ShortInlineR:
-                    position += 4;
-                    return position <= il.Length;
-                case System.Reflection.Emit.OperandType.InlineSwitch:
-                    if (position + 4 > il.Length)
-                    {
-                        return false;
-                    }
-
-                    var count = BitConverter.ToInt32(il, position);
-                    position += 4 + (count * 4);
-                    return position <= il.Length;
-                default:
-                    return false;
-            }
-        }
-
-        private static System.Reflection.Emit.OpCode[] BuildSingleByteOpcodeMap()
-        {
-            var map = new System.Reflection.Emit.OpCode[256];
-            var fields = typeof(System.Reflection.Emit.OpCodes).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            for (var i = 0; i < fields.Length; i++)
-            {
-                if (fields[i].GetValue(null) is not System.Reflection.Emit.OpCode opcode)
-                {
-                    continue;
-                }
-
-                var value = (ushort)opcode.Value;
-                if (value <= 0xFF)
-                {
-                    map[value] = opcode;
-                }
-            }
-
-            return map;
-        }
-
-        private static System.Reflection.Emit.OpCode[] BuildDoubleByteOpcodeMap()
-        {
-            var map = new System.Reflection.Emit.OpCode[256];
-            var fields = typeof(System.Reflection.Emit.OpCodes).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            for (var i = 0; i < fields.Length; i++)
-            {
-                if (fields[i].GetValue(null) is not System.Reflection.Emit.OpCode opcode)
-                {
-                    continue;
-                }
-
-                var value = (ushort)opcode.Value;
-                if ((value & 0xFF00) == 0xFE00)
-                {
-                    map[value & 0xFF] = opcode;
-                }
-            }
-
-            return map;
         }
 
         private static bool IsActiveEnemy(EnemyParent enemyParent)
