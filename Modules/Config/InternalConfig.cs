@@ -11,6 +11,7 @@ namespace DHHFLastChanceMode.Modules.Config
         internal static float LastChanceMonstersCameraLockKeepAliveGraceSeconds = 0.6f;
         internal static float LastChanceMonstersVisionLockSourceBucketSize = 1f;
 
+        internal static float CompatibilityGatePresenceRetrySeconds = 1f;
         internal static float CompatibilityGatePresenceTimeoutSeconds = 5f;
 
         // LastChance timer pulse duration (seconds) when timer changes by a discrete event (+/-).

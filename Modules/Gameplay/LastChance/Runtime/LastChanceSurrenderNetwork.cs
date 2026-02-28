@@ -289,7 +289,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             var surrenderMasterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
             if (surrenderMasterActor <= 0 ||
-                photonEvent.Sender != surrenderMasterActor ||
                 !NetworkEnvelope.TryParse(photonEvent.CustomData, out var surrenderEnvelope) ||
                 !surrenderEnvelope.IsExpectedSource() ||
                 !string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderMessageType, System.StringComparison.Ordinal) &&
@@ -300,28 +299,49 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (string.Equals(surrenderEnvelope.MessageType, LastChanceSurrenderSnapshotMessageType, System.StringComparison.Ordinal))
             {
+                if (photonEvent.Sender != surrenderMasterActor)
+                {
+                    return;
+                }
+
                 LastChanceTimerController.ApplyRemoteSurrenderSnapshot(surrenderEnvelope.Payload as object[] ?? System.Array.Empty<object>());
                 return;
             }
 
+            var payloadActor = 0;
             if (surrenderEnvelope.Payload is int actorNumber)
             {
-                if (actorNumber > 0)
-                {
-                    LastChanceTimerController.RegisterRemoteSurrender(actorNumber);
-                }
+                payloadActor = actorNumber;
+            }
+            else if (surrenderEnvelope.Payload is object[] payload &&
+                     payload.Length > 0 &&
+                     payload[0] is int payloadActorInArray)
+            {
+                payloadActor = payloadActorInArray;
+            }
+
+            if (payloadActor <= 0)
+            {
                 return;
             }
 
-            if (surrenderEnvelope.Payload is object[] payload &&
-                payload.Length > 0 &&
-                payload[0] is int payloadActor)
+            if (PhotonNetwork.IsMasterClient)
             {
-                if (payloadActor > 0)
+                if (photonEvent.Sender <= 0 || photonEvent.Sender == surrenderMasterActor || payloadActor != photonEvent.Sender)
                 {
-                    LastChanceTimerController.RegisterRemoteSurrender(payloadActor);
+                    return;
                 }
+
+                LastChanceTimerController.RegisterRemoteSurrender(payloadActor);
+                return;
             }
+
+            if (photonEvent.Sender != surrenderMasterActor)
+            {
+                return;
+            }
+
+            LastChanceTimerController.RegisterRemoteSurrender(payloadActor);
         }
 
         private static NetworkEnvelope CreateEnvelope(string messageType, object? payload)

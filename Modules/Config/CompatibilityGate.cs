@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Logging;
@@ -37,11 +36,9 @@ namespace DHHFLastChanceMode.Modules.Config
         private readonly Dictionary<int, string> _playersWithFixVersion = new();
         private readonly Dictionary<int, float> _pendingPresenceSince = new();
         private readonly Dictionary<int, float> _pendingPresenceNextRetryAt = new();
-        private Coroutine? _pendingPresenceCoroutine;
         private bool _postStartRetryArmed;
         private bool _postStartRetryConsumed;
         private bool _deferMissingPresenceUntilPostStartRetry;
-        private const float PresenceRetrySeconds = 0.15f;
 
         internal static event Action? HostApprovalChanged;
 
@@ -95,7 +92,6 @@ namespace DHHFLastChanceMode.Modules.Config
             LogDebug($"{TracePrefix} OnEnable begin.");
             PhotonNetwork.AddCallbackTarget(this);
             LogDebug($"{TracePrefix} OnEnable added Photon callback target.");
-            EnsurePendingPresenceLoopState();
         }
 
         public override void OnDisable()
@@ -104,13 +100,11 @@ namespace DHHFLastChanceMode.Modules.Config
             LogDebug($"{TracePrefix} OnDisable begin. inRoom={PhotonNetwork.InRoom} isMaster={PhotonNetwork.IsMasterClient}");
             PhotonNetwork.RemoveCallbackTarget(this);
             LogDebug($"{TracePrefix} OnDisable removed Photon callback target.");
-            StopPendingPresenceLoop();
         }
 
         private void OnDestroy()
         {
             LogDebug($"{TracePrefix} OnDestroy fired.");
-            StopPendingPresenceLoop();
             if (ReferenceEquals(s_instance, this))
             {
                 s_instance = null;
@@ -129,7 +123,6 @@ namespace DHHFLastChanceMode.Modules.Config
             _postStartRetryConsumed = false;
             _deferMissingPresenceUntilPostStartRetry = false;
             RegisterLocalPlayerFixVersion();
-            EnsurePendingPresenceLoopState();
             s_receivedHostDecision = PhotonNetwork.IsMasterClient;
             s_hostApprovedLastChanceCluster = PhotonNetwork.IsMasterClient;
             s_lastHostDecisionReason = string.Empty;
@@ -154,7 +147,6 @@ namespace DHHFLastChanceMode.Modules.Config
             _postStartRetryArmed = false;
             _postStartRetryConsumed = false;
             _deferMissingPresenceUntilPostStartRetry = false;
-            EnsurePendingPresenceLoopState();
             s_receivedHostDecision = false;
             s_hostApprovedLastChanceCluster = true;
             s_lastHostDecisionReason = string.Empty;
@@ -179,7 +171,6 @@ namespace DHHFLastChanceMode.Modules.Config
                 RequestPresenceFromActor(newPlayer.ActorNumber, "OnPlayerEnteredRoom");
             }
 
-            EnsurePendingPresenceLoopState();
             EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
         }
 
@@ -194,7 +185,6 @@ namespace DHHFLastChanceMode.Modules.Config
                 _pendingPresenceSince.Remove(otherPlayer.ActorNumber);
                 _pendingPresenceNextRetryAt.Remove(otherPlayer.ActorNumber);
             }
-            EnsurePendingPresenceLoopState();
 
             if (!PhotonNetwork.IsMasterClient)
             {
@@ -213,7 +203,6 @@ namespace DHHFLastChanceMode.Modules.Config
             _postStartRetryConsumed = false;
             _deferMissingPresenceUntilPostStartRetry = false;
             RegisterLocalPlayerFixVersion();
-            EnsurePendingPresenceLoopState();
             s_receivedHostDecision = PhotonNetwork.IsMasterClient;
             s_hostApprovedLastChanceCluster = PhotonNetwork.IsMasterClient;
             s_lastHostDecisionReason = string.Empty;
@@ -265,14 +254,12 @@ namespace DHHFLastChanceMode.Modules.Config
                 {
                     _pendingPresenceSince.Remove(actorNumber);
                     _pendingPresenceNextRetryAt.Remove(actorNumber);
-                    EnsurePendingPresenceLoopState();
                     return;
                 }
 
                 _playersWithFixVersion[actorNumber] = reportedVersion;
                 _pendingPresenceSince.Remove(actorNumber);
                 _pendingPresenceNextRetryAt.Remove(actorNumber);
-                EnsurePendingPresenceLoopState();
                 LogDebug($"{TracePrefix} ClientFixPresence received actor={actorNumber} version={reportedVersion}.");
                 EvaluateHostApprovalAndBroadcast(forceBroadcast: false);
                 return;
@@ -425,7 +412,7 @@ namespace DHHFLastChanceMode.Modules.Config
                     if (!float.IsPositiveInfinity(nextRetryAt))
                     {
                         RequestPresenceFromActor(actor, "UpdateRetry");
-                        _pendingPresenceNextRetryAt[actor] = now + PresenceRetrySeconds;
+                        _pendingPresenceNextRetryAt[actor] = now + InternalConfig.CompatibilityGatePresenceRetrySeconds;
                     }
                 }
 
@@ -453,53 +440,11 @@ namespace DHHFLastChanceMode.Modules.Config
                 LogDebug($"{TracePrefix} Update forcing compatibility recheck due to pending timeout.");
                 EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
             }
-
-            EnsurePendingPresenceLoopState();
         }
 
-        private void EnsurePendingPresenceLoopState()
+        private void Update()
         {
-            if (ShouldRunPendingPresenceLoop())
-            {
-                if (_pendingPresenceCoroutine == null)
-                {
-                    _pendingPresenceCoroutine = StartCoroutine(PendingPresenceLoop());
-                }
-
-                return;
-            }
-
-            StopPendingPresenceLoop();
-        }
-
-        private bool ShouldRunPendingPresenceLoop()
-        {
-            return isActiveAndEnabled &&
-                   PhotonNetwork.IsMasterClient &&
-                   PhotonNetwork.InRoom &&
-                   _pendingPresenceSince.Count > 0;
-        }
-
-        private void StopPendingPresenceLoop()
-        {
-            if (_pendingPresenceCoroutine == null)
-            {
-                return;
-            }
-
-            StopCoroutine(_pendingPresenceCoroutine);
-            _pendingPresenceCoroutine = null;
-        }
-
-        private IEnumerator PendingPresenceLoop()
-        {
-            while (ShouldRunPendingPresenceLoop())
-            {
-                ProcessPendingPresenceCycle();
-                yield return new WaitForSeconds(PresenceRetrySeconds);
-            }
-
-            _pendingPresenceCoroutine = null;
+            ProcessPendingPresenceCycle();
         }
 
         private void EvaluateHostApprovalAndBroadcast(bool forceBroadcast)
@@ -642,7 +587,6 @@ namespace DHHFLastChanceMode.Modules.Config
                 RequestPresenceFromActor(actor, "PostStartRuntimeRetry");
             }
 
-            EnsurePendingPresenceLoopState();
             LogDebug($"{TracePrefix} Runtime scene loaded. One-shot post-start presence retry executed.");
             EvaluateHostApprovalAndBroadcast(forceBroadcast: true);
         }
