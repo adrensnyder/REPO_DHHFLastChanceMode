@@ -10,6 +10,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch(typeof(EnemyHidden), "StatePlayerMove")]
     internal static class LastChanceMonstersHiddenDestinationModule
     {
+        private const float FallbackMinDistance = 8f;
+        private const float FallbackMaxDistance = 999f;
+
         private static readonly System.Reflection.MethodInfo? s_levelPointGetPlayerDistanceVanilla =
             AccessTools.Method(typeof(SemiFunc), "LevelPointGetPlayerDistance", new[] { typeof(Vector3), typeof(float), typeof(float), typeof(bool) });
 
@@ -69,7 +72,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             // In LastChance all players may be "disabled" for this selector.
             // Keep vanilla first, then fallback to a generic reachable point search.
-            return SemiFunc.LevelPointGet(position, 8f, 999f);
+            return SemiFunc.LevelPointGet(position, FallbackMinDistance, FallbackMaxDistance);
         }
 
         internal static LevelPoint? LevelPointGetFurthestFromPlayerLastChanceAware(Vector3 position, float minDistance)
@@ -80,7 +83,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return point;
             }
 
-            return SemiFunc.LevelPointGet(position, 8f, 999f);
+            return SemiFunc.LevelPointGet(position, FallbackMinDistance, FallbackMaxDistance);
         }
     }
 }
