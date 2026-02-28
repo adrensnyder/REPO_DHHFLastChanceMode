@@ -86,9 +86,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static List<System.Reflection.MethodBase> CreateTargetMethods()
         {
             var methods = new List<System.Reflection.MethodBase>();
-            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
+            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.StateHasTarget));
             AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.OnVisionTrigger));
-            AddMethod(methods, typeof(EnemySpinny), "HasLineOfSight");
+            AddMethod(methods, typeof(EnemySpinny), nameof(EnemySpinny.HasLineOfSight));
             return methods;
         }
 

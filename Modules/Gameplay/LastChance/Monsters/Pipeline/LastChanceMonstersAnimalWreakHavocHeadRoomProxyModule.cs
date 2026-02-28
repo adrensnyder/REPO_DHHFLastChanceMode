@@ -7,19 +7,19 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(SemiFunc), "LevelPointInTargetRoomGet")]
+    [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.LevelPointInTargetRoomGet))]
     internal static class LastChanceMonstersAnimalWreakHavocHeadRoomProxyModule
     {
         private static int s_animalWreakHavocDepth;
 
-        [HarmonyPatch(typeof(EnemyAnimal), "StateWreakHavoc")]
+        [HarmonyPatch(typeof(EnemyAnimal), nameof(EnemyAnimal.StateWreakHavoc))]
         [HarmonyPrefix]
         private static void EnemyAnimalStateWreakHavocPrefix()
         {
             s_animalWreakHavocDepth++;
         }
 
-        [HarmonyPatch(typeof(EnemyAnimal), "StateWreakHavoc")]
+        [HarmonyPatch(typeof(EnemyAnimal), nameof(EnemyAnimal.StateWreakHavoc))]
         [HarmonyPostfix]
         private static void EnemyAnimalStateWreakHavocPostfix()
         {

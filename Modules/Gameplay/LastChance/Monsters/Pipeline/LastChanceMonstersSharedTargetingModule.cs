@@ -29,12 +29,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
             var methods = new List<System.Reflection.MethodBase>();
-            AddMethod(methods, typeof(EnemyElsa), "StateStunSmall");
+            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateStunSmall));
             AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnHurt));
-            AddMethod(methods, typeof(EnemyHeadGrabber), "StateBackToNavmesh");
+            AddMethod(methods, typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.StateBackToNavmesh));
             AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.FindLevelPointAndCreateCeilingRoamPoints));
             AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.OnInvestigate));
-            AddMethod(methods, typeof(EnemyOogly), "StateCeilingRoam");
+            AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.StateCeilingRoam));
             return methods;
         }
 

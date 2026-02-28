@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
-    [HarmonyPatch(typeof(EnemyDirector), "Update")]
+    [HarmonyPatch(typeof(EnemyDirector), nameof(EnemyDirector.Update))]
     internal static class LastChanceMonstersBodyPositionProxyModule
     {
         private const float TargetScanIntervalSeconds = 1f;

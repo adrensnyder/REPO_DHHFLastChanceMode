@@ -12,7 +12,7 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch(typeof(EnemySpinny), "LockInPlayer")]
+    [HarmonyPatch(typeof(EnemySpinny), nameof(EnemySpinny.LockInPlayer))]
     internal static class LastChanceMonstersSpinnyLockBridgeModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spinny");

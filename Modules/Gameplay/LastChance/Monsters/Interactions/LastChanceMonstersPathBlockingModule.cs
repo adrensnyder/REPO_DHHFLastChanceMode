@@ -10,7 +10,7 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch(typeof(EnemyTricycle), "IsPlayerBlockingNavmeshPath")]
+    [HarmonyPatch(typeof(EnemyTricycle), nameof(EnemyTricycle.IsPlayerBlockingNavmeshPath))]
     internal static class LastChanceMonstersPathBlockingModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Tricycle");

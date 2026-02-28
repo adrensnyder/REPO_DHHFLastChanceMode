@@ -163,19 +163,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             AddMethod(methods, typeof(Enemy), nameof(Enemy.SetChaseTarget), typeof(PlayerAvatar));
             AddMethod(methods, typeof(Enemy), nameof(Enemy.OnPhotonSerializeView), typeof(Photon.Pun.PhotonStream), typeof(Photon.Pun.PhotonMessageInfo));
-            AddMethod(methods, typeof(EnemyParent), "PlayerCloseLogic");
-            AddMethod(methods, typeof(EnemyPlayerDistance), "Logic");
-            AddMethod(methods, typeof(EnemyPlayerRoom), "Logic");
-            AddMethod(methods, typeof(EnemyTriggerAttack), "OnTriggerStay", typeof(Collider));
-            AddMethod(methods, typeof(EnemyVision), "Vision");
+            AddMethod(methods, typeof(EnemyParent), nameof(EnemyParent.PlayerCloseLogic));
+            AddMethod(methods, typeof(EnemyPlayerDistance), nameof(EnemyPlayerDistance.Logic));
+            AddMethod(methods, typeof(EnemyPlayerRoom), nameof(EnemyPlayerRoom.Logic));
+            AddMethod(methods, typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay), typeof(Collider));
+            AddMethod(methods, typeof(EnemyVision), nameof(EnemyVision.Vision));
         }
 
         private static void AddStateMachineTargets(List<System.Reflection.MethodBase> methods)
         {
-            AddMethod(methods, typeof(EnemyStateChase), "Update");
-            AddMethod(methods, typeof(EnemyStateChaseBegin), "Update");
-            AddMethod(methods, typeof(EnemyStateRoaming), "PlayerTurn");
-            AddMethod(methods, typeof(EnemyStateSneak), "Update");
+            AddMethod(methods, typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
+            AddMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+            AddMethod(methods, typeof(EnemyStateRoaming), nameof(EnemyStateRoaming.PlayerTurn));
+            AddMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
         }
 
         private static void AddMethod(List<System.Reflection.MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)

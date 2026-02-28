@@ -19,7 +19,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
     // 1) this postfix drives LastChance runtime/timer state every frame,
     // 2) AllPlayersDeadGuard transpiles the same method to intercept vanilla allPlayersDead writes.
     // Keep them separate: timer state and vanilla all-dead suppression are different concerns.
-    [HarmonyPatch(typeof(RunManager), "Update")]
+    [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
     internal static class RunManagerUpdateLastChanceTimerPatch
     {
         [HarmonyPostfix]

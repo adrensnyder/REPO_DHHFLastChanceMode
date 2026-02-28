@@ -10,7 +10,7 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyOnScreen), "Awake")]
+    [HarmonyPatch(typeof(EnemyOnScreen), nameof(EnemyOnScreen.Awake))]
     internal static class LastChanceMonstersOnScreenCameraModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.ThinMan");
@@ -177,7 +177,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
     }
 
-    [HarmonyPatch(typeof(EnemyOnScreen), "GetOnScreen")]
+    [HarmonyPatch(typeof(EnemyOnScreen), nameof(EnemyOnScreen.GetOnScreen))]
     internal static class LastChanceMonstersOnScreenSafeLookupPatch
     {
         [HarmonyPrefix]

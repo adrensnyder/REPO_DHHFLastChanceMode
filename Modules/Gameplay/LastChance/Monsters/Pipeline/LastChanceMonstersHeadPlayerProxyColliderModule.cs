@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(GameDirector), "Update")]
+    [HarmonyPatch(typeof(GameDirector), nameof(GameDirector.Update))]
     internal static class LastChanceMonstersHeadPlayerProxyColliderModule
     {
         [HarmonyPostfix]

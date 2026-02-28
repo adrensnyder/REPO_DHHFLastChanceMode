@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch(typeof(PlayerVoiceChat), "Update")]
+    [HarmonyPatch(typeof(PlayerVoiceChat), nameof(PlayerVoiceChat.Update))]
     internal static class LastChanceMonstersVoiceEnemyOnlyModule
     {
         private static readonly Dictionary<int, float> OriginalAudioSourceVolumeByViewId = new();

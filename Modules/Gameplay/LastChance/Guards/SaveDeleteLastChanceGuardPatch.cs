@@ -41,7 +41,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         }
     }
 
-    [HarmonyPatch(typeof(StatsManager), "SaveFileDelete")]
+    [HarmonyPatch(typeof(StatsManager), nameof(StatsManager.SaveFileDelete))]
     internal static class StatsManagerSaveFileDeleteLastChancePatch
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.SaveDelete");
@@ -81,7 +81,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         }
     }
 
-    [HarmonyPatch(typeof(MenuPageSaves), "OnDeleteGame")]
+    [HarmonyPatch(typeof(MenuPageSaves), nameof(MenuPageSaves.OnDeleteGame))]
     internal static class MenuPageSavesOnDeleteGameLastChancePatch
     {
         [HarmonyPrefix]

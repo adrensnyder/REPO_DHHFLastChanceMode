@@ -9,7 +9,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch]
     internal static class LastChanceMonstersBeamerHeadAimModule
     {
-        [HarmonyPatch(typeof(EnemyBeamer), "StateAttackStart")]
+        [HarmonyPatch(typeof(EnemyBeamer), nameof(EnemyBeamer.StateAttackStart))]
         [HarmonyPostfix]
         private static void StateAttackStartPostfix(EnemyBeamer __instance)
         {
@@ -30,7 +30,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             __instance.aimHorizontalTarget = aim;
         }
 
-        [HarmonyPatch(typeof(EnemyBeamer), "VerticalAimLogic")]
+        [HarmonyPatch(typeof(EnemyBeamer), nameof(EnemyBeamer.VerticalAimLogic))]
         [HarmonyPostfix]
         private static void VerticalAimLogicPostfix(EnemyBeamer __instance)
         {

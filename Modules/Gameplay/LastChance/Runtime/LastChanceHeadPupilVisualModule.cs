@@ -10,7 +10,7 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
-    [HarmonyPatch(typeof(PlayerDeathHead), "Update")]
+    [HarmonyPatch(typeof(PlayerDeathHead), nameof(PlayerDeathHead.Update))]
     internal static class LastChanceHeadPupilVisualModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Eyes");

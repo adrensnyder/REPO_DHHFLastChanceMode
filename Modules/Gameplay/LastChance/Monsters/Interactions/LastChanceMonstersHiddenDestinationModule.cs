@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch(typeof(EnemyHidden), "StatePlayerMove")]
+    [HarmonyPatch(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerMove))]
     internal static class LastChanceMonstersHiddenDestinationModule
     {
         private const float FallbackMinDistance = 8f;

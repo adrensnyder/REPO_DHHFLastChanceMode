@@ -20,7 +20,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         private static readonly System.Reflection.MethodInfo? s_upgradeTumbleWingsVisualsActiveSafeMethod =
             AccessTools.Method(typeof(LastChanceMonstersVisualCouplingDecoupleModule), nameof(UpgradeTumbleWingsVisualsActiveSafe));
 
-        [HarmonyPatch(typeof(EnemyHeartHugger), "PlayersInGasLogic")]
+        [HarmonyPatch(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic))]
         private static class EnemyHeartHuggerPlayersInGasLogicPatch
         {
             [HarmonyTranspiler]
@@ -30,7 +30,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
         }
 
-        [HarmonyPatch(typeof(EnemyHeartHuggerGasChecker), "Update")]
+        [HarmonyPatch(typeof(EnemyHeartHuggerGasChecker), nameof(EnemyHeartHuggerGasChecker.Update))]
         private static class EnemyHeartHuggerGasCheckerUpdatePatch
         {
             [HarmonyTranspiler]

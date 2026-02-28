@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyTriggerAttack), "OnTriggerStay")]
+    [HarmonyPatch(typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay))]
     internal static class LastChanceMonstersTriggerAttackModule
     {
         [HarmonyPrefix]

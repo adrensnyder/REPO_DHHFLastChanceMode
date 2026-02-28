@@ -7,7 +7,7 @@ using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyThinMan), "StateStand")]
+    [HarmonyPatch(typeof(EnemyThinMan), nameof(EnemyThinMan.StateStand))]
     internal static class LastChanceMonstersThinManStandModule
     {
         private static readonly System.Collections.Generic.Dictionary<int, int> s_lastTransitionFrameByEnemy = new();

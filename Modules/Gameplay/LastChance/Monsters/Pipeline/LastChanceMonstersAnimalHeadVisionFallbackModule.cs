@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyAnimal), "Update")]
+    [HarmonyPatch(typeof(EnemyAnimal), nameof(EnemyAnimal.Update))]
     internal static class LastChanceMonstersAnimalHeadVisionFallbackModule
     {
         private const float ProbeInterval = 0.2f;

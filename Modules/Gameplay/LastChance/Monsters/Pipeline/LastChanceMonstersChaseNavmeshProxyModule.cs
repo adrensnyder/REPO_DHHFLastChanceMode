@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyStateChase), "Update")]
+    [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
     internal static class LastChanceMonstersChaseNavmeshProxyModule
     {
         [HarmonyPrefix]

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyVision), "Awake")]
+    [HarmonyPatch(typeof(EnemyVision), nameof(EnemyVision.Awake))]
     internal static class LastChanceMonstersVisionModule
     {
         [HarmonyPostfix]

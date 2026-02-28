@@ -12,7 +12,7 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch(typeof(EnemyHeartHuggerGasChecker), "Update")]
+    [HarmonyPatch(typeof(EnemyHeartHuggerGasChecker), nameof(EnemyHeartHuggerGasChecker.Update))]
     internal static class LastChanceMonstersGasCaptureModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeartHugger");
