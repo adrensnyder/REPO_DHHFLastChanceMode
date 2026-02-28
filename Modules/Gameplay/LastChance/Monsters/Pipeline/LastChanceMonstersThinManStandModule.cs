@@ -20,7 +20,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyPostfix]
         private static void Postfix(EnemyThinMan __instance)
         {
-            if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+            if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return;
             }

@@ -22,6 +22,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             return SemiFunc.IsMasterClientOrSingleplayer();
         }
 
+        internal static bool IsRuntimeMasterContextEnabled()
+        {
+            return IsRuntimeEnabled() && IsMasterContext();
+        }
+
         internal static bool IsDisabled(PlayerAvatar? player)
         {
             return player != null && player.isDisabled;

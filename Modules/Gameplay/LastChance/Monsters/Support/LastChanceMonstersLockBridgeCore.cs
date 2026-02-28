@@ -49,8 +49,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
         internal static bool IsHeadProxyRuntimeApplicable(PlayerAvatar? player)
         {
             return player != null &&
-                   LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() &&
-                   LastChanceMonstersTargetProxyHelper.IsMasterContext() &&
+                   LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled() &&
                    LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
         }
 

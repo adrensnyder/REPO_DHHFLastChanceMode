@@ -16,7 +16,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
-            if (!LastChanceMonstersTargetProxyHelper.IsMasterContext() || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return true;
             }

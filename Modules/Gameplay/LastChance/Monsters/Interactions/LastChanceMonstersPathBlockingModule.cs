@@ -22,9 +22,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyPostfix]
         private static void Postfix(EnemyTricycle __instance, ref bool __result)
         {
-            if (__result || __instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+            var runtimeMaster = LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled();
+            if (__result || __instance == null || !runtimeMaster)
             {
-                DebugLog("Skip.Early", $"result={__result} instanceNull={__instance == null} runtime={LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled()} master={LastChanceMonstersTargetProxyHelper.IsMasterContext()}");
+                DebugLog("Skip.Early", $"result={__result} instanceNull={__instance == null} runtimeMaster={runtimeMaster}");
                 return;
             }
 

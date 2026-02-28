@@ -17,7 +17,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
         [HarmonyPostfix]
         private static void Postfix()
         {
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return;
             }

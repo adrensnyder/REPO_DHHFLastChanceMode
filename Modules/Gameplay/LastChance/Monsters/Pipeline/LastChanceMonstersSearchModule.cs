@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
@@ -70,7 +71,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         internal static int GetAliveSearchMonsterCount()
         {
-            if (!FeatureFlags.LastChanceMonstersSearchEnabled || !FeatureFlags.LastChangeMode || !LastChanceRuntimeOrchestrator.IsRuntimeActive)
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
                 return 0;
             }
@@ -211,10 +212,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             s_runtimeStateCachedAt = now;
             var wasEnabled = s_runtimeStateEnabled;
-            s_runtimeStateEnabled =
-                FeatureFlags.LastChanceMonstersSearchEnabled &&
-                FeatureFlags.LastChangeMode &&
-                LastChanceRuntimeOrchestrator.IsRuntimeActive;
+            s_runtimeStateEnabled = LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled();
 
             if (!s_runtimeStateEnabled)
             {

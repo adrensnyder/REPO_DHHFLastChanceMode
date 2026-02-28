@@ -77,8 +77,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         private static void ChargeWindupPostfix(ChargeHandler __instance)
         {
             if (__instance == null ||
-                !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() ||
-                !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+                !LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return;
             }

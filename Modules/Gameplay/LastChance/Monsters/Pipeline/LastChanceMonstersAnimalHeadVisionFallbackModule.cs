@@ -26,8 +26,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             var key = __instance.GetInstanceID();
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() ||
-                !LastChanceMonstersTargetProxyHelper.IsMasterContext() ||
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled() ||
                 !IsStateEligible(__instance.currentState))
             {
                 NextProbeAtByAnimal.Remove(key);
