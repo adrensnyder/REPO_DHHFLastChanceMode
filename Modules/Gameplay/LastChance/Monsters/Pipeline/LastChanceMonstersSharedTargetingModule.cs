@@ -208,47 +208,85 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
             var methods = new List<System.Reflection.MethodBase>();
-            AddMethod(methods, typeof(EnemyBangDirector), "StateAttackPlayer");
+            AddDestinationAndMovementTargets(methods);
+            AddRotationAndLookTargets(methods);
+            AddAttackAndAbilityTargets(methods);
+            return methods;
+        }
+
+        private static void AddDestinationAndMovementTargets(List<System.Reflection.MethodBase> methods)
+        {
             AddMethod(methods, typeof(EnemyBeamer), "StateAttackStart");
             AddMethod(methods, typeof(EnemyBeamer), "StateMeleeStart");
-            AddMethod(methods, typeof(EnemyBeamer), nameof(EnemyBeamer.OnVision));
             AddMethod(methods, typeof(EnemyBirthdayBoy), "StateGoToPlayerAngry");
-            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttack");
-            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttackUnder");
-            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttackOver");
             AddMethod(methods, typeof(EnemyBirthdayBoy), "PlayerOnNavMesh");
             AddMethod(methods, typeof(EnemyBombThrower), "StateGotoPlayer");
             AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayPlayer");
             AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayHead");
-            AddMethod(methods, typeof(EnemyBombThrower), "RotationStateSet", typeof(EnemyBombThrower.RotationState));
-            AddMethod(methods, typeof(EnemyBombThrower), "AttackSetLogic");
-            AddMethod(methods, typeof(EnemyBombThrower), "MeleeLogic");
-            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateActive", typeof(bool));
-            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.Update));
-            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
-            AddMethod(methods, typeof(EnemyCeilingEye), "RotationAnimation");
             AddMethod(methods, typeof(EnemyDuck), "StateChaseNavmesh");
-            AddMethod(methods, typeof(EnemyDuck), "TargetPositionLogic");
-            AddMethod(methods, typeof(EnemyDuck), "RotationLogic");
             AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerSmall");
             AddMethod(methods, typeof(EnemyElsa), "StateLookUnderStartBig");
-            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnVision));
-            AddMethod(methods, typeof(EnemyElsa), "TargetPositionLogic");
-            AddMethod(methods, typeof(EnemyElsa), "RotationLogic");
-            AddMethod(methods, typeof(EnemyElsa), "AnnoyingJumpCheck");
             AddMethod(methods, typeof(EnemyFloater), "StateNotice");
             AddMethod(methods, typeof(EnemyFloater), "StateGoToPlayer");
             AddMethod(methods, typeof(EnemyFloater), "StateSneak");
-            AddMethod(methods, typeof(EnemyFloater), "RotationLogic");
-            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackSet");
-            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackPlayer");
-            AddMethod(methods, typeof(EnemyHeadGrabber), "RotationLogic");
             AddMethod(methods, typeof(EnemyHeadGrabber), "GotoLogic");
             AddMethod(methods, typeof(EnemyHeadGrabber), "GotoOverLogic");
             AddMethod(methods, typeof(EnemyHidden), "StatePlayerGoTo");
             AddMethod(methods, typeof(EnemyHidden), "StatePlayerMove");
             AddMethod(methods, typeof(EnemyHidden), "StatePlayerRelease");
+            AddMethod(methods, typeof(EnemyRobe), "MoveTowardPlayer");
+            AddMethod(methods, typeof(EnemyRunner), "StateSneak");
+            AddMethod(methods, typeof(EnemyRunner), "StateLookUnderStart");
+            AddMethod(methods, typeof(EnemyShadow), "StateFollow");
+            AddMethod(methods, typeof(EnemySlowWalker), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemySlowWalker), "StateSneak");
+            AddMethod(methods, typeof(EnemySlowWalker), "StateLookUnderStart");
+            AddMethod(methods, typeof(EnemySpinny), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
+            AddMethod(methods, typeof(EnemyTumbler), "StateMoveToPlayer");
+            AddMethod(methods, typeof(EnemyTumbler), "StateTumble");
+            AddMethod(methods, typeof(EnemyUpscream), "StateGoToPlayer");
+            AddMethod(methods, typeof(EnemyValuableThrower), "StateGetValuable");
+            AddMethod(methods, typeof(EnemyValuableThrower), "StateTargetPlayer");
+        }
+
+        private static void AddRotationAndLookTargets(List<System.Reflection.MethodBase> methods)
+        {
+            AddMethod(methods, typeof(EnemyBombThrower), "RotationStateSet", typeof(EnemyBombThrower.RotationState));
+            AddMethod(methods, typeof(EnemyCeilingEye), "RotationAnimation");
+            AddMethod(methods, typeof(EnemyDuck), "RotationLogic");
+            AddMethod(methods, typeof(EnemyElsa), "RotationLogic");
+            AddMethod(methods, typeof(EnemyFloater), "RotationLogic");
+            AddMethod(methods, typeof(EnemyHeadGrabber), "RotationLogic");
             AddMethod(methods, typeof(EnemyHidden), "RotationLogic");
+            AddMethod(methods, typeof(EnemyRobe), "RotationLogic");
+            AddMethod(methods, typeof(EnemyRunner), "RotationLogic");
+            AddMethod(methods, typeof(EnemyShadow), "UpdateHandPositionTo", typeof(Transform));
+            AddMethod(methods, typeof(EnemyShadow), "DistanceFromPlayer");
+            AddMethod(methods, typeof(EnemySlowWalker), "RotationLogic");
+            AddMethod(methods, typeof(EnemySpinny), "LerpToFaceTargetPlayer", typeof(float));
+            AddMethod(methods, typeof(EnemySpinnyAnim), nameof(EnemySpinnyAnim.Update));
+            AddMethod(methods, typeof(EnemyThinManAnim), nameof(EnemyThinManAnim.Update));
+            AddMethod(methods, typeof(EnemyTick), "RotationLogic");
+        }
+
+        private static void AddAttackAndAbilityTargets(List<System.Reflection.MethodBase> methods)
+        {
+            AddMethod(methods, typeof(EnemyBangDirector), "StateAttackPlayer");
+            AddMethod(methods, typeof(EnemyBeamer), nameof(EnemyBeamer.OnVision));
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttack");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttackUnder");
+            AddMethod(methods, typeof(EnemyBirthdayBoy), "StateAttackOver");
+            AddMethod(methods, typeof(EnemyBombThrower), "AttackSetLogic");
+            AddMethod(methods, typeof(EnemyBombThrower), "MeleeLogic");
+            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateActive", typeof(bool));
+            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.Update));
+            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
+            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnVision));
+            AddMethod(methods, typeof(EnemyElsa), "TargetPositionLogic");
+            AddMethod(methods, typeof(EnemyElsa), "AnnoyingJumpCheck");
+            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackSet");
+            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackPlayer");
             AddMethod(methods, typeof(EnemyOogly), "VisionBlocked");
             AddMethod(methods, typeof(EnemyOogly), "StatePlayerSpotted");
             AddMethod(methods, typeof(EnemyOogly), "StateDive");
@@ -256,45 +294,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddMethod(methods, typeof(EnemyRobe), "StateLookUnderStart");
             AddMethod(methods, typeof(EnemyRobe), "StateLookUnder");
             AddMethod(methods, typeof(EnemyRobe), nameof(EnemyRobe.OnVision));
-            AddMethod(methods, typeof(EnemyRobe), "MoveTowardPlayer");
-            AddMethod(methods, typeof(EnemyRobe), "RotationLogic");
-            AddMethod(methods, typeof(EnemyRunner), "StateSneak");
             AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer));
             AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver));
-            AddMethod(methods, typeof(EnemyRunner), "StateLookUnderStart");
             AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.OnVision));
-            AddMethod(methods, typeof(EnemyRunner), "RotationLogic");
             AddMethod(methods, typeof(EnemyShadow), nameof(EnemyShadow.Update));
-            AddMethod(methods, typeof(EnemyShadow), "StateFollow");
-            AddMethod(methods, typeof(EnemyShadow), "UpdateHandPositionTo", typeof(Transform));
             AddMethod(methods, typeof(EnemyShadow), "GetHandTarget", typeof(bool));
             AddMethod(methods, typeof(EnemyShadow), "PlayerTargetTell");
-            AddMethod(methods, typeof(EnemyShadow), "DistanceFromPlayer");
             AddMethod(methods, typeof(EnemySlowMouth), "TargetPositionLogic");
-            AddMethod(methods, typeof(EnemySlowWalker), "StateGoToPlayer");
-            AddMethod(methods, typeof(EnemySlowWalker), "StateSneak");
-            AddMethod(methods, typeof(EnemySlowWalker), "StateLookUnderStart");
             AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack));
             AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.OnVision));
-            AddMethod(methods, typeof(EnemySlowWalker), "RotationLogic");
-            AddMethod(methods, typeof(EnemySpinny), "StateGoToPlayer");
-            AddMethod(methods, typeof(EnemySpinny), "LerpToFaceTargetPlayer", typeof(float));
             AddMethod(methods, typeof(EnemySpinny), "CloseToPlayerTarget", typeof(float));
-            AddMethod(methods, typeof(EnemySpinnyAnim), nameof(EnemySpinnyAnim.Update));
             AddMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
-            AddMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
             AddMethod(methods, typeof(EnemyThinMan), "StateDamage");
-            AddMethod(methods, typeof(EnemyThinManAnim), nameof(EnemyThinManAnim.Update));
             AddMethod(methods, typeof(EnemyThinManAnim), "NoticeSet", typeof(bool));
-            AddMethod(methods, typeof(EnemyTick), "RotationLogic");
             AddMethod(methods, typeof(EnemyTick), "Suck");
-            AddMethod(methods, typeof(EnemyTumbler), "StateMoveToPlayer");
-            AddMethod(methods, typeof(EnemyTumbler), "StateTumble");
-            AddMethod(methods, typeof(EnemyUpscream), "StateGoToPlayer");
             AddMethod(methods, typeof(EnemyUpscreamAnim), "AttackImpulse");
-            AddMethod(methods, typeof(EnemyValuableThrower), "StateGetValuable");
-            AddMethod(methods, typeof(EnemyValuableThrower), "StateTargetPlayer");
-            return methods;
         }
 
         [HarmonyPrepare]
