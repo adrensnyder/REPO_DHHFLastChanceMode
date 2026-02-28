@@ -81,10 +81,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             {
                 AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "JumpScareAtChompStartForceLookAtHead"),
                 AccessTools.DeclaredMethod(typeof(EnemyThinManAnim), "Scream"),
-                AccessTools.DeclaredMethod(typeof(EnemySlowMouthAttaching), "Attach"),
+                AccessTools.DeclaredMethod(typeof(EnemySlowMouthAttaching), "Update"),
                 AccessTools.DeclaredMethod(typeof(EnemyOogly), "Update"),
-                AccessTools.DeclaredMethod(typeof(EnemyCeilingEye), "Logic"),
-                AccessTools.DeclaredMethod(typeof(EnemyCeilingEye), "StateAttack"),
+                AccessTools.DeclaredMethod(typeof(EnemyCeilingEye), "Update"),
                 AccessTools.DeclaredMethod(typeof(EnemySpinny), "OverrideTargetPlayerCameraAim"),
                 AccessTools.DeclaredMethod(typeof(EnemyUpscream), "Update")
             };
