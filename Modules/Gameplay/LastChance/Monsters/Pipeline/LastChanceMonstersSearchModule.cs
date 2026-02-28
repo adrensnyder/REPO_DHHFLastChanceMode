@@ -14,6 +14,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     internal static class LastChanceMonstersSearchModule
     {
         private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersSearch";
+        private static readonly System.Reflection.FieldInfo? s_playerIsDisabledField =
+            AccessTools.Field(typeof(PlayerAvatar), nameof(PlayerAvatar.isDisabled));
         private static readonly AccessTools.FieldRef<PlayerAvatar, bool> s_playerIsDisabledGetter =
             AccessTools.FieldRefAccess<PlayerAvatar, bool>(nameof(PlayerAvatar.isDisabled));
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
@@ -133,8 +135,26 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             var methods = new List<System.Reflection.MethodBase>();
 
+            AddCoreEnemyTargets(methods);
+            AddHeavyMonsterTargets(methods);
+            AddStateMachineTargets(methods);
+
+            return methods;
+        }
+
+        private static void AddCoreEnemyTargets(List<System.Reflection.MethodBase> methods)
+        {
             AddMethod(methods, typeof(Enemy), nameof(Enemy.SetChaseTarget), typeof(PlayerAvatar));
             AddMethod(methods, typeof(Enemy), nameof(Enemy.OnPhotonSerializeView), typeof(Photon.Pun.PhotonStream), typeof(Photon.Pun.PhotonMessageInfo));
+            AddMethod(methods, typeof(EnemyParent), "PlayerCloseLogic");
+            AddMethod(methods, typeof(EnemyPlayerDistance), "Logic");
+            AddMethod(methods, typeof(EnemyPlayerRoom), "Logic");
+            AddMethod(methods, typeof(EnemyTriggerAttack), "OnTriggerStay", typeof(Collider));
+            AddMethod(methods, typeof(EnemyVision), "Vision");
+        }
+
+        private static void AddHeavyMonsterTargets(List<System.Reflection.MethodBase> methods)
+        {
             AddMethod(methods, typeof(EnemyBangDirector), "StateAttackPlayer");
             AddMethod(methods, typeof(EnemyBirthdayBoy), "Update");
             AddMethod(methods, typeof(EnemyBirthdayBoy), "CheckIfPlayersNearbyPop", typeof(Vector3));
@@ -198,10 +218,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddMethod(methods, typeof(EnemySlowMouthPlayerAvatarAttached), "OnDisable");
             AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack));
             AddMethod(methods, typeof(EnemySpinny), "Update");
-            AddMethod(methods, typeof(EnemyStateChase), "Update");
-            AddMethod(methods, typeof(EnemyStateChaseBegin), "Update");
-            AddMethod(methods, typeof(EnemyStateRoaming), "PlayerTurn");
-            AddMethod(methods, typeof(EnemyStateSneak), "Update");
             AddMethod(methods, typeof(EnemyThinMan), "StateStand");
             AddMethod(methods, typeof(EnemyTick), "Update");
             AddMethod(methods, typeof(EnemyTricycle), "StateStateBeforeAttack");
@@ -209,11 +225,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddMethod(methods, typeof(EnemyTricycle), "FixedUpdateAttackDive");
             AddMethod(methods, typeof(EnemyTricycle), "FixedUpdateAttack");
             AddMethod(methods, typeof(EnemyTricycle), "RotationFollowTargetOrVelocity");
-            AddMethod(methods, typeof(EnemyTriggerAttack), "OnTriggerStay", typeof(Collider));
             AddMethod(methods, typeof(EnemyValuableThrower), "TargetFailsafe");
-            AddMethod(methods, typeof(EnemyVision), "Vision");
+        }
 
-            return methods;
+        private static void AddStateMachineTargets(List<System.Reflection.MethodBase> methods)
+        {
+            AddMethod(methods, typeof(EnemyStateChase), "Update");
+            AddMethod(methods, typeof(EnemyStateChaseBegin), "Update");
+            AddMethod(methods, typeof(EnemyStateRoaming), "PlayerTurn");
+            AddMethod(methods, typeof(EnemyStateSneak), "Update");
         }
 
         private static void AddMethod(List<System.Reflection.MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)
@@ -241,8 +261,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 var instruction = list[i];
                 if ((instruction.opcode == System.Reflection.Emit.OpCodes.Ldfld || instruction.opcode == System.Reflection.Emit.OpCodes.Ldflda) &&
                     instruction.operand is System.Reflection.FieldInfo field &&
-                    string.Equals(field.Name, nameof(PlayerAvatar.isDisabled), StringComparison.Ordinal) &&
-                    field.DeclaringType == typeof(PlayerAvatar))
+                    field == s_playerIsDisabledField)
                 {
                     instruction.opcode = System.Reflection.Emit.OpCodes.Call;
                     instruction.operand = remapMethod;
