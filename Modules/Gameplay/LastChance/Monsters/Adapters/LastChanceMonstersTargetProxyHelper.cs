@@ -163,6 +163,44 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             return false;
         }
 
+        internal static Vector3 ResolveEffectivePlayerTargetPosition(PlayerAvatar? player)
+        {
+            if (player == null)
+            {
+                return Vector3.zero;
+            }
+
+            if (!IsRuntimeEnabled())
+            {
+                return player.transform.position;
+            }
+
+            return TryGetHeadProxyTarget(player, out var headCenter)
+                ? headCenter
+                : player.transform.position;
+        }
+
+        internal static Vector3 ResolveEffectiveTransformTargetPosition(Transform? transform)
+        {
+            if (transform == null)
+            {
+                return Vector3.zero;
+            }
+
+            if (!IsRuntimeEnabled())
+            {
+                return transform.position;
+            }
+
+            TryResolvePlayerAvatarFromTransform(transform, out var player);
+            if (player != null && TryGetHeadProxyTarget(player, out var headCenter))
+            {
+                return headCenter;
+            }
+
+            return transform.position;
+        }
+
         internal static bool IsLineOfSightToHead(Transform origin, Vector3 headCenter, LayerMask visionMask, PlayerAvatar player)
         {
             var dir = headCenter - origin.position;

@@ -79,23 +79,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         private static Vector3 GetEffectiveTransformPosition(Transform transform)
         {
-            if (transform == null)
-            {
-                return Vector3.zero;
-            }
-
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
-            {
-                return transform.position;
-            }
-
-            LastChanceMonstersTargetProxyHelper.TryResolvePlayerAvatarFromTransform(transform, out var player);
-            if (player != null && LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
-            {
-                return headCenter;
-            }
-
-            return transform.position;
+            return LastChanceMonstersTargetProxyHelper.ResolveEffectiveTransformTargetPosition(transform);
         }
 
     }

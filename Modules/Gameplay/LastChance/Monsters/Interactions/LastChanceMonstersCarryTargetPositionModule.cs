@@ -96,22 +96,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
         internal static Vector3 GetEffectivePlayerTargetPosition(PlayerAvatar? player)
         {
-            if (player == null)
-            {
-                return Vector3.zero;
-            }
-
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
-            {
-                return player.transform.position;
-            }
-
-            if (LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
-            {
-                return headCenter;
-            }
-
-            return player.transform.position;
+            return LastChanceMonstersTargetProxyHelper.ResolveEffectivePlayerTargetPosition(player);
         }
     }
 }
