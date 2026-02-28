@@ -23,80 +23,141 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return;
             }
 
-            var nearby = __instance.PlayerNearby();
-            if (nearby == null || !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(nearby))
-            {
-                return;
-            }
-
-            if (!LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(nearby, out var headCenter))
-            {
-                return;
-            }
-
-            if (!IsHeadOverlappingBalloon(__instance, headCenter))
+            if (!TryGetOverlappingHeadPopper(__instance, out var popper) || popper == null)
             {
                 return;
             }
 
             __instance.popped = true;
-            __instance.popper = nearby;
+            __instance.popper = popper;
         }
 
         [HarmonyPatch(typeof(BirthdayBoyBalloon), nameof(BirthdayBoyBalloon.OnTriggerEnter))]
-        [HarmonyPostfix]
-        private static void OnTriggerEnterPostfix(BirthdayBoyBalloon __instance, Collider _other)
+        [HarmonyPrefix]
+        private static bool OnTriggerEnterPrefix(BirthdayBoyBalloon __instance, Collider _other)
         {
             if (__instance == null || _other == null || __instance.popped)
             {
-                return;
+                return true;
             }
 
             if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
-                return;
+                return true;
             }
 
             var deathHead = _other.GetComponentInParent<PlayerDeathHead>();
             if (deathHead == null)
             {
-                return;
+                return true;
             }
 
             var player = deathHead.playerAvatar;
             if (player == null || !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
             {
-                return;
-            }
-
-            if (__instance.PlayerNearby() == null)
-            {
-                return;
+                return true;
             }
 
             __instance.popped = true;
             __instance.popper = player;
+            return false;
         }
 
-        private static bool IsHeadOverlappingBalloon(BirthdayBoyBalloon balloon, Vector3 headCenter)
+        private static bool TryGetOverlappingHeadPopper(BirthdayBoyBalloon balloon, out PlayerAvatar? popper)
         {
-            if (balloon.collider1 != null && IsInsideCollider(balloon.collider1, headCenter))
+            popper = null;
+            var players = SemiFunc.PlayerGetList();
+            if (players == null)
             {
-                return true;
+                return false;
             }
 
-            if (balloon.collider2 != null && IsInsideCollider(balloon.collider2, headCenter))
+            var bestDistance = float.MaxValue;
+            foreach (var player in players)
             {
-                return true;
+                if (player == null || !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
+                {
+                    continue;
+                }
+
+                var head = player.playerDeathHead;
+                if (head == null || !IsHeadOverlappingBalloon(balloon, head))
+                {
+                    continue;
+                }
+
+                var dist = (head.transform.position - balloon.transform.position).sqrMagnitude;
+                if (dist < bestDistance)
+                {
+                    bestDistance = dist;
+                    popper = player;
+                }
+            }
+
+            return popper != null;
+        }
+
+        private static bool IsHeadOverlappingBalloon(BirthdayBoyBalloon balloon, PlayerDeathHead head)
+        {
+            if (!TryGetBalloonCollider(balloon, 1, out var balloonColA) &&
+                !TryGetBalloonCollider(balloon, 2, out var _))
+            {
+                return false;
+            }
+
+            var headColliders = head.colliders;
+            if (headColliders == null || headColliders.Length == 0)
+            {
+                headColliders = head.GetComponentsInChildren<Collider>();
+            }
+
+            for (var i = 0; i < headColliders.Length; i++)
+            {
+                var headCol = headColliders[i];
+                if (!IsColliderValid(headCol))
+                {
+                    continue;
+                }
+
+                if (balloonColA != null && Physics.ComputePenetration(
+                    balloonColA,
+                    balloonColA.transform.position,
+                    balloonColA.transform.rotation,
+                    headCol,
+                    headCol.transform.position,
+                    headCol.transform.rotation,
+                    out _,
+                    out var distA) && distA > 0f)
+                {
+                    return true;
+                }
+
+                if (TryGetBalloonCollider(balloon, 2, out var balloonColB) && balloonColB != null && Physics.ComputePenetration(
+                    balloonColB,
+                    balloonColB.transform.position,
+                    balloonColB.transform.rotation,
+                    headCol,
+                    headCol.transform.position,
+                    headCol.transform.rotation,
+                    out _,
+                    out var distB) && distB > 0f)
+                {
+                    return true;
+                }
             }
 
             return false;
         }
 
-        private static bool IsInsideCollider(Collider collider, Vector3 point)
+        private static bool TryGetBalloonCollider(BirthdayBoyBalloon balloon, int index, out Collider? collider)
         {
-            var closest = collider.ClosestPoint(point);
-            return (closest - point).sqrMagnitude <= 0.0004f;
+            collider = index == 1 ? balloon.collider1 : balloon.collider2;
+            return IsColliderValid(collider);
+        }
+
+        private static bool IsColliderValid(Collider? collider)
+        {
+            return collider != null && collider.enabled && collider.gameObject.activeInHierarchy;
         }
     }
 }
