@@ -10,14 +10,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
-        private static readonly System.Reflection.MethodBase? s_enemyStateChaseUpdate =
-            AccessTools.DeclaredMethod(typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
-
-        private static readonly System.Reflection.MethodBase? s_enemyStateChaseBeginUpdate =
-            AccessTools.DeclaredMethod(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
-
-        private static readonly System.Reflection.MethodBase? s_enemyStateChaseSlowUpdate =
-            AccessTools.DeclaredMethod(typeof(EnemyStateChaseSlow), nameof(EnemyStateChaseSlow.Update));
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddTargetMethods);
 
         private static readonly System.Reflection.MethodInfo? s_transformGetPositionMethod =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
@@ -28,20 +22,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            if (s_enemyStateChaseUpdate != null)
-            {
-                yield return s_enemyStateChaseUpdate;
-            }
+            return s_targetMethods;
+        }
 
-            if (s_enemyStateChaseBeginUpdate != null)
-            {
-                yield return s_enemyStateChaseBeginUpdate;
-            }
-
-            if (s_enemyStateChaseSlowUpdate != null)
-            {
-                yield return s_enemyStateChaseSlowUpdate;
-            }
+        private static void AddTargetMethods(List<System.Reflection.MethodBase> methods)
+        {
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChaseSlow), nameof(EnemyStateChaseSlow.Update));
         }
 
         [HarmonyPrepare]

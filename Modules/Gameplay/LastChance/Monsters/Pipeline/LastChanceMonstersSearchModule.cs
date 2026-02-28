@@ -22,7 +22,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AccessTools.FieldRefAccess<PlayerAvatar, bool>(nameof(PlayerAvatar.isDisabled));
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
         private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
-        private static readonly List<System.Reflection.MethodBase> s_patchTargets = CreatePatchTargets();
+        private static readonly List<System.Reflection.MethodBase> s_patchTargets =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddCoreEnemyTargets, AddStateMachineTargets);
         private static Harmony? s_harmony;
         private static float s_runtimeStateCachedAt;
         private static bool s_runtimeStateEnabled;
@@ -131,16 +132,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return !enemyParent.forceLeave;
-        }
-
-        private static List<System.Reflection.MethodBase> CreatePatchTargets()
-        {
-            var methods = new List<System.Reflection.MethodBase>();
-
-            AddCoreEnemyTargets(methods);
-            AddStateMachineTargets(methods);
-
-            return LastChanceMonstersPatchTargetHelper.Deduplicate(methods);
         }
 
         private static void AddCoreEnemyTargets(List<System.Reflection.MethodBase> methods)

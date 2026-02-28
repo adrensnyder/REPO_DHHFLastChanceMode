@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 
@@ -10,6 +11,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch]
     internal static class LastChanceMonstersCarryTargetPositionModule
     {
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddTargetMethods);
+
         private static readonly System.Reflection.FieldInfo? s_enemyHiddenPlayerTargetField =
             AccessTools.Field(typeof(EnemyHidden), nameof(EnemyHidden.playerTarget));
 
@@ -25,20 +29,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new System.Reflection.MethodBase?[]
-            {
-                AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerGoTo)),
-                AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerMove)),
-                AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerRelease)),
-            };
+            return s_targetMethods;
+        }
 
-            for (var i = 0; i < methods.Length; i++)
-            {
-                if (methods[i] != null)
-                {
-                    yield return methods[i]!;
-                }
-            }
+        private static void AddTargetMethods(List<System.Reflection.MethodBase> methods)
+        {
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerGoTo));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerMove));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerRelease));
         }
 
         [HarmonyTranspiler]

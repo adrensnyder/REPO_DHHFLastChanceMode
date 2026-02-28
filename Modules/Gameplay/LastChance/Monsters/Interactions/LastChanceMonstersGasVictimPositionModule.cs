@@ -4,17 +4,15 @@ using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersGasVictimPositionModule
     {
-        private static readonly System.Reflection.MethodBase? s_playersInGasLogicMethod =
-            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic));
-
-        private static readonly System.Reflection.MethodBase? s_playerInGasMethod =
-            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayerInGas), new[] { typeof(PlayerAvatar) });
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddTargetMethods);
 
         private static readonly System.Reflection.MethodInfo? s_componentGetTransform =
             AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));
@@ -28,15 +26,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            if (s_playersInGasLogicMethod != null)
-            {
-                yield return s_playersInGasLogicMethod;
-            }
+            return s_targetMethods;
+        }
 
-            if (s_playerInGasMethod != null)
-            {
-                yield return s_playerInGasMethod;
-            }
+        private static void AddTargetMethods(List<System.Reflection.MethodBase> methods)
+        {
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayerInGas), typeof(PlayerAvatar));
         }
 
         [HarmonyTranspiler]

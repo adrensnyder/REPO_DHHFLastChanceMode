@@ -16,7 +16,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersPlayerVisionCheck";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.CeilingEye");
         private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
-        private static readonly List<System.Reflection.MethodBase> s_targetMethods = CreateTargetMethods();
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddTargetMethods);
         private static Harmony? s_harmony;
 
         private static readonly System.Reflection.MethodInfo? s_playerVisionCheckVanilla = AccessTools.Method(
@@ -84,13 +85,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             ResetRuntimeState();
         }
 
-        private static List<System.Reflection.MethodBase> CreateTargetMethods()
+        private static void AddTargetMethods(List<System.Reflection.MethodBase> methods)
         {
-            var methods = new List<System.Reflection.MethodBase>();
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.StateHasTarget));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.OnVisionTrigger));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySpinny), nameof(EnemySpinny.HasLineOfSight));
-            return methods;
         }
 
         private static IEnumerable<CodeInstruction> ReplaceVisionChecks(IEnumerable<CodeInstruction> instructions)

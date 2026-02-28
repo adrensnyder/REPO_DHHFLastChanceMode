@@ -9,6 +9,22 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
 {
     internal static class LastChanceMonstersPatchTargetHelper
     {
+        internal static List<MethodBase> BuildTargetList(params Action<List<MethodBase>>[] addSteps)
+        {
+            var methods = new List<MethodBase>();
+            if (addSteps == null)
+            {
+                return methods;
+            }
+
+            for (var i = 0; i < addSteps.Length; i++)
+            {
+                addSteps[i]?.Invoke(methods);
+            }
+
+            return Deduplicate(methods);
+        }
+
         internal static void AddDeclaredMethod(List<MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)
         {
             var method = argumentTypes.Length == 0

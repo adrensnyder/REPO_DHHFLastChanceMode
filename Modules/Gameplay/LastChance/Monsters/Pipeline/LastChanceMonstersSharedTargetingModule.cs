@@ -10,6 +10,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedPlayerSearchModule
     {
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddTargetMethods);
+
         private static readonly System.Reflection.MethodInfo? s_getAllVanillaMethod = AccessTools.Method(
             typeof(SemiFunc),
             nameof(SemiFunc.PlayerGetAllPlayerAvatarWithinRange),
@@ -29,14 +32,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new List<System.Reflection.MethodBase>();
+            return s_targetMethods;
+        }
+
+        private static void AddTargetMethods(List<System.Reflection.MethodBase> methods)
+        {
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateStunSmall));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnHurt));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.StateBackToNavmesh));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.FindLevelPointAndCreateCeilingRoamPoints));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.OnInvestigate));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.StateCeilingRoam));
-            return methods;
         }
 
         [HarmonyTranspiler]
@@ -92,6 +98,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersEffectiveTargetPointModule
     {
+        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(
+                AddDestinationAndMovementTargets,
+                AddRotationAndLookTargets,
+                AddAttackAndAbilityTargets);
+
         private static readonly System.Reflection.MethodInfo? s_transformGetPositionMethod =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
 
@@ -101,12 +113,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new List<System.Reflection.MethodBase>();
-            AddDestinationAndMovementTargets(methods);
-            AddRotationAndLookTargets(methods);
-            AddAttackAndAbilityTargets(methods);
-            methods = LastChanceMonstersPatchTargetHelper.Deduplicate(methods);
-            return methods;
+            return s_targetMethods;
         }
 
         private static void AddDestinationAndMovementTargets(List<System.Reflection.MethodBase> methods)
@@ -128,12 +135,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyPrepare]
         private static bool Prepare()
         {
-            foreach (var _ in TargetMethods())
-            {
-                return true;
-            }
-
-            return false;
+            return s_targetMethods.Count > 0;
         }
 
         [HarmonyTranspiler]
