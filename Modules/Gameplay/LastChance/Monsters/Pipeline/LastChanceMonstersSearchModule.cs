@@ -320,7 +320,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var methods = new List<System.Reflection.MethodBase>();
 
             AddCoreEnemyTargets(methods);
-            AddHeavyMonsterTargets(methods);
             AddStateMachineTargets(methods);
 
             return DeduplicateTargets(methods);
@@ -353,78 +352,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddMethod(methods, typeof(EnemyPlayerRoom), "Logic");
             AddMethod(methods, typeof(EnemyTriggerAttack), "OnTriggerStay", typeof(Collider));
             AddMethod(methods, typeof(EnemyVision), "Vision");
-        }
-
-        private static void AddHeavyMonsterTargets(List<System.Reflection.MethodBase> methods)
-        {
-            AddMethod(methods, typeof(EnemyBangDirector), "StateAttackPlayer");
-            AddMethod(methods, typeof(EnemyBirthdayBoy), "Update");
-            AddMethod(methods, typeof(EnemyBirthdayBoy), "CheckIfPlayersNearbyPop", typeof(Vector3));
-            AddMethod(methods, typeof(EnemyBirthdayBoy), "PlayerNearby");
-            AddMethod(methods, typeof(EnemyBombThrower), "StateGotoPlayer");
-            AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayPlayer");
-            AddMethod(methods, typeof(EnemyBombThrower), "StateBackAwayHead");
-            AddMethod(methods, typeof(EnemyBombThrowerAnim), "HeadLookAtLogic");
-            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateSpawn", typeof(bool));
-            AddMethod(methods, typeof(EnemyBombThrowerHead), "StateActive", typeof(bool));
-            AddMethod(methods, typeof(EnemyBombThrowerHead), "EyeLogic");
-            AddMethod(methods, typeof(EnemyCeilingEye), "StateHasTarget");
-            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.TargetFailSafe));
-            AddMethod(methods, typeof(EnemyDuck), "StateGoToPlayer");
-            AddMethod(methods, typeof(EnemyDuck), "StateGoToPlayerUnder");
-            AddMethod(methods, typeof(EnemyDuck), "StateGoToPlayerOver");
-            AddMethod(methods, typeof(EnemyDuck), "StateStun");
-            AddMethod(methods, typeof(EnemyDuck), "HeadLookAtLogic");
-            AddMethod(methods, typeof(EnemyDuck), "ChaseStop");
-            AddMethod(methods, typeof(EnemyElsa), "Update");
-            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerSmall");
-            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerUnderSmall");
-            AddMethod(methods, typeof(EnemyElsa), "StateGoToPlayerOverBig");
-            AddMethod(methods, typeof(EnemyElsa), "StateLookUnderBig");
-            AddMethod(methods, typeof(EnemyElsa), "ChaseStop");
-            AddMethod(methods, typeof(EnemyGnomeDirector), "StateAttackPlayer");
-            AddMethod(methods, typeof(EnemyHeadGrabber), "GotoLogic");
-            AddMethod(methods, typeof(EnemyHeadGrabber), "GotoOverLogic");
-            AddMethod(methods, typeof(EnemyHeadGrabber), "DeathHeadLogic");
-            AddMethod(methods, typeof(EnemyHeadGrabber), "GetClosestDeathHead", typeof(float));
-            AddMethod(methods, typeof(EnemyHeadUp), "Update");
-            AddMethod(methods, typeof(EnemyHidden), "StatePlayerGoTo");
-            AddMethod(methods, typeof(EnemyHidden), "StatePlayerPickup");
-            AddMethod(methods, typeof(EnemyHidden), "StatePlayerMove");
-            AddMethod(methods, typeof(EnemyHidden), "StatePlayerRelease");
-            AddMethod(methods, typeof(EnemyHidden), "PlayerTumbleLogic");
-            AddMethod(methods, typeof(EnemyOnScreen), "Logic");
-            AddMethod(methods, typeof(EnemyOogly), "FixedUpdate");
-            AddMethod(methods, typeof(EnemyOogly), "CheckSinglePlayerNearby");
-            AddMethod(methods, typeof(EnemyOogly), "StatePlayerSpotted");
-            AddMethod(methods, typeof(EnemyOogly), "StateWrestlePlayer");
-            AddMethod(methods, typeof(EnemyRobe), "StateLookUnderAttack");
-            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer));
-            AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver));
-            AddMethod(methods, typeof(EnemyShadow), "Update");
-            AddMethod(methods, typeof(EnemyShadow), "StateChooseTarget");
-            AddMethod(methods, typeof(EnemyShadow), "PlayerTargetTell");
-            AddMethod(methods, typeof(EnemyShadow), "PlayerTargetStopTell");
-            AddMethod(methods, typeof(EnemySlowMouth), "DetatchLogic");
-            AddMethod(methods, typeof(EnemySlowMouth), "StateAttached", typeof(bool));
-            AddMethod(methods, typeof(EnemySlowMouth), "StateDetach", typeof(bool));
-            AddMethod(methods, typeof(EnemySlowMouth), "StateGoToPlayerOver", typeof(bool));
-            AddMethod(methods, typeof(EnemySlowMouth), "StateGoToPlayerUnder", typeof(bool));
-            AddMethod(methods, typeof(EnemySlowMouth), "TargettingPlayer");
-            AddMethod(methods, typeof(EnemySlowMouth), "IsPossessedBySeveral");
-            AddMethod(methods, typeof(EnemySlowMouthAttaching), "Update");
-            AddMethod(methods, typeof(EnemySlowMouthAttaching), "AttachToPlayer");
-            AddMethod(methods, typeof(EnemySlowMouthPlayerAvatarAttached), "OnDisable");
-            AddMethod(methods, typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack));
-            AddMethod(methods, typeof(EnemySpinny), "Update");
-            AddMethod(methods, typeof(EnemyThinMan), "StateStand");
-            AddMethod(methods, typeof(EnemyTick), "Update");
-            AddMethod(methods, typeof(EnemyTricycle), "StateStateBeforeAttack");
-            AddMethod(methods, typeof(EnemyTricycle), "StateAttackDive");
-            AddMethod(methods, typeof(EnemyTricycle), "FixedUpdateAttackDive");
-            AddMethod(methods, typeof(EnemyTricycle), "FixedUpdateAttack");
-            AddMethod(methods, typeof(EnemyTricycle), "RotationFollowTargetOrVelocity");
-            AddMethod(methods, typeof(EnemyValuableThrower), "TargetFailsafe");
         }
 
         private static void AddStateMachineTargets(List<System.Reflection.MethodBase> methods)
