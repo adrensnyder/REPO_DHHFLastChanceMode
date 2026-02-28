@@ -10,6 +10,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
+        private static readonly System.Reflection.MethodBase? s_enemyStateChaseUpdate =
+            AccessTools.DeclaredMethod(typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
+
+        private static readonly System.Reflection.MethodBase? s_enemyStateChaseBeginUpdate =
+            AccessTools.DeclaredMethod(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+
+        private static readonly System.Reflection.MethodBase? s_enemyStateChaseSlowUpdate =
+            AccessTools.DeclaredMethod(typeof(EnemyStateChaseSlow), nameof(EnemyStateChaseSlow.Update));
+
         private static readonly System.Reflection.MethodInfo? s_transformGetPositionMethod =
             AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
 
@@ -19,13 +28,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            var methods = new List<System.Reflection.MethodBase>();
+            if (s_enemyStateChaseUpdate != null)
+            {
+                yield return s_enemyStateChaseUpdate;
+            }
 
-            AddIfFound(methods, typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
-            AddIfFound(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
-            AddIfFound(methods, typeof(EnemyStateChaseSlow), nameof(EnemyStateChaseSlow.Update));
+            if (s_enemyStateChaseBeginUpdate != null)
+            {
+                yield return s_enemyStateChaseBeginUpdate;
+            }
 
-            return methods;
+            if (s_enemyStateChaseSlowUpdate != null)
+            {
+                yield return s_enemyStateChaseSlowUpdate;
+            }
         }
 
         [HarmonyPrepare]
@@ -82,13 +98,5 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return transform.position;
         }
 
-        private static void AddIfFound(List<System.Reflection.MethodBase> methods, System.Type type, string methodName)
-        {
-            var method = AccessTools.DeclaredMethod(type, methodName);
-            if (method != null)
-            {
-                methods.Add(method);
-            }
-        }
     }
 }
