@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
 using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
@@ -10,6 +11,7 @@ using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
 using UnityEngine.AI;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
@@ -29,6 +31,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
     internal static class LastChanceTimerController
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Runtime");
         private const string LogKey = "LastChance.Timer";
         private const string TimerSecondAudioFileName = "TimerSecond.mp3";
         private const string TimerWarningAudioPrimaryFileName = "TimerWarning.mp3";
@@ -518,10 +521,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 LastChanceTruckDistanceLogger.LogDistances();
             }
 
-            if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey, 30))
-            {
-                Debug.Log($"[LastChance] Timer started: {s_timerRemaining:F1}s");
-            }
+            Log.LogInfo($"[LastChance] Runtime activated. Timer started: {s_timerRemaining:F1}s.");
 
             if (profileEnabled)
             {
