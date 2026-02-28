@@ -68,6 +68,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private const float AssetRetryIntervalSeconds = 2f;
 
         private const float VisibilityRefreshIntervalSeconds = 0.5f;
+        private const float AbilitySpotCacheRefreshIntervalSeconds = 0.5f;
+        private static AbilitySpot[] s_cachedAbilitySpots = Array.Empty<AbilitySpot>();
+        private static float s_nextAbilitySpotCacheRefreshAt;
 
         private sealed class PlayerIconSlot
         {
@@ -182,6 +185,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_truckIconImage = null;
             s_truckCounterLabel = null;
             s_lastTruckCounterText = string.Empty;
+            s_cachedAbilitySpots = Array.Empty<AbilitySpot>();
+            s_nextAbilitySpotCacheRefreshAt = 0f;
             LastChanceTimerChangeEffectsModule.Reset();
         }
 
@@ -705,7 +710,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
                 return;
             }
 
-            var spots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
+            var spots = GetAbilitySpotsCached();
             if (spots == null || spots.Length == 0)
             {
                 return;
@@ -724,6 +729,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
                 return;
             }
+        }
+
+        private static AbilitySpot[] GetAbilitySpotsCached()
+        {
+            if (Time.unscaledTime < s_nextAbilitySpotCacheRefreshAt)
+            {
+                return s_cachedAbilitySpots;
+            }
+
+            s_cachedAbilitySpots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
+            s_nextAbilitySpotCacheRefreshAt = Time.unscaledTime + AbilitySpotCacheRefreshIntervalSeconds;
+            return s_cachedAbilitySpots;
         }
 
         
