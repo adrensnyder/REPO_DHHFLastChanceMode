@@ -1,15 +1,18 @@
 #nullable enable
 
 using System;
+using BepInEx.Logging;
 using DeathHeadHopper.DeathHead;
 using DeathHeadHopper.Helpers;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
 {
     internal static class LastChanceSpectateHelper
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spectate");
         private const string ForceSpectateLogKey = "LastChance.ForceDeathHeadSpectate";
         private const string DebugStateLogKey = "LastChance.SpectateState";
         private static bool s_forceComplete;
@@ -185,7 +188,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
             }
 
             s_lastSpectateDebugMessage = message;
-            UnityEngine.Debug.Log(message);
+            Log.LogDebug(message);
         }
 
         internal static bool ShouldForceLocalDeathHeadSpectate()

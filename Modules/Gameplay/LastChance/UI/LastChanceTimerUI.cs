@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
 using DeathHeadHopper.Managers;
@@ -10,11 +11,13 @@ using HarmonyLib;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 {
     internal static class LastChanceTimerUI
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.TimerUI");
         private const string SemibotWhiteFileName = "SemibotWhite.png";
         private const string TruckWhiteFileName = "TruckWhite.png";
         private const string SemibotSurrenderedFileName = "SemibotSurrendered.png";
@@ -517,7 +520,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.UI.Sprites", 30))
             {
-                Debug.Log(
+                Log.LogDebug(
                     $"[LastChance] UI sprites status: semibot={(s_semibotWhiteSprite != null)} truck={(s_truckWhiteSprite != null)} " +
                     $"surrendered={(s_semibotSurrenderedSprite != null)} safe={(s_semibotSafeSprite != null)}");
             }

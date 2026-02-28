@@ -4,15 +4,18 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using Photon.Pun;
 using UnityEngine;
 using UnityEngine.AI;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Utilities
 {
     internal static class PlayerTruckDistanceHelper
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.PlayerTruckDistance");
         private const float HeightCacheTtlSeconds = 2f;
 
         [Flags]
@@ -318,7 +321,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("GetDistancesFromTruck", ex);
+                LogRuntimeHotPathException("GetDistancesFromTruck", ex);
                 return Array.Empty<PlayerTruckDistance>();
             }
         }
@@ -394,25 +397,25 @@ namespace DHHFLastChanceMode.Modules.Utilities
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("TryBuildLocalPlayerTruckHint", ex);
+                LogRuntimeHotPathException("TryBuildLocalPlayerTruckHint", ex);
                 return false;
             }
         }
 
-        private static void LogReflectionHotPathException(string context, Exception ex)
+        private static void LogRuntimeHotPathException(string context, Exception ex)
         {
             if (!FeatureFlags.DebugLogging)
             {
                 return;
             }
 
-            var key = "LastChance.Reflection.PlayerTruckDistance." + context;
+            var key = "LastChance.Runtime.PlayerTruckDistance." + context;
             if (!LogLimiter.ShouldLog(key, 600))
             {
                 return;
             }
 
-            Debug.LogWarning($"[LastChance] Reflection hot-path failed in {context}: {ex.GetType().Name}: {ex.Message}");
+            Log.LogWarning($"[LastChance] Runtime hot-path failed in {context}: {ex.GetType().Name}: {ex.Message}");
         }
 
         internal static void BeginActivationProfiling()

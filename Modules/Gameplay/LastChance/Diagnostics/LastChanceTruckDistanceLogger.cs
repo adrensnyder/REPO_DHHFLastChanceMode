@@ -1,14 +1,16 @@
 #nullable enable
 
 using System.Text;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
-using UnityEngine;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Diagnostics
 {
     internal static class LastChanceTruckDistanceLogger
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.TruckDistances");
         private const string LogKey = "LastChance.TruckDistances";
 
         internal static void LogDistances()
@@ -49,7 +51,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Diagnostics
                     totalMapRoomsText);
             }
 
-            Debug.Log(message.ToString());
+            Log.LogDebug(message.ToString());
         }
     }
 }

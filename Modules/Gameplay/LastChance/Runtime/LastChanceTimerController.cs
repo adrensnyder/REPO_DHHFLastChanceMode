@@ -555,7 +555,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey, 30))
             {
-                Debug.Log("[LastChance] All heads in truck; sending to shop.");
+                Log.LogDebug("[LastChance] All heads in truck; sending to shop.");
             }
 
             LastChanceTimerUI.Hide();
@@ -606,7 +606,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("NormalizeDirectorsBeforeShopReturn", ex);
+                LogRuntimeHotPathException("NormalizeDirectorsBeforeShopReturn", ex);
             }
         }
 
@@ -625,7 +625,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 var extractionDone = RoundDirector.instance != null &&
                                      RoundDirector.instance.allExtractionPointsCompleted;
 
-                Debug.Log(
+                Log.LogDebug(
                     $"[LastChance] ShopReturn snapshot phase={phase} " +
                     $"levelCurrent={levelCurrent} previousRunLevel={previousRunLevelName} " +
                     $"runCurrency={SemiFunc.StatGetRunCurrency()} targetCurrency={targetCurrency} " +
@@ -633,7 +633,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("TryLogShopReturnSnapshot", ex);
+                LogRuntimeHotPathException("TryLogShopReturnSnapshot", ex);
             }
         }
 
@@ -688,7 +688,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             if (FeatureFlags.DebugLogging && !s_suppressedLogEmitted && LogLimiter.ShouldLog("LastChance.Suppress", 10))
             {
                 s_suppressedLogEmitted = true;
-                Debug.Log(reason);
+                Log.LogDebug(reason);
             }
         }
 
@@ -897,7 +897,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey, 30))
             {
-                Debug.Log(reason);
+                Log.LogDebug(reason);
             }
 
             LastChanceTimerUI.Hide();
@@ -1442,7 +1442,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerSecond.LoadFail", 30))
                     {
                         var baseDir = AudioAssetLoader.GetDefaultAssetsDirectory();
-                        Debug.LogWarning($"[LastChance] Failed to load timer tick audio. file={TimerSecondAudioFileName} baseDir={baseDir}");
+                        Log.LogWarning($"[LastChance] Failed to load timer tick audio. file={TimerSecondAudioFileName} baseDir={baseDir}");
                     }
 
                     return false;
@@ -1451,7 +1451,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 s_timerSecondAudioClip = clip;
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerSecond.Loaded", 30))
                 {
-                    Debug.Log($"[LastChance] Loaded timer tick audio from: {resolvedPath}");
+                    Log.LogDebug($"[LastChance] Loaded timer tick audio from: {resolvedPath}");
                 }
                 }
                 else
@@ -1492,7 +1492,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerWarning.LoadFail", 30))
                     {
                         var baseDir = AudioAssetLoader.GetDefaultAssetsDirectory();
-                        Debug.LogWarning(
+                        Log.LogWarning(
                             $"[LastChance] Failed to load timer warning audio. files={TimerWarningAudioPrimaryFileName} baseDir={baseDir}");
                     }
 
@@ -1502,7 +1502,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 s_timerWarningAudioClip = clip;
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.TimerWarning.Loaded", 30))
                 {
-                    Debug.Log($"[LastChance] Loaded timer warning audio from: {resolvedPath}");
+                    Log.LogDebug($"[LastChance] Loaded timer warning audio from: {resolvedPath}");
                 }
                 }
                 else
@@ -1575,7 +1575,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Prewarm", 30))
             {
-                Debug.Log("[LastChance] Prewarmed UI sprites and timer audio assets.");
+                Log.LogDebug("[LastChance] Prewarmed UI sprites and timer audio assets.");
             }
         }
 
@@ -1595,7 +1595,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Indicator.Blocked", 5))
                 {
                     var rawMode = FeatureFlags.LastChanceIndicators ?? string.Empty;
-                    Debug.Log($"[LastChance] Indicator blocked: active={s_active} allDead={allDead} modeRaw='{rawMode}' modeParsed={mode}");
+                    Log.LogDebug($"[LastChance] Indicator blocked: active={s_active} allDead={allDead} modeRaw='{rawMode}' modeParsed={mode}");
                 }
                 ClearActiveIndicatorVisuals();
                 AbilityModule.RefreshDirectionSlotVisuals();
@@ -1607,7 +1607,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 if (!s_indicatorNoneLoggedThisCycle && FeatureFlags.DebugLogging)
                 {
                     var rawMode = FeatureFlags.LastChanceIndicators ?? string.Empty;
-                    Debug.Log($"[LastChance] Indicator disabled for this cycle: modeRaw='{rawMode}' modeParsed={mode}");
+                    Log.LogDebug($"[LastChance] Indicator disabled for this cycle: modeRaw='{rawMode}' modeParsed={mode}");
                     s_indicatorNoneLoggedThisCycle = true;
                 }
                 ClearActiveIndicatorVisuals();
@@ -1745,7 +1745,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog($"{IndicatorCooldownLogKey}.Start.{kind}", 2))
             {
-                Debug.Log($"[LastChance] Indicator cooldown started: kind={kind} duration={duration:F1}s cooldown={cooldown:F1}s");
+                Log.LogDebug($"[LastChance] Indicator cooldown started: kind={kind} duration={duration:F1}s cooldown={cooldown:F1}s");
             }
 
             ApplyIndicatorPenalty(kind, maxPlayers);
@@ -1759,7 +1759,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(IndicatorLogKey, 3))
             {
                 var remainingCooldown = Mathf.Max(0f, GetIndicatorCooldownUntil(kind) - Time.time);
-                Debug.Log($"[LastChance] Indicator triggered: mode={kind} active={duration:F1}s cooldown={remainingCooldown:F1}s timer={s_timerRemaining:F1}s");
+                Log.LogDebug($"[LastChance] Indicator triggered: mode={kind} active={duration:F1}s cooldown={remainingCooldown:F1}s timer={s_timerRemaining:F1}s");
             }
         }
 
@@ -2243,7 +2243,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("TryGetTruckPosition", ex);
+                LogRuntimeHotPathException("TryGetTruckPosition", ex);
             }
 
             return false;
@@ -2267,7 +2267,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("TryGetTransformPosition", ex);
+                LogRuntimeHotPathException("TryGetTransformPosition", ex);
             }
 
             return false;
@@ -2286,7 +2286,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("TrySampleNavMeshPosition", ex);
+                LogRuntimeHotPathException("TrySampleNavMeshPosition", ex);
             }
 
             return false;
@@ -2311,26 +2311,26 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
             catch (Exception ex)
             {
-                LogReflectionHotPathException("TryCalculateNavMeshPathCorners", ex);
+                LogRuntimeHotPathException("TryCalculateNavMeshPathCorners", ex);
             }
 
             return false;
         }
 
-        private static void LogReflectionHotPathException(string context, Exception ex)
+        private static void LogRuntimeHotPathException(string context, Exception ex)
         {
             if (!FeatureFlags.DebugLogging)
             {
                 return;
             }
 
-            var key = "LastChance.Reflection.TimerController." + context;
+            var key = "LastChance.Runtime.TimerController." + context;
             if (!LogLimiter.ShouldLog(key, 600))
             {
                 return;
             }
 
-            Debug.LogWarning($"[LastChance] Reflection hot-path failed in {context}: {ex.GetType().Name}: {ex.Message}");
+            Log.LogWarning($"[LastChance] Runtime hot-path failed in {context}: {ex.GetType().Name}: {ex.Message}");
         }
 
         private static void ClearActiveIndicatorVisuals()
@@ -2406,7 +2406,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             s_lastTruckStateDebugMessage = message;
-            Debug.Log(message);
+            Log.LogDebug(message);
         }
 
         private static string GetPlayerName(PlayerAvatar player)
@@ -2491,7 +2491,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.DynamicTimer", 30))
             {
-                Debug.Log(
+                Log.LogDebug(
                     $"[LastChance] DynamicTimer: base={baseSeconds:F1}s level={inputs.LevelNumber} required={inputs.RequiredPlayers} " +
                     $"totalDistance={inputs.TotalDistanceMeters:F1}m belowPlayers={inputs.PlayersBelowTruckThreshold} belowMeters={inputs.TotalBelowTruckMeters:F2} " +
                     $"aliveMonsters={inputs.AliveSearchMonsters} totalRoomSteps={inputs.TotalShortestRoomPathSteps} rawAdd={rawAddedSeconds:F1}s " +
@@ -2562,7 +2562,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 ? $"start=total={s_lastActivationStartPhaseProfile.TotalMs:F1}ms setActive={s_lastActivationStartPhaseProfile.SetActiveMs:F1}ms initialTimer={s_lastActivationStartPhaseProfile.InitialTimerMs:F1}ms captureCurrency={s_lastActivationStartPhaseProfile.CaptureCurrencyMs:F1}ms ensureNetwork={s_lastActivationStartPhaseProfile.EnsureNetworkMs:F1}ms showUi={s_lastActivationStartPhaseProfile.ShowUiMs:F1}ms clearState={s_lastActivationStartPhaseProfile.ClearStateMs:F1}ms broadcast={s_lastActivationStartPhaseProfile.BroadcastMs:F1}ms debugExtras={s_lastActivationStartPhaseProfile.DebugExtrasMs:F1}ms"
                 : "start=not-collected";
 
-            Debug.Log($"[LastChance] ActivationProfile: window={activationMs:F1}ms {startPhaseSummary} {dynamicSummary} helper={helperSummary}");
+            Log.LogDebug($"[LastChance] ActivationProfile: window={activationMs:F1}ms {startPhaseSummary} {dynamicSummary} helper={helperSummary}");
         }
 
         private static void ClearActivationProfileState()

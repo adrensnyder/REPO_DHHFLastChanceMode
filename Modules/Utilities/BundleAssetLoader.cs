@@ -5,13 +5,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using BepInEx;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using UnityEngine;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Utilities
 {
     internal static class BundleAssetLoader
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.BundleAssetLoader");
         private static AssetBundle? s_bundle;
         private static Sprite[]? s_allSprites;
         private static AudioClip[]? s_allAudioClips;
@@ -70,7 +73,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                     {
                         if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.Loaded", 120))
                         {
-                            Debug.Log($"[LastChance] Loaded asset bundle from: {path}");
+                            Log.LogDebug($"[LastChance] Loaded asset bundle from: {path}");
                         }
                         return;
                     }
@@ -154,7 +157,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                         resolvedPath = candidate;
                         if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.SpriteHit." + fileName, 60))
                         {
-                            Debug.Log($"[LastChance] Sprite '{fileName}' resolved as Sprite: {resolvedPath}");
+                            Log.LogDebug($"[LastChance] Sprite '{fileName}' resolved as Sprite: {resolvedPath}");
                         }
                         return true;
                     }
@@ -171,7 +174,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                         resolvedPath = candidate;
                         if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.SpriteHitTex." + fileName, 60))
                         {
-                            Debug.Log($"[LastChance] Sprite '{fileName}' resolved from Texture2D: {resolvedPath}");
+                            Log.LogDebug($"[LastChance] Sprite '{fileName}' resolved from Texture2D: {resolvedPath}");
                         }
                         return true;
                     }
@@ -198,7 +201,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                                 resolvedPath = assetName;
                                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.SpriteHitAsset." + fileName, 60))
                                 {
-                                    Debug.Log($"[LastChance] Sprite '{fileName}' resolved via asset name: {resolvedPath}");
+                                    Log.LogDebug($"[LastChance] Sprite '{fileName}' resolved via asset name: {resolvedPath}");
                                 }
                                 return true;
                             }
@@ -215,7 +218,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                             resolvedPath = assetName;
                             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.SpriteHitAssetTex." + fileName, 60))
                             {
-                                Debug.Log($"[LastChance] Sprite '{fileName}' resolved via asset Texture2D: {resolvedPath}");
+                                Log.LogDebug($"[LastChance] Sprite '{fileName}' resolved via asset Texture2D: {resolvedPath}");
                             }
                             return true;
                         }
@@ -245,14 +248,14 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 resolvedPath = loadedSprite.name;
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.SpriteHitByName." + fileName, 60))
                 {
-                    Debug.Log($"[LastChance] Sprite '{fileName}' resolved by object name: {resolvedPath}");
+                    Log.LogDebug($"[LastChance] Sprite '{fileName}' resolved by object name: {resolvedPath}");
                 }
                 return true;
             }
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.SpriteMiss." + fileName, 60))
             {
-                Debug.LogWarning($"[LastChance] Sprite '{fileName}' not found in bundle.");
+                Log.LogWarning($"[LastChance] Sprite '{fileName}' not found in bundle.");
             }
             return false;
         }
@@ -285,7 +288,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                         resolvedPath = candidate;
                         if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.AudioHit." + fileName, 60))
                         {
-                            Debug.Log($"[LastChance] Audio '{fileName}' resolved as AudioClip: {resolvedPath}");
+                            Log.LogDebug($"[LastChance] Audio '{fileName}' resolved as AudioClip: {resolvedPath}");
                         }
                         return true;
                     }
@@ -312,7 +315,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                             resolvedPath = assetName;
                             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.AudioHitAsset." + fileName, 60))
                             {
-                                Debug.Log($"[LastChance] Audio '{fileName}' resolved via asset name: {resolvedPath}");
+                                Log.LogDebug($"[LastChance] Audio '{fileName}' resolved via asset name: {resolvedPath}");
                             }
                             return true;
                         }
@@ -342,14 +345,14 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 resolvedPath = loadedClip.name;
                 if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.AudioHitByName." + fileName, 60))
                 {
-                    Debug.Log($"[LastChance] Audio '{fileName}' resolved by object name: {resolvedPath}");
+                    Log.LogDebug($"[LastChance] Audio '{fileName}' resolved by object name: {resolvedPath}");
                 }
                 return true;
             }
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.Bundle.AudioMiss." + fileName, 60))
             {
-                Debug.LogWarning($"[LastChance] Audio '{fileName}' not found in bundle.");
+                Log.LogWarning($"[LastChance] Audio '{fileName}' not found in bundle.");
             }
             return false;
         }
