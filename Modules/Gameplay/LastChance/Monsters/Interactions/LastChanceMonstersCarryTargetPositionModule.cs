@@ -10,6 +10,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch]
     internal static class LastChanceMonstersCarryTargetPositionModule
     {
+        private static readonly System.Reflection.FieldInfo? s_enemyHiddenPlayerTargetField =
+            AccessTools.Field(typeof(EnemyHidden), nameof(EnemyHidden.playerTarget));
+
         private static readonly System.Reflection.MethodInfo? s_componentGetTransform =
             AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));
 
@@ -22,9 +25,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerGoTo");
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerMove");
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerRelease");
+            var methods = new System.Reflection.MethodBase?[]
+            {
+                AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerGoTo"),
+                AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerMove"),
+                AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerRelease"),
+            };
+
+            for (var i = 0; i < methods.Length; i++)
+            {
+                if (methods[i] != null)
+                {
+                    yield return methods[i]!;
+                }
+            }
         }
 
         [HarmonyTranspiler]
@@ -35,8 +49,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return instructions;
             }
 
-            var playerTargetField = AccessTools.Field(typeof(EnemyHidden), nameof(EnemyHidden.playerTarget));
-            if (playerTargetField == null)
+            if (s_enemyHiddenPlayerTargetField == null)
             {
                 return instructions;
             }
@@ -50,7 +63,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
                 if ((a.opcode != System.Reflection.Emit.OpCodes.Ldfld && a.opcode != System.Reflection.Emit.OpCodes.Ldflda) ||
                     a.operand is not System.Reflection.FieldInfo loadedField ||
-                    loadedField != playerTargetField)
+                    loadedField != s_enemyHiddenPlayerTargetField)
                 {
                     continue;
                 }
