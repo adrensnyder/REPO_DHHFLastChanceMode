@@ -96,7 +96,7 @@ namespace DHHFLastChanceMode
                 return;
             }
 
-            harmony.PatchAll(typeof(Plugin).Assembly);
+            LastChanceHarmonyPatchRegistry.ApplyAll(harmony, s_log);
 
             AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
             SceneManager.sceneLoaded += OnSceneLoaded;
