@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
@@ -86,21 +87,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static List<System.Reflection.MethodBase> CreateTargetMethods()
         {
             var methods = new List<System.Reflection.MethodBase>();
-            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.StateHasTarget));
-            AddMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.OnVisionTrigger));
-            AddMethod(methods, typeof(EnemySpinny), nameof(EnemySpinny.HasLineOfSight));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.StateHasTarget));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.OnVisionTrigger));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySpinny), nameof(EnemySpinny.HasLineOfSight));
             return methods;
-        }
-
-        private static void AddMethod(List<System.Reflection.MethodBase> methods, System.Type declaringType, string methodName, params System.Type[] argumentTypes)
-        {
-            var method = argumentTypes.Length == 0
-                ? AccessTools.DeclaredMethod(declaringType, methodName)
-                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
-            if (method != null)
-            {
-                methods.Add(method);
-            }
         }
 
         private static IEnumerable<CodeInstruction> ReplaceVisionChecks(IEnumerable<CodeInstruction> instructions)

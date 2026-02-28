@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Generic;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 
@@ -29,12 +30,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
             var methods = new List<System.Reflection.MethodBase>();
-            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateStunSmall));
-            AddMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnHurt));
-            AddMethod(methods, typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.StateBackToNavmesh));
-            AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.FindLevelPointAndCreateCeilingRoamPoints));
-            AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.OnInvestigate));
-            AddMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.StateCeilingRoam));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateStunSmall));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.OnHurt));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.StateBackToNavmesh));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.FindLevelPointAndCreateCeilingRoamPoints));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.OnInvestigate));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.StateCeilingRoam));
             return methods;
         }
 
@@ -75,17 +76,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return list;
-        }
-
-        private static void AddMethod(List<System.Reflection.MethodBase> methods, System.Type declaringType, string methodName, params System.Type[] argumentTypes)
-        {
-            var method = argumentTypes.Length == 0
-                ? AccessTools.DeclaredMethod(declaringType, methodName)
-                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
-            if (method != null)
-            {
-                methods.Add(method);
-            }
         }
 
         private static List<PlayerAvatar> GetAllPlayersWithinRangeLastChanceAware(float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
@@ -211,32 +201,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddDestinationAndMovementTargets(methods);
             AddRotationAndLookTargets(methods);
             AddAttackAndAbilityTargets(methods);
-            methods = DeduplicateTargets(methods);
+            methods = LastChanceMonstersPatchTargetHelper.Deduplicate(methods);
             return methods;
-        }
-
-        private static List<System.Reflection.MethodBase> DeduplicateTargets(List<System.Reflection.MethodBase> methods)
-        {
-            var unique = new List<System.Reflection.MethodBase>(methods.Count);
-            var seen = new HashSet<System.Reflection.MethodBase>();
-            for (var i = 0; i < methods.Count; i++)
-            {
-                var method = methods[i];
-                if (method == null || !seen.Add(method))
-                {
-                    continue;
-                }
-
-                unique.Add(method);
-            }
-
-            return unique;
         }
 
         private static void AddDestinationAndMovementTargets(List<System.Reflection.MethodBase> methods)
         {
             // Keep this module focused on shared state-machine entry points to reduce patch surface.
-            AddMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
         }
 
         private static void AddRotationAndLookTargets(List<System.Reflection.MethodBase> methods)
@@ -246,7 +218,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         private static void AddAttackAndAbilityTargets(List<System.Reflection.MethodBase> methods)
         {
-            AddMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
         }
 
         [HarmonyPrepare]
@@ -285,17 +257,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return list;
-        }
-
-        private static void AddMethod(List<System.Reflection.MethodBase> methods, System.Type declaringType, string methodName, params System.Type[] argumentTypes)
-        {
-            var method = argumentTypes.Length == 0
-                ? AccessTools.DeclaredMethod(declaringType, methodName)
-                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
-            if (method != null)
-            {
-                methods.Add(method);
-            }
         }
 
         private static Vector3 GetEffectiveTransformPosition(Transform transform)

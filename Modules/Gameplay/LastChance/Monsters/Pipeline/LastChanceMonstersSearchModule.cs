@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
@@ -138,55 +139,26 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddCoreEnemyTargets(methods);
             AddStateMachineTargets(methods);
 
-            return DeduplicateTargets(methods);
-        }
-
-        private static List<System.Reflection.MethodBase> DeduplicateTargets(List<System.Reflection.MethodBase> methods)
-        {
-            var unique = new List<System.Reflection.MethodBase>(methods.Count);
-            var seen = new HashSet<System.Reflection.MethodBase>();
-            for (var i = 0; i < methods.Count; i++)
-            {
-                var method = methods[i];
-                if (method == null || !seen.Add(method))
-                {
-                    continue;
-                }
-
-                unique.Add(method);
-            }
-
-            return unique;
+            return LastChanceMonstersPatchTargetHelper.Deduplicate(methods);
         }
 
         private static void AddCoreEnemyTargets(List<System.Reflection.MethodBase> methods)
         {
-            AddMethod(methods, typeof(Enemy), nameof(Enemy.SetChaseTarget), typeof(PlayerAvatar));
-            AddMethod(methods, typeof(Enemy), nameof(Enemy.OnPhotonSerializeView), typeof(Photon.Pun.PhotonStream), typeof(Photon.Pun.PhotonMessageInfo));
-            AddMethod(methods, typeof(EnemyParent), nameof(EnemyParent.PlayerCloseLogic));
-            AddMethod(methods, typeof(EnemyPlayerDistance), nameof(EnemyPlayerDistance.Logic));
-            AddMethod(methods, typeof(EnemyPlayerRoom), nameof(EnemyPlayerRoom.Logic));
-            AddMethod(methods, typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay), typeof(Collider));
-            AddMethod(methods, typeof(EnemyVision), nameof(EnemyVision.Vision));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(Enemy), nameof(Enemy.SetChaseTarget), typeof(PlayerAvatar));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(Enemy), nameof(Enemy.OnPhotonSerializeView), typeof(Photon.Pun.PhotonStream), typeof(Photon.Pun.PhotonMessageInfo));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyParent), nameof(EnemyParent.PlayerCloseLogic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyPlayerDistance), nameof(EnemyPlayerDistance.Logic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyPlayerRoom), nameof(EnemyPlayerRoom.Logic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay), typeof(Collider));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyVision), nameof(EnemyVision.Vision));
         }
 
         private static void AddStateMachineTargets(List<System.Reflection.MethodBase> methods)
         {
-            AddMethod(methods, typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
-            AddMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
-            AddMethod(methods, typeof(EnemyStateRoaming), nameof(EnemyStateRoaming.PlayerTurn));
-            AddMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
-        }
-
-        private static void AddMethod(List<System.Reflection.MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)
-        {
-            var method = argumentTypes.Length == 0
-                ? AccessTools.DeclaredMethod(declaringType, methodName)
-                : AccessTools.DeclaredMethod(declaringType, methodName, argumentTypes);
-            if (method != null)
-            {
-                methods.Add(method);
-            }
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChase), nameof(EnemyStateChase.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateRoaming), nameof(EnemyStateRoaming.PlayerTurn));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
         }
 
         private static IEnumerable<CodeInstruction> ReplaceDisabledChecksTranspiler(IEnumerable<CodeInstruction> instructions)
