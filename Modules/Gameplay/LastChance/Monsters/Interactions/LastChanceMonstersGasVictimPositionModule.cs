@@ -10,6 +10,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch]
     internal static class LastChanceMonstersGasVictimPositionModule
     {
+        private static readonly System.Reflection.MethodBase? s_playersInGasLogicMethod =
+            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayersInGasLogic");
+
+        private static readonly System.Reflection.MethodBase? s_playerInGasMethod =
+            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayerInGas", new[] { typeof(PlayerAvatar) });
+
         private static readonly System.Reflection.MethodInfo? s_componentGetTransform =
             AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));
 
@@ -22,8 +28,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayersInGasLogic");
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayerInGas", new[] { typeof(PlayerAvatar) });
+            if (s_playersInGasLogicMethod != null)
+            {
+                yield return s_playersInGasLogicMethod;
+            }
+
+            if (s_playerInGasMethod != null)
+            {
+                yield return s_playerInGasMethod;
+            }
         }
 
         [HarmonyTranspiler]
