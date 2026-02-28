@@ -2,16 +2,15 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
 {
     internal static class LastChanceMonstersPatchTargetHelper
     {
-        internal static List<MethodBase> BuildTargetList(params Action<List<MethodBase>>[] addSteps)
+        internal static List<System.Reflection.MethodBase> BuildTargetList(params Action<List<System.Reflection.MethodBase>>[] addSteps)
         {
-            var methods = new List<MethodBase>();
+            var methods = new List<System.Reflection.MethodBase>();
             if (addSteps == null)
             {
                 return methods;
@@ -25,7 +24,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
             return Deduplicate(methods);
         }
 
-        internal static void AddDeclaredMethod(List<MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)
+        internal static void AddDeclaredMethod(List<System.Reflection.MethodBase> methods, Type declaringType, string methodName, params Type[] argumentTypes)
         {
             var method = argumentTypes.Length == 0
                 ? AccessTools.DeclaredMethod(declaringType, methodName)
@@ -36,10 +35,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
             }
         }
 
-        internal static List<MethodBase> Deduplicate(List<MethodBase> methods)
+        internal static List<System.Reflection.MethodBase> Deduplicate(List<System.Reflection.MethodBase> methods)
         {
-            var unique = new List<MethodBase>(methods.Count);
-            var seen = new HashSet<MethodBase>();
+            var unique = new List<System.Reflection.MethodBase>(methods.Count);
+            var seen = new HashSet<System.Reflection.MethodBase>();
             for (var i = 0; i < methods.Count; i++)
             {
                 var method = methods[i];
