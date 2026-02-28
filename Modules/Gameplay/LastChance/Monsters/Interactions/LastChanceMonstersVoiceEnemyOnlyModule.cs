@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using DHHFLastChanceMode.Modules.Config;
 using DeathHeadHopper.DeathHead;
 using HarmonyLib;
@@ -76,9 +75,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if (ins.opcode == OpCodes.Ldfld && ins.operand is System.Reflection.FieldInfo f && f.Name == nameof(PlayerDeathHead.spectated) && f.DeclaringType == typeof(PlayerDeathHead))
+                if (ins.opcode == System.Reflection.Emit.OpCodes.Ldfld && ins.operand is System.Reflection.FieldInfo f && f.Name == nameof(PlayerDeathHead.spectated) && f.DeclaringType == typeof(PlayerDeathHead))
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = replacement;
                 }
             }

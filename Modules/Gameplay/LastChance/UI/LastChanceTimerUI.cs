@@ -111,15 +111,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             LastChanceTimerChangeEffectsModule.Initialize(
                 s_rect,
                 s_label,
-                typeof(TextMeshProUGUI),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.text)),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.color)),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.alignment)),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.fontSize)),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.enableAutoSizing)),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.enableWordWrapping)),
-                typeof(TextMeshProUGUI).GetProperty(nameof(TextMeshProUGUI.richText)),
-                CenterAlignment,
                 TimerFontSize);
             SetEnabled(false);
 

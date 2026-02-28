@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using DHHFLastChanceMode.Modules.Config;
 using HarmonyLib;
 using UnityEngine;
@@ -111,21 +110,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
+                if ((ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
 
                 if (called == s_aimTargetSoftSetVanilla)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_aimTargetSoftSetProxy;
                     continue;
                 }
 
                 if (called == s_aimTargetSetVanilla)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_aimTargetSetProxy;
                 }
             }

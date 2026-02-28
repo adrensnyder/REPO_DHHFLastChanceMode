@@ -1,7 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using HarmonyLib;
 using UnityEngine;
@@ -38,21 +37,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             for (var i = 0; i < list.Count; i++)
             {
                 var ins = list[i];
-                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
+                if ((ins.opcode != System.Reflection.Emit.OpCodes.Call && ins.opcode != System.Reflection.Emit.OpCodes.Callvirt) || ins.operand is not System.Reflection.MethodInfo called)
                 {
                     continue;
                 }
 
                 if (called == s_levelPointGetPlayerDistanceVanilla)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_levelPointGetPlayerDistanceProxy;
                     continue;
                 }
 
                 if (called == s_levelPointGetFurthestFromPlayerVanilla)
                 {
-                    ins.opcode = OpCodes.Call;
+                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
                     ins.operand = s_levelPointGetFurthestFromPlayerProxy;
                 }
             }
