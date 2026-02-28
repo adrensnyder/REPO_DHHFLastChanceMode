@@ -16,9 +16,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
     {
         private const int DirectionIndicatorSlotIndex = 1;
         private const string AbilityBarDemandSourceId = "DHHFLastChanceMode.Direction";
+        private const float AbilitySpotCacheRefreshSeconds = 0.5f;
         private static Sprite? s_directionSprite;
         private static float s_nextDirectionIconFallbackApplyAt;
         private static DirectionIndicatorAbility? s_directionAbility;
+        private static AbilitySpot[] s_cachedAbilitySpots = Array.Empty<AbilitySpot>();
+        private static float s_nextAbilitySpotCacheRefreshAt;
 
         internal static void RefreshDirectionSlotVisuals()
         {
@@ -74,7 +77,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
                 return;
             }
 
-            var spots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
+            var spots = GetAbilitySpotsCached();
             if (spots == null || spots.Length == 0)
             {
                 return;
@@ -107,7 +110,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
         private static void EnsureDirectionAbilitySlotState()
         {
             var shouldBeVisible = LastChanceTimerController.IsDirectionIndicatorUiVisible;
-            var spots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
+            var spots = GetAbilitySpotsCached();
             if (spots == null || spots.Length == 0)
             {
                 return;
@@ -226,6 +229,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
                 ability.icon = s_directionSprite;
             }
             return ability;
+        }
+
+        private static AbilitySpot[] GetAbilitySpotsCached()
+        {
+            if (Time.unscaledTime < s_nextAbilitySpotCacheRefreshAt)
+            {
+                return s_cachedAbilitySpots;
+            }
+
+            s_cachedAbilitySpots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
+            s_nextAbilitySpotCacheRefreshAt = Time.unscaledTime + AbilitySpotCacheRefreshSeconds;
+            return s_cachedAbilitySpots;
         }
 
         public static string DirectionAbility_GetName()

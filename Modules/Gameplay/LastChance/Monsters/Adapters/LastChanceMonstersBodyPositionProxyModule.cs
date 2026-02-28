@@ -9,6 +9,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
     [HarmonyPatch(typeof(EnemyDirector), "Update")]
     internal static class LastChanceMonstersBodyPositionProxyModule
     {
+        private const float TargetScanIntervalSeconds = 1f;
+        private static Enemy[] s_cachedEnemies = Array.Empty<Enemy>();
+        private static EnemyAnimal[] s_cachedAnimals = Array.Empty<EnemyAnimal>();
+        private static float s_nextTargetScanAt;
+
         [HarmonyPostfix]
         private static void Postfix()
         {
@@ -54,10 +59,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            var enemies = UnityEngine.Object.FindObjectsOfType<Enemy>();
-            for (var i = 0; i < enemies.Length; i++)
+            RefreshTargetCachesIfDue();
+
+            for (var i = 0; i < s_cachedEnemies.Length; i++)
             {
-                var enemy = enemies[i];
+                var enemy = s_cachedEnemies[i];
                 if (enemy == null)
                 {
                     continue;
@@ -70,10 +76,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             }
 
             // EnemyAnimal keeps its own target field on the EnemyAnimal component.
-            var animals = UnityEngine.Object.FindObjectsOfType<EnemyAnimal>();
-            for (var i = 0; i < animals.Length; i++)
+            for (var i = 0; i < s_cachedAnimals.Length; i++)
             {
-                var animal = animals[i];
+                var animal = s_cachedAnimals[i];
                 if (animal == null)
                 {
                     continue;
@@ -86,6 +91,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             }
 
             return false;
+        }
+
+        private static void RefreshTargetCachesIfDue()
+        {
+            var now = Time.unscaledTime;
+            if (now < s_nextTargetScanAt)
+            {
+                return;
+            }
+
+            s_cachedEnemies = UnityEngine.Object.FindObjectsOfType<Enemy>();
+            s_cachedAnimals = UnityEngine.Object.FindObjectsOfType<EnemyAnimal>();
+            s_nextTargetScanAt = now + TargetScanIntervalSeconds;
         }
     }
 }
