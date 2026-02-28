@@ -34,7 +34,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         [HarmonyTargetMethods]
         private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
         {
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), "PlayerTumbleLogic");
+            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.PlayerTumbleLogic));
         }
 
         [HarmonyPrefix]

@@ -14,10 +14,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         private const float FallbackMaxDistance = 999f;
 
         private static readonly System.Reflection.MethodInfo? s_levelPointGetPlayerDistanceVanilla =
-            AccessTools.Method(typeof(SemiFunc), "LevelPointGetPlayerDistance", new[] { typeof(Vector3), typeof(float), typeof(float), typeof(bool) });
+            AccessTools.Method(typeof(SemiFunc), nameof(SemiFunc.LevelPointGetPlayerDistance), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(bool) });
 
         private static readonly System.Reflection.MethodInfo? s_levelPointGetFurthestFromPlayerVanilla =
-            AccessTools.Method(typeof(SemiFunc), "LevelPointGetFurthestFromPlayer", new[] { typeof(Vector3), typeof(float) });
+            AccessTools.Method(typeof(SemiFunc), nameof(SemiFunc.LevelPointGetFurthestFromPlayer), new[] { typeof(Vector3), typeof(float) });
 
         private static readonly System.Reflection.MethodInfo? s_levelPointGetPlayerDistanceProxy =
             AccessTools.Method(typeof(LastChanceMonstersHiddenDestinationModule), nameof(LevelPointGetPlayerDistanceLastChanceAware));

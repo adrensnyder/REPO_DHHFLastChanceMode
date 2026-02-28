@@ -36,7 +36,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 return;
             }
 
-            var windupMethod = AccessTools.Method(typeof(ChargeHandler), "ChargeWindup", new[] { typeof(Vector3) });
+            var windupMethod = AccessTools.Method(typeof(ChargeHandler), nameof(ChargeHandler.ChargeWindup), new[] { typeof(Vector3) });
 
             if (windupMethod == null)
             {

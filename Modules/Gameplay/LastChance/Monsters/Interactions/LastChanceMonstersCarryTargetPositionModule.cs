@@ -27,9 +27,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         {
             var methods = new System.Reflection.MethodBase?[]
             {
-                AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerGoTo"),
-                AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerMove"),
-                AccessTools.DeclaredMethod(typeof(EnemyHidden), "StatePlayerRelease"),
+                AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerGoTo)),
+                AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerMove)),
+                AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerRelease)),
             };
 
             for (var i = 0; i < methods.Length; i++)

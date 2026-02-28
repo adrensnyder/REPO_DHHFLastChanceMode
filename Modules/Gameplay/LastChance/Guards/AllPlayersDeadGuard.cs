@@ -15,7 +15,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         private const string LogKey = "SuppressAllDeadTransition";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
         private static readonly System.Reflection.FieldInfo? AllPlayersDeadField =
-            AccessTools.Field(typeof(RunManager), "allPlayersDead");
+            AccessTools.Field(typeof(RunManager), nameof(RunManager.allPlayersDead));
         private static Harmony? _harmony;
         private static bool s_suppressedLogged;
         private static bool s_allowAllPlayersDead;
@@ -44,7 +44,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             // This transpiler intentionally coexists with RunManagerUpdateLastChanceTimerPatch.Postfix.
             // It owns only the guard of vanilla allPlayersDead assignment flow.
             _harmony.Patch(
-                AccessTools.Method(typeof(RunManager), "Update"),
+                AccessTools.Method(typeof(RunManager), nameof(RunManager.Update)),
                 transpiler: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(UpdateTranspiler)));
             _harmony.Patch(changeLevelMethod, prefix: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(ChangeLevelPrefix)));
 

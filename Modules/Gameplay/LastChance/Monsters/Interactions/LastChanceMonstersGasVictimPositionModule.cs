@@ -11,10 +11,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     internal static class LastChanceMonstersGasVictimPositionModule
     {
         private static readonly System.Reflection.MethodBase? s_playersInGasLogicMethod =
-            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayersInGasLogic");
+            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic));
 
         private static readonly System.Reflection.MethodBase? s_playerInGasMethod =
-            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "PlayerInGas", new[] { typeof(PlayerAvatar) });
+            AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayerInGas), new[] { typeof(PlayerAvatar) });
 
         private static readonly System.Reflection.MethodInfo? s_componentGetTransform =
             AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));

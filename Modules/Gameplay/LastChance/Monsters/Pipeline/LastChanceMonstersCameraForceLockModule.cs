@@ -20,10 +20,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static Harmony? s_harmony;
 
         private static readonly System.Reflection.MethodInfo? s_aimTargetSoftSetVanilla =
-            AccessTools.Method(typeof(CameraAim), "AimTargetSoftSet", new[] { typeof(Vector3), typeof(float), typeof(float), typeof(float), typeof(GameObject), typeof(int) });
+            AccessTools.Method(typeof(CameraAim), nameof(CameraAim.AimTargetSoftSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(float), typeof(GameObject), typeof(int) });
 
         private static readonly System.Reflection.MethodInfo? s_aimTargetSetVanilla =
-            AccessTools.Method(typeof(CameraAim), "AimTargetSet", new[] { typeof(Vector3), typeof(float), typeof(float), typeof(GameObject), typeof(int) });
+            AccessTools.Method(typeof(CameraAim), nameof(CameraAim.AimTargetSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(GameObject), typeof(int) });
 
         private static readonly System.Reflection.MethodInfo? s_aimTargetSoftSetProxy =
             AccessTools.Method(typeof(LastChanceMonstersCameraForceLockModule), nameof(AimTargetSoftSetLastChanceAware));
@@ -79,13 +79,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             var methods = new System.Reflection.MethodBase?[]
             {
-                AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), "JumpScareAtChompStartForceLookAtHead"),
-                AccessTools.DeclaredMethod(typeof(EnemyThinManAnim), "Scream"),
-                AccessTools.DeclaredMethod(typeof(EnemySlowMouthAttaching), "Update"),
-                AccessTools.DeclaredMethod(typeof(EnemyOogly), "Update"),
-                AccessTools.DeclaredMethod(typeof(EnemyCeilingEye), "Update"),
-                AccessTools.DeclaredMethod(typeof(EnemySpinny), "OverrideTargetPlayerCameraAim"),
-                AccessTools.DeclaredMethod(typeof(EnemyUpscream), "Update")
+                AccessTools.DeclaredMethod(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.JumpScareAtChompStartForceLookAtHead)),
+                AccessTools.DeclaredMethod(typeof(EnemyThinManAnim), nameof(EnemyThinManAnim.Scream)),
+                AccessTools.DeclaredMethod(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update)),
+                AccessTools.DeclaredMethod(typeof(EnemyOogly), nameof(EnemyOogly.Update)),
+                AccessTools.DeclaredMethod(typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.Update)),
+                AccessTools.DeclaredMethod(typeof(EnemySpinny), nameof(EnemySpinny.OverrideTargetPlayerCameraAim)),
+                AccessTools.DeclaredMethod(typeof(EnemyUpscream), nameof(EnemyUpscream.Update))
             };
 
             for (var i = 0; i < methods.Length; i++)
