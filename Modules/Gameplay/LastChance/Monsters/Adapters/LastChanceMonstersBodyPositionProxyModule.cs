@@ -14,11 +14,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
         private static EnemyAnimal[] s_cachedAnimals = Array.Empty<EnemyAnimal>();
         private static float s_nextTargetScanAt;
 
+        internal static void ResetRuntimeState()
+        {
+            s_cachedEnemies = Array.Empty<Enemy>();
+            s_cachedAnimals = Array.Empty<EnemyAnimal>();
+            s_nextTargetScanAt = 0f;
+        }
+
         [HarmonyPostfix]
         private static void Postfix()
         {
             if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
+                ResetRuntimeState();
                 return;
             }
 
