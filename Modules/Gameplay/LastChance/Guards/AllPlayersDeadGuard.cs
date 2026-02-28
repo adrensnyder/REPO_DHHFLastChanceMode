@@ -196,29 +196,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
                    SemiFunc.MenuLevel();
         }
 
-        private static bool IsProceduralMonsterLevelContext()
-        {
-            if (!SemiFunc.RunIsLevel())
-            {
-                return false;
-            }
-
-            var runManager = RunManager.instance;
-            if (runManager == null || runManager.levelCurrent == null)
-            {
-                return false;
-            }
-
-            // Whitelist: only levels in the procedural run list.
-            if (runManager.levels == null || !runManager.levels.Contains(runManager.levelCurrent))
-            {
-                return false;
-            }
-
-            // LastChance should run only where monsters are expected.
-            return runManager.levelCurrent.HasEnemies;
-        }
-
         internal static bool AllPlayersDisabled()
         {
             var director = GameDirector.instance;

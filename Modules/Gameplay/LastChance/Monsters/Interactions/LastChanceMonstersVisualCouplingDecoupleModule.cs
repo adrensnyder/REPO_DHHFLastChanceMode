@@ -81,12 +81,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         {
             if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
-                if (logic == null)
-                {
-                    throw new System.NullReferenceException("upgradeTumbleWingsLogic is null");
-                }
-
-                logic.tumbleWingPinkTimer = value;
+                // Preserve vanilla null semantics when runtime override is not active.
+                logic!.tumbleWingPinkTimer = value;
                 return;
             }
 
