@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using System.Collections;
 using BepInEx;
 using BepInEx.Bootstrap;
@@ -37,7 +36,6 @@ namespace DHHFLastChanceMode
 
         private void OnDestroy()
         {
-            AppDomain.CurrentDomain.AssemblyLoad -= OnAssemblyLoad;
             SceneManager.sceneLoaded -= OnSceneLoaded;
             ConfigManager.HostControlledChanged -= OnHostControlledChanged;
 
@@ -98,15 +96,9 @@ namespace DHHFLastChanceMode
 
             LastChanceHarmonyPatchRegistry.ApplyAll(harmony, s_log);
 
-            AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
             SceneManager.sceneLoaded += OnSceneLoaded;
             ConfigManager.HostControlledChanged += OnHostControlledChanged;
 
-            ReconcileConditionalMonsterPatches();
-        }
-
-        private void OnAssemblyLoad(object sender, System.AssemblyLoadEventArgs args)
-        {
             ReconcileConditionalMonsterPatches();
         }
 
