@@ -23,7 +23,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
         private static readonly HashSet<System.Reflection.MethodBase> s_patchedMethods = new();
         private static readonly List<System.Reflection.MethodBase> s_patchTargets =
-            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddCoreEnemyTargets, AddStateMachineTargets);
+            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddCoreEnemyTargets, AddStateMachineTargets, AddMonsterSpecificTargets);
         private static Harmony? s_harmony;
         private static float s_runtimeStateCachedAt;
         private static bool s_runtimeStateEnabled;
@@ -151,6 +151,65 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateRoaming), nameof(EnemyStateRoaming.PlayerTurn));
             LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update));
+        }
+
+        private static void AddMonsterSpecificTargets(List<System.Reflection.MethodBase> methods)
+        {
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBangDirector), nameof(EnemyBangDirector.StateAttackPlayer));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBirthdayBoy), nameof(EnemyBirthdayBoy.Update));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBombThrower), nameof(EnemyBombThrower.StateGotoPlayer));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBombThrower), nameof(EnemyBombThrower.StateBackAwayPlayer));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBombThrower), nameof(EnemyBombThrower.StateBackAwayHead));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBombThrowerHead), nameof(EnemyBombThrowerHead.StateSpawn), typeof(bool));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBombThrowerHead), nameof(EnemyBombThrowerHead.StateActive), typeof(bool));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyBombThrowerHead), nameof(EnemyBombThrowerHead.EyeLogic));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyDuck), nameof(EnemyDuck.StateGoToPlayer));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyDuck), nameof(EnemyDuck.StateGoToPlayerUnder));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyDuck), nameof(EnemyDuck.StateGoToPlayerOver));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyDuck), nameof(EnemyDuck.HeadLookAtLogic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyDuck), nameof(EnemyDuck.ChaseStop));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateGoToPlayerSmall));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateGoToPlayerUnderSmall));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.StateLookUnderBig));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyElsa), nameof(EnemyElsa.ChaseStop));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyGnomeDirector), nameof(EnemyGnomeDirector.StateAttackPlayer));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.GotoLogic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.GotoOverLogic));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerGoTo));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerPickup));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerMove));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerRelease));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyShadow), nameof(EnemyShadow.Update));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyShadow), nameof(EnemyShadow.StateChooseTarget));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySlowMouth), nameof(EnemySlowMouth.DetatchLogic));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySlowMouth), nameof(EnemySlowMouth.StateAttached), typeof(bool));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySlowMouth), nameof(EnemySlowMouth.StateIdlePuke), typeof(bool));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySlowMouth), nameof(EnemySlowMouth.StateGoToPlayerOver), typeof(bool));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySlowMouth), nameof(EnemySlowMouth.StateGoToPlayerUnder), typeof(bool));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySlowMouth), nameof(EnemySlowMouth.TargettingPlayer));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyTricycle), nameof(EnemyTricycle.StateStateBeforeAttack));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyTricycle), nameof(EnemyTricycle.StateAttackDive));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyTricycle), nameof(EnemyTricycle.FixedUpdateAttackDive));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyValuableThrower), nameof(EnemyValuableThrower.TargetFailsafe));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.StateHasTarget));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyCeilingEye), nameof(EnemyCeilingEye.TargetFailSafe));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemySpinny), nameof(EnemySpinny.Update));
+
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.StatePlayerSpotted));
+            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyOogly), nameof(EnemyOogly.StateWrestlePlayer));
         }
 
         private static IEnumerable<CodeInstruction> ReplaceDisabledChecksTranspiler(IEnumerable<CodeInstruction> instructions)

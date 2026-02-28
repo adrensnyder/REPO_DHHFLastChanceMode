@@ -29,16 +29,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         [HarmonyPatch(typeof(CameraAim), nameof(CameraAim.AimTargetSoftSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(float), typeof(GameObject), typeof(int) })]
         [HarmonyPrefix]
-        private static bool AimTargetSoftSetPrefix(Vector3 position, GameObject source)
+        private static bool AimTargetSoftSetPrefix(Vector3 position, GameObject obj)
         {
-            return HandleCameraAimRequest(position, source);
+            return HandleCameraAimRequest(position, obj);
         }
 
         [HarmonyPatch(typeof(CameraAim), nameof(CameraAim.AimTargetSet), new[] { typeof(Vector3), typeof(float), typeof(float), typeof(GameObject), typeof(int) })]
         [HarmonyPrefix]
-        private static bool AimTargetSetPrefix(Vector3 position, GameObject source)
+        private static bool AimTargetSetPrefix(Vector3 position, GameObject obj)
         {
-            return HandleCameraAimRequest(position, source);
+            return HandleCameraAimRequest(position, obj);
         }
 
         private static bool HandleCameraAimRequest(Vector3 position, GameObject? source)
