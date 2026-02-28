@@ -1,7 +1,7 @@
 #nullable enable
 
 using System.Collections.Generic;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 
@@ -79,7 +79,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         private static Vector3 GetEffectiveTransformPosition(Transform transform)
         {
-            return LastChanceMonstersTargetProxyHelper.ResolveEffectiveTransformTargetPosition(transform);
+            return LastChanceMonstersTargetingOrchestrator.ResolveEffectiveTransformTargetPoint(transform);
         }
 
     }
