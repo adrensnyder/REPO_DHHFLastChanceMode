@@ -213,6 +213,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddDestinationAndMovementTargets(methods);
             AddRotationAndLookTargets(methods);
             AddAttackAndAbilityTargets(methods);
+            methods = DeduplicateTargets(methods);
 
             if (s_transformGetPositionMethod == null)
             {
@@ -235,6 +236,24 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return filtered;
+        }
+
+        private static List<System.Reflection.MethodBase> DeduplicateTargets(List<System.Reflection.MethodBase> methods)
+        {
+            var unique = new List<System.Reflection.MethodBase>(methods.Count);
+            var seen = new HashSet<System.Reflection.MethodBase>();
+            for (var i = 0; i < methods.Count; i++)
+            {
+                var method = methods[i];
+                if (method == null || !seen.Add(method))
+                {
+                    continue;
+                }
+
+                unique.Add(method);
+            }
+
+            return unique;
         }
 
         private static void AddDestinationAndMovementTargets(List<System.Reflection.MethodBase> methods)

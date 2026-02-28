@@ -323,7 +323,25 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddHeavyMonsterTargets(methods);
             AddStateMachineTargets(methods);
 
-            return methods;
+            return DeduplicateTargets(methods);
+        }
+
+        private static List<System.Reflection.MethodBase> DeduplicateTargets(List<System.Reflection.MethodBase> methods)
+        {
+            var unique = new List<System.Reflection.MethodBase>(methods.Count);
+            var seen = new HashSet<System.Reflection.MethodBase>();
+            for (var i = 0; i < methods.Count; i++)
+            {
+                var method = methods[i];
+                if (method == null || !seen.Add(method))
+                {
+                    continue;
+                }
+
+                unique.Add(method);
+            }
+
+            return unique;
         }
 
         private static void AddCoreEnemyTargets(List<System.Reflection.MethodBase> methods)
@@ -380,9 +398,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             AddMethod(methods, typeof(EnemyOogly), "CheckSinglePlayerNearby");
             AddMethod(methods, typeof(EnemyOogly), "StatePlayerSpotted");
             AddMethod(methods, typeof(EnemyOogly), "StateWrestlePlayer");
-            AddMethod(methods, typeof(EnemyParent), "PlayerCloseLogic");
-            AddMethod(methods, typeof(EnemyPlayerDistance), "Logic");
-            AddMethod(methods, typeof(EnemyPlayerRoom), "Logic");
             AddMethod(methods, typeof(EnemyRobe), "StateLookUnderAttack");
             AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer));
             AddMethod(methods, typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver));
