@@ -15,14 +15,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     internal static class LastChanceMonstersNoiseAggroModule
     {
-        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.Monsters.NoiseAggro";
         private const float DefaultAggroRadius = 18f;
         private const float DefaultAggroCooldown = 0.75f;
 
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Monsters.NoiseAggro");
         private static readonly Dictionary<int, float> s_lastAggroByPlayerViewId = new();
-        private static Harmony? s_harmony;
-        private static bool s_applied;
 
         internal static void ResetRuntimeState()
         {
@@ -31,49 +28,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
         internal static void Apply(Harmony harmony)
         {
-            if (s_applied || harmony == null)
-            {
-                return;
-            }
-
-            var windupMethod = AccessTools.Method(typeof(ChargeHandler), nameof(ChargeHandler.ChargeWindup), new[] { typeof(Vector3) });
-
-            if (windupMethod == null)
-            {
-                if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.NoiseAggro.Missing", 120))
-                {
-                    Log.LogWarning("[LastChance] NoiseAggro skipped: ChargeHandler.ChargeWindup not found.");
-                }
-                return;
-            }
-
-            s_harmony = new Harmony(PatchId);
-            var postfix = new HarmonyMethod(typeof(LastChanceMonstersNoiseAggroModule), nameof(ChargeWindupPostfix));
-            s_harmony.Patch(windupMethod, postfix: postfix);
-            s_applied = true;
+            // Typed patch is registered in LastChanceHarmonyPatchRegistry.
         }
 
         internal static void Unapply()
         {
-            if (!s_applied || s_harmony == null)
-            {
-                return;
-            }
-
-            try
-            {
-                s_harmony.UnpatchSelf();
-            }
-            catch
-            {
-                // Best-effort unpatch.
-            }
-
-            s_applied = false;
-            s_harmony = null;
             ResetRuntimeState();
         }
 
+        [HarmonyPatch(typeof(ChargeHandler), nameof(ChargeHandler.ChargeWindup), new[] { typeof(Vector3) })]
+        [HarmonyPostfix]
         private static void ChargeWindupPostfix(ChargeHandler __instance)
         {
             if (__instance == null ||

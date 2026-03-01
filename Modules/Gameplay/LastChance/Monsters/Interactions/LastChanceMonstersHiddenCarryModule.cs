@@ -11,7 +11,7 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch]
+    [HarmonyPatch(typeof(EnemyHidden), nameof(EnemyHidden.PlayerTumbleLogic))]
     internal static class LastChanceMonstersCarryProxyModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HiddenCarry");
@@ -29,12 +29,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
         internal static void ResetRuntimeState()
         {
             AnchorByCarrier.Clear();
-        }
-
-        [HarmonyTargetMethods]
-        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
-        {
-            yield return AccessTools.DeclaredMethod(typeof(EnemyHidden), nameof(EnemyHidden.PlayerTumbleLogic));
         }
 
         [HarmonyPrefix]

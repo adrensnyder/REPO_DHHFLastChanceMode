@@ -35,6 +35,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceMonstersVisualCouplingDecoupleModule.PlayerAvatarUpgradeTumbleWingsVisualsActivePatch),
             typeof(LastChanceMonstersPlayerVisionCheckModule.SemiFuncPlayerVisionCheckPatch),
             typeof(LastChanceMonstersPlayerVisionCheckModule.SemiFuncPlayerVisionCheckPositionPatch),
+            typeof(LastChanceMonstersNoiseAggroModule),
             typeof(LastChanceMonstersHeadPlayerProxyColliderModule),
             typeof(LastChanceMonstersGasGuiderHeadProxyModule),
             typeof(LastChanceMonstersAnimalWreakHavocHeadRoomProxyModule),
