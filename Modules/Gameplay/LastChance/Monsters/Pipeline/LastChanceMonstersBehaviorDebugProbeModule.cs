@@ -265,6 +265,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
         }
 
+        [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
+        [HarmonyPostfix]
+        private static void EnemyStateChaseUpdatePostfix(EnemyStateChase __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            LogRoamingWriter("EnemyStateChase.Update", __instance.Enemy, $"visionTimer={__instance.VisionTimer:F2} stateTimer={__instance.StateTimer:F2} canReach={__instance.ChaseCanReach}");
+        }
+
         [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
         [HarmonyPrefix]
         private static void EnemyHeadControllerOnStunnedEndPrefix(EnemyHeadController __instance)
@@ -283,6 +295,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             Log.LogInfo(
                 $"[HeadmanDebug] OnStunnedEnd enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
                 $"stateBefore={enemy.CurrentState} -> Roaming");
+        }
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
+        [HarmonyPostfix]
+        private static void EnemyHeadControllerOnStunnedEndPostfix(EnemyHeadController __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            LogRoamingWriter("EnemyHeadController.OnStunnedEnd", __instance.Enemy, "postfix");
         }
 
         [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
@@ -339,6 +363,54 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 $"enemyState={enemy.CurrentState} stunTimer={__instance.stunTimer:F2} overrideDisableTimer={__instance.overrideDisableTimer:F2} " +
                 $"active={__instance.active} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
                 $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
+
+            LogRoamingWriter(
+                "EnemyStateStunned.Update",
+                enemy,
+                $"stunTimer={__instance.stunTimer:F2} overrideDisableTimer={__instance.overrideDisableTimer:F2} active={__instance.active}");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update))]
+        [HarmonyPostfix]
+        private static void EnemyStateSneakUpdatePostfix(EnemyStateSneak __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var target = __instance.TargetPlayer ?? __instance.Enemy.TargetPlayerAvatar;
+            LogRoamingWriter(
+                "EnemyStateSneak.Update",
+                __instance.Enemy,
+                $"stateTimer={__instance.StateTimer:F2} active={__instance.Active} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateChaseEnd), nameof(EnemyStateChaseEnd.Update))]
+        [HarmonyPostfix]
+        private static void EnemyStateChaseEndUpdatePostfix(EnemyStateChaseEnd __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            LogRoamingWriter(
+                "EnemyStateChaseEnd.Update",
+                __instance.Enemy,
+                $"stateTimer={__instance.StateTimer:F2} active={__instance.Active}");
+        }
+
+        [HarmonyPatch(typeof(Enemy), nameof(Enemy.PlayerRemoved))]
+        [HarmonyPostfix]
+        private static void EnemyPlayerRemovedPostfix(Enemy __instance, int photonID)
+        {
+            if (!ShouldDebug() || __instance == null)
+            {
+                return;
+            }
+
+            LogRoamingWriter("Enemy.PlayerRemoved", __instance, $"removedPhotonId={photonID}");
         }
 
         [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.OnSpawn))]
@@ -375,6 +447,35 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return $"anchorSummary=currentTargetToHead={headDelta:F2} currentTargetToCamera={cameraDelta:F2}";
+        }
+
+        private static void LogRoamingWriter(string source, Enemy? enemy, string details)
+        {
+            if (enemy == null || enemy.GetComponentInChildren<EnemyHeadController>() == null)
+            {
+                return;
+            }
+
+            if (enemy.CurrentState != EnemyState.Roaming)
+            {
+                return;
+            }
+
+            var id = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"Headman.RoamingWriter.{source}.{id}", 5))
+            {
+                return;
+            }
+
+            var target = enemy.TargetPlayerAvatar;
+            var targetId = target?.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            var visionTimer = enemy.StateChase != null ? enemy.StateChase.VisionTimer : -1f;
+            Log.LogInfo(
+                $"[HeadmanRoamingWriter] source={source} enemy={enemy.gameObject.name} id={id} " +
+                $"targetViewId={targetId} targetDisabled={targetDisabled} targetEligible={targetEligible} " +
+                $"visionTimer={visionTimer:F2} details={details}");
         }
     }
 }
