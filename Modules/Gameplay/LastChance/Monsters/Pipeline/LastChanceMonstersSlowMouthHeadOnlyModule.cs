@@ -27,18 +27,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             ApplyHeadTarget(__instance, "UpdatePlayerTargetRPC");
         }
 
-        [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.AttachToPlayer))]
-        [HarmonyPrefix]
-        private static void EnemySlowMouthAttachToPlayerPrefix(EnemySlowMouth __instance)
-        {
-            if (!ShouldApplyTargetFix(__instance))
-            {
-                return;
-            }
-
-            ApplyHeadTarget(__instance, "AttachToPlayer");
-        }
-
         [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.SetTarget))]
         [HarmonyPostfix]
         private static void EnemySlowMouthAttachingSetTargetPostfix(EnemySlowMouthAttaching __instance, PlayerAvatar _playerAvatar)
@@ -54,11 +42,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            if (LastChanceMonstersTargetProxyHelper.TryGetHeadProxyVisionTransform(_playerAvatar, out var headVision) &&
-                headVision != null)
+            var camera = _playerAvatar.localCamera != null ? _playerAvatar.localCamera.transform : null;
+            if (camera != null)
             {
-                __instance.targetTransform = headVision;
-                DebugTargetApply(__instance.enemySlowMouth, "Attaching.SetTarget");
+                __instance.targetTransform = camera;
+                DebugTargetApply(__instance.enemySlowMouth, "Attaching.SetTarget.Camera");
             }
         }
 
