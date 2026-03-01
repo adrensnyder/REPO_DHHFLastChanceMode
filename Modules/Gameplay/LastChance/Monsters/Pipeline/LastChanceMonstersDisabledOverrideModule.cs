@@ -460,6 +460,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyFinalizer]
         private static Exception? EnemyHeadUpUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
+        [HarmonyPatch(typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay))]
+        [HarmonyPrefix]
+        private static void EnemyTriggerAttackOnTriggerStayPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyTriggerAttackOnTriggerStayFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
         [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update))]
         [HarmonyPrefix]
         private static void EnemySlowMouthAttachingUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
