@@ -81,6 +81,41 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
         }
 
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
+        internal static class EnemyHeadControllerOnStunnedEndPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyHeadController __instance)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || __instance == null)
+                {
+                    return true;
+                }
+
+                var enemy = __instance.Enemy;
+                if (enemy == null)
+                {
+                    return true;
+                }
+
+                var target = enemy.TargetPlayerAvatar;
+                if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+                {
+                    return true;
+                }
+
+                if (enemy.StateChase != null)
+                {
+                    enemy.StateChase.ChaseCanReach = true;
+                    enemy.StateChase.VisionTimer = Mathf.Max(enemy.StateChase.VisionTimer, 0.5f);
+                }
+
+                enemy.CurrentState = EnemyState.ChaseBegin;
+                DebugChaseTransition(enemy, "OnStunnedEnd->ChaseBegin.Override", target, "prevent forced roaming for eligible LastChance target");
+                return false;
+            }
+        }
+
         private static void ExecuteChaseUpdate(EnemyStateChase state)
         {
             if (!state.Enemy.MasterClient)

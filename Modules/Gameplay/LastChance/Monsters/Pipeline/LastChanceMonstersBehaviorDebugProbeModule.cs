@@ -153,6 +153,27 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
 
         [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.VisionTriggered))]
+        [HarmonyPrefix]
+        private static void EnemyHeadControllerVisionTriggeredPrefix(EnemyHeadController __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.Enemy;
+            if (!LogLimiter.ShouldLog($"Headman.VisionTriggered.Prefix.{enemy.GetInstanceID()}", 20))
+            {
+                return;
+            }
+
+            Log.LogInfo(
+                $"[HeadmanDebug] VisionTriggered.Prefix enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"state={enemy.CurrentState} targetViewId={enemy.TargetPlayerViewID} " +
+                $"{BuildPlayerAnchorSummary(enemy.TargetPlayerAvatar, enemy.TargetPlayerAvatar?.PlayerVisionTarget?.VisionTransform)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.VisionTriggered))]
         [HarmonyPostfix]
         private static void EnemyHeadControllerVisionTriggeredPostfix(EnemyHeadController __instance)
         {
@@ -172,6 +193,76 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 $"[HeadmanDebug] VisionTriggered enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
                 $"state={enemy.CurrentState} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
                 $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget != null ? target.PlayerVisionTarget.VisionTransform : null)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateChaseBeginUpdatePrefix(EnemyStateChaseBegin __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.Enemy;
+            if (!LogLimiter.ShouldLog($"Headman.ChaseBegin.Update.Prefix.{enemy.GetInstanceID()}", 15))
+            {
+                return;
+            }
+
+            var target = __instance.TargetPlayer ?? enemy.TargetPlayerAvatar;
+            Log.LogInfo(
+                $"[HeadmanDebug] ChaseBegin.Update.Prefix enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"enemyState={enemy.CurrentState} active={__instance.Active} stateTimer={__instance.StateTimer:F2} " +
+                $"master={enemy.MasterClient} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
+                $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update))]
+        [HarmonyPostfix]
+        private static void EnemyStateChaseBeginUpdatePostfix(EnemyStateChaseBegin __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.Enemy;
+            if (!LogLimiter.ShouldLog($"Headman.ChaseBegin.Update.Postfix.{enemy.GetInstanceID()}", 15))
+            {
+                return;
+            }
+
+            var target = __instance.TargetPlayer ?? enemy.TargetPlayerAvatar;
+            Log.LogInfo(
+                $"[HeadmanDebug] ChaseBegin.Update.Postfix enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"enemyState={enemy.CurrentState} active={__instance.Active} stateTimer={__instance.StateTimer:F2} " +
+                $"master={enemy.MasterClient} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
+                $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateChaseUpdatePrefix(EnemyStateChase __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.Enemy;
+            if (!LogLimiter.ShouldLog($"Headman.Chase.Update.Prefix.{enemy.GetInstanceID()}", 15))
+            {
+                return;
+            }
+
+            var target = enemy.TargetPlayerAvatar;
+            Log.LogInfo(
+                $"[HeadmanDebug] Chase.Update.Prefix enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"enemyState={enemy.CurrentState} active={__instance.Active} visionTimer={__instance.VisionTimer:F2} " +
+                $"stateTimer={__instance.StateTimer:F2} canReach={__instance.ChaseCanReach} master={enemy.MasterClient} " +
+                $"targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
+                $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
         }
 
         [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
