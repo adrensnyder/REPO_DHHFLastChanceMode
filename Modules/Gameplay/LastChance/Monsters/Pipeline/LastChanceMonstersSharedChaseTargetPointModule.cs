@@ -85,6 +85,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             if (!state.Enemy.MasterClient)
             {
+                DebugChaseProbe(state.Enemy, "Chase.Return.NotMaster", state.Enemy.TargetPlayerAvatar, "skipping custom chase update on non-master");
                 return;
             }
 
@@ -93,6 +94,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 if (state.Active)
                 {
                     state.Active = false;
+                    DebugChaseProbe(state.Enemy, "Chase.ResetActive", state.Enemy.TargetPlayerAvatar, "CurrentState != Chase");
                 }
 
                 return;
@@ -165,6 +167,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             {
                 if (state.SawPlayerHide)
                 {
+                    DebugChaseProbe(state.Enemy, "Chase->LookUnder.SawPlayerHide", targetPlayer, "vision timer expired while saw player hide");
                     state.Enemy.CurrentState = EnemyState.LookUnder;
                     return;
                 }
@@ -196,6 +199,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 if (state.CantReachTime > 2f)
                 {
                     state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
+                    DebugChaseProbe(state.Enemy, "Chase->ChaseSlow.CantReach", targetPlayer, $"cantReachTime={state.CantReachTime:F2}");
                     state.Enemy.CurrentState = EnemyState.ChaseSlow;
                     return;
                 }
@@ -208,6 +212,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             state.StateTimer -= Time.deltaTime;
             if (state.StateTimer <= 0f)
             {
+                DebugChaseProbe(state.Enemy, "Chase->ChaseSlow.TimerElapsed", targetPlayer, "state timer elapsed");
                 state.Enemy.CurrentState = EnemyState.ChaseSlow;
             }
 
@@ -227,6 +232,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 {
                     DebugChaseTransition(state.Enemy, "ChaseBegin.ResetActive", state.TargetPlayer, "CurrentState != ChaseBegin");
                     state.Active = false;
+                }
+                else
+                {
+                    DebugChaseProbe(state.Enemy, "ChaseBegin.Return.NotInState", state.TargetPlayer, $"currentState={state.Enemy.CurrentState}");
                 }
 
                 return;
@@ -279,11 +288,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 state.Active = true;
+                DebugChaseProbe(state.Enemy, "ChaseBegin.ActiveInit", state.TargetPlayer, $"targetViewId={state.Enemy.TargetPlayerViewID}");
             }
 
             state.Enemy.SetChaseTimer();
             if (!state.Enemy.MasterClient)
             {
+                DebugChaseProbe(state.Enemy, "ChaseBegin.Return.NotMaster", state.TargetPlayer, "skipping chase begin update on non-master");
                 return;
             }
 
@@ -317,6 +328,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             {
                 DebugChaseTransition(state.Enemy, "ChaseBegin->Chase.TimerElapsed", targetPlayer, "transitioning to chase");
                 state.Enemy.CurrentState = EnemyState.Chase;
+            }
+            else
+            {
+                DebugChaseProbe(state.Enemy, "ChaseBegin.WaitingTimer", targetPlayer, $"stateTimer={state.StateTimer:F2}");
             }
         }
 
@@ -366,6 +381,27 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             Log.LogInfo(
                 $"[HeadmanChase] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
                 $"targetViewId={targetId} targetDisabled={targetDisabled} targetEligible={targetEligible} {details}");
+        }
+
+        private static void DebugChaseProbe(Enemy? enemy, string reason, PlayerAvatar? target, string details)
+        {
+            if (!InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || enemy == null)
+            {
+                return;
+            }
+
+            var enemyId = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"HeadmanChase.Probe.{reason}.{enemyId}", 8))
+            {
+                return;
+            }
+
+            var targetId = target != null && target.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            Log.LogInfo(
+                $"[HeadmanChaseProbe] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
+                $"targetViewId={targetId} targetDisabled={targetDisabled} targetEligible={targetEligible} details={details}");
         }
     }
 }
