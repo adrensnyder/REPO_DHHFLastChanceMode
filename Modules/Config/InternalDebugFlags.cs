@@ -13,6 +13,6 @@ namespace DHHFLastChanceMode.Modules.Config
         public static bool DebugLastChanceSpinnyVerbose = false;
         public static bool DebugLastChanceThinManFlow = false;
         public static bool DebugLastChanceEyesFlow = false;
-        public static bool DebugLastChanceHeadmanSlowMouthFlow = true;
+        public static bool DebugLastChanceHeadmanSlowMouthFlow = false;
     }
 }

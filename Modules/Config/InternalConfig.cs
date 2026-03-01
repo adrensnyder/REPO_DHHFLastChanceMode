@@ -12,6 +12,8 @@ namespace DHHFLastChanceMode.Modules.Config
         internal static float LastChanceMonstersVisionLockSourceBucketSize = 1f;
         internal static bool LastChanceMonstersVisionProxyEnabled = true;
         internal static float LastChanceMonstersVisionProxyTickSeconds = 0.25f;
+        internal static float LastChanceMonstersHeadmanDeathHeadFocusMaxSeconds = 3f;
+        internal static float LastChanceMonstersHeadmanDeathHeadFocusCooldownSeconds = 5f;
 
         internal static float CompatibilityGatePresenceRetrySeconds = 1f;
         internal static float CompatibilityGatePresenceTimeoutSeconds = 5f;

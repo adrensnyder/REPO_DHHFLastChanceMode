@@ -13,7 +13,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
+        private sealed class HeadmanDeathHeadWindowState
+        {
+            internal float FocusStartAt = -1f;
+            internal float CooldownUntil = -1f;
+            internal float LastTouchAt = -1f;
+        }
+
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeadmanChase");
+        private static readonly System.Collections.Generic.Dictionary<int, HeadmanDeathHeadWindowState> HeadmanWindowByEnemyId = new();
+        private static float s_nextHeadmanWindowCleanupAt;
 
         [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
         internal static class EnemyStateChaseUpdatePatch
@@ -65,8 +74,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 var target = enemy.TargetPlayerAvatar;
-                if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+                if (!ShouldTreatDisabledAsActiveForEnemy(enemy, target, out var eligibilityReason))
                 {
+                    DebugChaseProbe(enemy, "VisionTriggered.Skip", target, $"target not eligible reason={eligibilityReason}");
                     return;
                 }
 
@@ -99,8 +109,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 var target = enemy.TargetPlayerAvatar;
-                if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+                if (!ShouldTreatDisabledAsActiveForEnemy(enemy, target, out var eligibilityReason))
                 {
+                    DebugChaseProbe(enemy, "OnStunnedEnd.Skip", target, $"target not eligible reason={eligibilityReason}");
                     return true;
                 }
 
@@ -134,8 +145,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 var target = enemy.TargetPlayerAvatar;
-                if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+                if (!ShouldTreatDisabledAsActiveForEnemy(enemy, target, out var eligibilityReason))
                 {
+                    DebugChaseProbe(enemy, "Stunned.Update.Skip", target, $"target not eligible reason={eligibilityReason}");
                     return;
                 }
 
@@ -183,6 +195,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             if (targetPlayer == null)
             {
                 DebugChaseTransition(state.Enemy, "Chase->Roaming.NoTarget", null, "TargetPlayerAvatar is null");
+                state.Enemy.CurrentState = EnemyState.Roaming;
+                return;
+            }
+
+            if (!ShouldTreatDisabledAsActiveForEnemy(state.Enemy, targetPlayer, out var targetEligibilityReason))
+            {
+                DebugChaseTransition(state.Enemy, "Chase->Roaming.TargetWindowClosed", targetPlayer, $"reason={targetEligibilityReason}");
+                state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
                 state.Enemy.CurrentState = EnemyState.Roaming;
                 return;
             }
@@ -295,7 +315,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 state.Enemy.CurrentState = EnemyState.ChaseSlow;
             }
 
-            if (targetPlayer.isDisabled && !LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(targetPlayer))
+            if (targetPlayer.isDisabled && !ShouldTreatDisabledAsActiveForEnemy(state.Enemy, targetPlayer, out _))
             {
                 DebugChaseTransition(state.Enemy, "Chase->Roaming.DisabledTarget", targetPlayer, "target is disabled and not eligible");
                 state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
@@ -332,7 +352,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 state.TargetPlayer = PlayerController.instance.playerAvatarScript;
                 foreach (var playerAvatar in GameDirector.instance.PlayerList)
                 {
-                        if ((!playerAvatar.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(playerAvatar)) &&
+                        if ((!playerAvatar.isDisabled || ShouldTreatDisabledAsActiveForEnemy(state.Enemy, playerAvatar, out _)) &&
                             playerAvatar.photonView.ViewID == state.Enemy.TargetPlayerViewID)
                         {
                             state.TargetPlayer = playerAvatar;
@@ -342,7 +362,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
                 foreach (var playerAvatar in GameDirector.instance.PlayerList)
                 {
-                    if ((!playerAvatar.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(playerAvatar)) &&
+                    if ((!playerAvatar.isDisabled || ShouldTreatDisabledAsActiveForEnemy(state.Enemy, playerAvatar, out _)) &&
                         playerAvatar.isLocal)
                     {
                         if (GameManager.instance.gameMode != 0 && !(state.TargetPlayer == playerAvatar) && !state.Enemy.PlayerRoom.SameLocal && !state.Enemy.OnScreen.OnScreenLocal)
@@ -384,7 +404,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             {
                 var enemyTarget = state.Enemy.TargetPlayerAvatar;
                 if (enemyTarget != null &&
-                    (!enemyTarget.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(enemyTarget)))
+                    (!enemyTarget.isDisabled || ShouldTreatDisabledAsActiveForEnemy(state.Enemy, enemyTarget, out _)))
                 {
                     targetPlayer = enemyTarget;
                     state.TargetPlayer = enemyTarget;
@@ -411,6 +431,103 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             else
             {
                 DebugChaseProbe(state.Enemy, "ChaseBegin.WaitingTimer", targetPlayer, $"stateTimer={state.StateTimer:F2}");
+            }
+        }
+
+        private static bool ShouldTreatDisabledAsActiveForEnemy(Enemy? enemy, PlayerAvatar? target, out string reason)
+        {
+            reason = "DisabledGateFalse";
+            if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+            {
+                return false;
+            }
+
+            if (enemy == null || !IsHeadmanEnemy(enemy))
+            {
+                reason = "Allowed.NonHeadman";
+                return true;
+            }
+
+            return EvaluateHeadmanDeathHeadWindow(enemy, out reason);
+        }
+
+        private static bool IsHeadmanEnemy(Enemy enemy)
+        {
+            return enemy.GetComponentInChildren<EnemyHeadController>() != null;
+        }
+
+        private static bool EvaluateHeadmanDeathHeadWindow(Enemy enemy, out string reason)
+        {
+            var now = Time.unscaledTime;
+            CleanupHeadmanWindowState(now);
+
+            var enemyId = enemy.GetInstanceID();
+            if (!HeadmanWindowByEnemyId.TryGetValue(enemyId, out var state))
+            {
+                state = new HeadmanDeathHeadWindowState();
+                HeadmanWindowByEnemyId[enemyId] = state;
+            }
+
+            state.LastTouchAt = now;
+
+            if (state.CooldownUntil > now)
+            {
+                reason = "Blocked.Cooldown";
+                return false;
+            }
+
+            if (state.FocusStartAt < 0f)
+            {
+                state.FocusStartAt = now;
+            }
+
+            var maxFocus = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersHeadmanDeathHeadFocusMaxSeconds);
+            if (now - state.FocusStartAt >= maxFocus)
+            {
+                var cooldown = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersHeadmanDeathHeadFocusCooldownSeconds);
+                state.CooldownUntil = now + cooldown;
+                state.FocusStartAt = -1f;
+                reason = "Blocked.StartCooldown";
+                return false;
+            }
+
+            reason = "Allowed.FocusWindow";
+            return true;
+        }
+
+        private static void CleanupHeadmanWindowState(float now)
+        {
+            if (now < s_nextHeadmanWindowCleanupAt)
+            {
+                return;
+            }
+
+            s_nextHeadmanWindowCleanupAt = now + 5f;
+            if (HeadmanWindowByEnemyId.Count == 0)
+            {
+                return;
+            }
+
+            var stale = new System.Collections.Generic.List<int>();
+            foreach (var pair in HeadmanWindowByEnemyId)
+            {
+                var state = pair.Value;
+                if (state == null)
+                {
+                    stale.Add(pair.Key);
+                    continue;
+                }
+
+                var lastRelevant = Mathf.Max(state.LastTouchAt, state.CooldownUntil);
+                if (lastRelevant < 0f || now - lastRelevant > 30f)
+                {
+                    stale.Add(pair.Key);
+                }
+            }
+
+            for (var i = 0; i < stale.Count; i++)
+            {
+                HeadmanWindowByEnemyId.Remove(stale[i]);
             }
         }
 
