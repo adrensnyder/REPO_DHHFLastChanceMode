@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
@@ -14,55 +13,30 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         private const string ModuleTag = "[DHHFLastChanceMode] [Gameplay]";
         private const string LogKey = "SuppressAllDeadTransition";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
-        private static readonly System.Reflection.FieldInfo? AllPlayersDeadField =
-            AccessTools.Field(typeof(RunManager), nameof(RunManager.allPlayersDead));
-        private static Harmony? _harmony;
+        private static bool s_enabledLogged;
         private static bool s_suppressedLogged;
         private static bool s_allowAllPlayersDead;
 
         internal static void EnsureEnabled()
         {
-            if (_harmony != null)
+            if (s_enabledLogged)
             {
                 return;
             }
 
-            var changeLevelMethod = AccessTools.Method(
-                typeof(RunManager),
-                nameof(RunManager.ChangeLevel),
-                new[] { typeof(bool), typeof(bool), typeof(RunManager.ChangeLevelType) });
-            if (changeLevelMethod == null)
-            {
-                if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey))
-                {
-                    Log.LogWarning($"{ModuleTag} Cannot find RunManager methods for patching.");
-                }
-                return;
-            }
-
-            _harmony = new Harmony("DHHFLastChanceMode.Gameplay.AllPlayersDeadGuard");
-            // This transpiler intentionally coexists with RunManagerUpdateLastChanceTimerPatch.Postfix.
-            // It owns only the guard of vanilla allPlayersDead assignment flow.
-            _harmony.Patch(
-                AccessTools.Method(typeof(RunManager), nameof(RunManager.Update)),
-                transpiler: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(UpdateTranspiler)));
-            _harmony.Patch(changeLevelMethod, prefix: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(ChangeLevelPrefix)));
+            s_enabledLogged = true;
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey))
             {
-                Log.LogInfo($"{ModuleTag} Override enabled (debug players count).");
+                Log.LogInfo($"{ModuleTag} Guard enabled via typed ChangeLevel prefix patch.");
             }
         }
 
         internal static void Disable()
         {
-            if (_harmony == null)
-            {
-                return;
-            }
-
-            _harmony.UnpatchSelf();
-            _harmony = null;
+            s_enabledLogged = false;
+            s_suppressedLogged = false;
+            s_allowAllPlayersDead = false;
         }
 
         internal static void AllowVanillaAllPlayersDead()
@@ -126,65 +100,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             return false;
         }
 
-        private static IEnumerable<CodeInstruction> UpdateTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            if (AllPlayersDeadField == null)
-            {
-                foreach (var instruction in instructions)
-                {
-                    yield return instruction;
-                }
-                yield break;
-            }
-
-            var guardMethod = AccessTools.Method(typeof(AllPlayersDeadGuard), nameof(GuardAllPlayersDead));
-            if (guardMethod == null)
-            {
-                foreach (var instruction in instructions)
-                {
-                    yield return instruction;
-                }
-                yield break;
-            }
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == System.Reflection.Emit.OpCodes.Stfld &&
-                    instruction.operand is System.Reflection.FieldInfo field &&
-                    field == AllPlayersDeadField)
-                {
-                    yield return new CodeInstruction(System.Reflection.Emit.OpCodes.Call, guardMethod);
-                }
-
-                yield return instruction;
-            }
-        }
-
-        private static bool GuardAllPlayersDead(bool value)
-        {
-            if (!value)
-                return false;
-
-            if (!FeatureFlags.LastChangeMode)
-                return true;
-
-            if (!CompatibilityGate.IsFeatureUsable(ModFeatureGate.LastChanceCluster))
-                return true;
-
-            if (LastChanceTimerController.IsSuppressedForRoom)
-                return true;
-
-            if (IsVanillaOnlyContext())
-                return true;
-
-            if (s_allowAllPlayersDead)
-                return true;
-            
-            // Prevent vanilla all-players-dead transitions while LastChance mode is enabled.
-            // Vanilla flow is re-enabled explicitly via AllowVanillaAllPlayersDead().
-            return false;
-        }
-
         private static bool IsVanillaOnlyContext()
         {
             // Preserve vanilla behavior in non-gameplay flows to avoid lobby/password regressions.
@@ -223,6 +138,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             }
 
             return true;
+        }
+
+        [HarmonyPatch(typeof(RunManager), nameof(RunManager.ChangeLevel), new[] { typeof(bool), typeof(bool), typeof(RunManager.ChangeLevelType) })]
+        internal static class RunManagerChangeLevelPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(RunManager __instance, bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
+            {
+                return ChangeLevelPrefix(__instance, _completedLevel, _levelFailed, _changeLevelType);
+            }
         }
     }
 }
