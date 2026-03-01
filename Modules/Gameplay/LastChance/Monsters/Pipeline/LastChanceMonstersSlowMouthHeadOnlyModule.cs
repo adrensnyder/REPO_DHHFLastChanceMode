@@ -1,13 +1,19 @@
 #nullable enable
 
+using BepInEx.Logging;
+using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersSlowMouthHeadOnlyModule
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.SlowMouthHeadOnly");
+
         [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.UpdateState))]
         [HarmonyPrefix]
         private static void EnemySlowMouthUpdateStatePrefix(EnemySlowMouth __instance, ref EnemySlowMouth.State newState)
@@ -24,6 +30,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 newState == EnemySlowMouth.State.IdlePuke ||
                 newState == EnemySlowMouth.State.Leave)
             {
+                DebugStateRemap(__instance, "UpdateState", newState, EnemySlowMouth.State.GoToPlayer);
                 newState = EnemySlowMouth.State.GoToPlayer;
             }
         }
@@ -44,6 +51,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 newState == EnemySlowMouth.State.IdlePuke ||
                 newState == EnemySlowMouth.State.Leave)
             {
+                DebugStateRemap(__instance, "UpdateStateRPC", newState, EnemySlowMouth.State.GoToPlayer);
                 newState = EnemySlowMouth.State.GoToPlayer;
             }
         }
@@ -57,6 +65,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
+            DebugDirectBlock(__instance, "StateAttack");
             __instance.UpdateState(EnemySlowMouth.State.GoToPlayer);
             return false;
         }
@@ -70,6 +79,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
+            DebugDirectBlock(__instance, "StateAttached");
             __instance.UpdateState(EnemySlowMouth.State.GoToPlayer);
             return false;
         }
@@ -83,6 +93,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
+            DebugDirectBlock(__instance, "StatePuke");
             __instance.UpdateState(EnemySlowMouth.State.GoToPlayer);
             return false;
         }
@@ -96,6 +107,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
+            DebugDirectBlock(__instance, "StateDetach");
             __instance.UpdateState(EnemySlowMouth.State.GoToPlayer);
             return false;
         }
@@ -109,6 +121,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
+            DebugDirectBlock(__instance, "StateIdlePuke");
             __instance.UpdateState(EnemySlowMouth.State.GoToPlayer);
             return false;
         }
@@ -122,6 +135,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return true;
             }
 
+            DebugAttachAction(__instance.enemySlowMouth, "Attaching.Update", "ForceDetach");
             __instance.Detach();
             return false;
         }
@@ -130,6 +144,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyPrefix]
         private static bool EnemySlowMouthAttachingAttachToPlayerPrefix(EnemySlowMouthAttaching __instance)
         {
+            if (__instance != null && ShouldUseHeadOnlyBehavior(__instance.enemySlowMouth))
+            {
+                DebugAttachAction(__instance.enemySlowMouth, "Attaching.AttachToPlayer", "Blocked");
+            }
+
             return !ShouldUseHeadOnlyBehavior(__instance?.enemySlowMouth);
         }
 
@@ -137,6 +156,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyPrefix]
         private static bool EnemySlowMouthAttachToPlayerPrefix(EnemySlowMouth __instance)
         {
+            if (ShouldUseHeadOnlyBehavior(__instance))
+            {
+                DebugAttachAction(__instance, "EnemySlowMouth.AttachToPlayer", "Blocked");
+            }
+
             return !ShouldUseHeadOnlyBehavior(__instance);
         }
 
@@ -175,6 +199,72 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return null;
+        }
+
+        private static void DebugStateRemap(EnemySlowMouth? slowMouth, string source, EnemySlowMouth.State from, EnemySlowMouth.State to)
+        {
+            if (!ShouldDebug(slowMouth))
+            {
+                return;
+            }
+
+            var id = slowMouth!.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"SlowMouthHeadOnly.Remap.{source}.{id}.{from}.{to}", 30))
+            {
+                return;
+            }
+
+            Log.LogInfo(
+                $"[SlowMouthHeadOnly] source={source} enemyId={id} remap={from}->{to} state={slowMouth.currentState} " +
+                $"{BuildTargetSummary(slowMouth)}");
+        }
+
+        private static void DebugDirectBlock(EnemySlowMouth? slowMouth, string source)
+        {
+            if (!ShouldDebug(slowMouth))
+            {
+                return;
+            }
+
+            var id = slowMouth!.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"SlowMouthHeadOnly.Block.{source}.{id}", 30))
+            {
+                return;
+            }
+
+            Log.LogInfo($"[SlowMouthHeadOnly] source={source} enemyId={id} blocked=vanilla-state {BuildTargetSummary(slowMouth)}");
+        }
+
+        private static void DebugAttachAction(EnemySlowMouth? slowMouth, string source, string action)
+        {
+            if (!ShouldDebug(slowMouth))
+            {
+                return;
+            }
+
+            var id = slowMouth!.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"SlowMouthHeadOnly.Attach.{source}.{action}.{id}", 20))
+            {
+                return;
+            }
+
+            Log.LogInfo($"[SlowMouthHeadOnly] source={source} enemyId={id} action={action} {BuildTargetSummary(slowMouth)}");
+        }
+
+        private static bool ShouldDebug(EnemySlowMouth? slowMouth)
+        {
+            return slowMouth != null &&
+                   InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow &&
+                   LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled();
+        }
+
+        private static string BuildTargetSummary(EnemySlowMouth slowMouth)
+        {
+            var player = ResolveBehaviorTarget(slowMouth) ?? PlayerAvatar.instance;
+            var playerId = player != null && player.photonView != null ? player.photonView.ViewID : -1;
+            var playerDisabled = player != null && player.isDisabled;
+            var headActive = LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
+            return $"targetViewId={playerId} targetDisabled={playerDisabled} headProxyActive={headActive}";
         }
     }
 }

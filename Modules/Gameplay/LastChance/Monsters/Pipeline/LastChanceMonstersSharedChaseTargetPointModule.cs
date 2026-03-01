@@ -1,14 +1,20 @@
 #nullable enable
 
+using BepInEx.Logging;
+using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeadmanChase");
+
         [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
         internal static class EnemyStateChaseUpdatePatch
         {
@@ -61,6 +67,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var targetPlayer = state.Enemy.TargetPlayerAvatar;
             if (targetPlayer == null)
             {
+                DebugChaseTransition(state.Enemy, "Chase->Roaming.NoTarget", null, "TargetPlayerAvatar is null");
                 state.Enemy.CurrentState = EnemyState.Roaming;
                 return;
             }
@@ -170,6 +177,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             if (targetPlayer.isDisabled && !LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(targetPlayer))
             {
+                DebugChaseTransition(state.Enemy, "Chase->Roaming.DisabledTarget", targetPlayer, "target is disabled and not eligible");
                 state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
                 state.Enemy.CurrentState = EnemyState.Roaming;
             }
@@ -251,9 +259,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 {
                     targetPlayer = enemyTarget;
                     state.TargetPlayer = enemyTarget;
+                    DebugChaseTransition(state.Enemy, "ChaseBegin.TargetFallback", enemyTarget, "using Enemy.TargetPlayerAvatar fallback");
                 }
                 else
                 {
+                    DebugChaseTransition(state.Enemy, "ChaseBegin->Roaming.NoUsableTarget", enemyTarget, "TargetPlayer null and fallback invalid");
                     state.Enemy.CurrentState = EnemyState.Roaming;
                     return;
                 }
@@ -266,6 +276,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             state.StateTimer -= Time.deltaTime;
             if (state.StateTimer <= 0f)
             {
+                DebugChaseTransition(state.Enemy, "ChaseBegin->Chase.TimerElapsed", targetPlayer, "transitioning to chase");
                 state.Enemy.CurrentState = EnemyState.Chase;
             }
         }
@@ -273,6 +284,28 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private static Vector3 ResolveTargetPosition(PlayerAvatar targetPlayer)
         {
             return LastChanceMonstersTargetingOrchestrator.ResolveEffectiveTransformTargetPoint(targetPlayer.transform);
+        }
+
+        private static void DebugChaseTransition(Enemy? enemy, string reason, PlayerAvatar? target, string details)
+        {
+            if (!InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || enemy == null)
+            {
+                return;
+            }
+
+            var enemyId = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"HeadmanChase.{reason}.{enemyId}", 30))
+            {
+                return;
+            }
+
+            var targetId = target != null && target.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            var targetInfo = target == null ? "target=n/a" : $"target='{target.gameObject.name}' targetViewId={targetId}";
+            Log.LogInfo(
+                $"[HeadmanChase] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
+                $"{targetInfo} targetDisabled={targetDisabled} targetEligible={targetEligible} details={details}");
         }
     }
 }
