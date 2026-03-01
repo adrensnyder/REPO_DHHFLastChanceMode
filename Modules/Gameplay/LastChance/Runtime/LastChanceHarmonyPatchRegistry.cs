@@ -51,6 +51,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceMonstersChaseNavmeshProxyModule),
             typeof(LastChanceMonstersDeathTimerBonusModule),
             typeof(LastChanceMonstersGasCaptureModule),
+            typeof(LastChanceMonstersDisabledOverrideModule),
             typeof(LastChanceMonstersAnimalHeadVisionFallbackModule),
             typeof(LastChanceMonstersSharedChaseTargetPointModule),
             typeof(LastChanceMonstersGasVictimPositionModule),
