@@ -1,72 +1,177 @@
 #nullable enable
 
 using System.Collections.Generic;
-using HarmonyLib;
-using UnityEngine;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using HarmonyLib;
+using Photon.Pun;
+using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersGasVictimPositionModule
     {
-        private static readonly List<System.Reflection.MethodBase> s_targetMethods =
-            LastChanceMonstersPatchTargetHelper.BuildTargetList(AddTargetMethods);
-
-        private static readonly System.Reflection.MethodInfo? s_componentGetTransform =
-            AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));
-
-        private static readonly System.Reflection.MethodInfo? s_transformGetPosition =
-            AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
-
-        private static readonly System.Reflection.MethodInfo? s_getEffectivePosition =
-            AccessTools.Method(typeof(LastChanceMonstersGasVictimPositionModule), nameof(GetEffectivePlayerPosition));
-
-        [HarmonyTargetMethods]
-        private static IEnumerable<System.Reflection.MethodBase> TargetMethods()
+        [HarmonyPatch(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic))]
+        internal static class EnemyHeartHuggerPlayersInGasLogicPatch
         {
-            return s_targetMethods;
-        }
-
-        private static void AddTargetMethods(List<System.Reflection.MethodBase> methods)
-        {
-            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic));
-            LastChanceMonstersPatchTargetHelper.AddDeclaredMethod(methods, typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayerInGas), typeof(PlayerAvatar));
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            if (s_componentGetTransform == null || s_transformGetPosition == null || s_getEffectivePosition == null)
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyHeartHugger __instance)
             {
-                return instructions;
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecutePlayersInGasLogic(__instance);
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayerInGas), new[] { typeof(PlayerAvatar) })]
+        internal static class EnemyHeartHuggerPlayerInGasPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyHeartHugger __instance, PlayerAvatar _player)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecutePlayerInGas(__instance, _player);
+                return false;
+            }
+        }
+
+        private static void ExecutePlayersInGasLogic(EnemyHeartHugger instance)
+        {
+            if (!SemiFunc.IsMasterClientOrSingleplayer())
+            {
+                return;
             }
 
-            var list = new List<CodeInstruction>(instructions);
-            for (var i = 0; i <= list.Count - 2; i++)
+            if (instance.playersInGas.Count > 0)
             {
-                var a = list[i];
-                var b = list[i + 1];
-                if (!CallsMethod(a, s_componentGetTransform) || !CallsMethod(b, s_transformGetPosition))
+                var toRemove = new List<EnemyHeartHugger.PlayersInGas>();
+                foreach (var playersInGas in instance.playersInGas)
+                {
+                    playersInGas.playerAvatar.upgradeTumbleWingsLogic.tumbleWingPinkTimer = 1f;
+                    if (playersInGas.inGasTime >= 2f)
+                    {
+                        playersInGas.isCaught = true;
+                    }
+
+                    playersInGas.inGasTime += Time.deltaTime;
+                    var currentPosition = GetEffectivePlayerPosition(playersInGas.playerAvatar);
+                    var distance = Vector3.Distance(playersInGas.lastPositionInsideGas, currentPosition);
+                    if (playersInGas.outsideGasTime >= 3f || distance > 2f)
+                    {
+                        toRemove.Add(playersInGas);
+                    }
+
+                    playersInGas.outsideGasTime += Time.deltaTime;
+                }
+
+                foreach (var playersInGas in toRemove)
+                {
+                    instance.playersOnCooldown.Add(playersInGas.playerAvatar, Time.time);
+                    instance.playersInGas.Remove(playersInGas);
+                }
+            }
+
+            if (!SemiFunc.FPSImpulse5())
+            {
+                return;
+            }
+
+            foreach (var playersInGas in instance.playersInGas)
+            {
+                var isNew = true;
+                foreach (var previous in instance.playersInGasPrevious)
+                {
+                    if (playersInGas.playerAvatar == previous.playerAvatar)
+                    {
+                        isNew = false;
+                    }
+                }
+
+                if (!isNew)
                 {
                     continue;
                 }
 
-                a.opcode = System.Reflection.Emit.OpCodes.Nop;
-                a.operand = null;
-                b.opcode = System.Reflection.Emit.OpCodes.Call;
-                b.operand = s_getEffectivePosition;
+                if (SemiFunc.IsMultiplayer())
+                {
+                    instance.photonView.RPC("PlayerInGasClientRPC", RpcTarget.All, new object[]
+                    {
+                        playersInGas.playerAvatar.photonView.ViewID,
+                        true
+                    });
+                }
+                else
+                {
+                    instance.PlayerInGasClientRPC(playersInGas.playerAvatar.photonView.ViewID, true, default);
+                }
             }
 
-            return list;
+            foreach (var previous in instance.playersInGasPrevious)
+            {
+                var removed = true;
+                using (var enumerator = instance.playersInGas.GetEnumerator())
+                {
+                    while (enumerator.MoveNext())
+                    {
+                        if (enumerator.Current.playerAvatar == previous.playerAvatar)
+                        {
+                            removed = false;
+                        }
+                    }
+                }
+
+                if (!removed)
+                {
+                    continue;
+                }
+
+                if (SemiFunc.IsMultiplayer())
+                {
+                    instance.photonView.RPC("PlayerInGasClientRPC", RpcTarget.All, new object[]
+                    {
+                        previous.playerAvatar.photonView.ViewID,
+                        false
+                    });
+                }
+                else
+                {
+                    instance.PlayerInGasClientRPC(previous.playerAvatar.photonView.ViewID, false, default);
+                }
+            }
+
+            instance.playersInGasPrevious.Clear();
+            instance.playersInGasPrevious.AddRange(instance.playersInGas);
         }
 
-        private static bool CallsMethod(CodeInstruction instruction, System.Reflection.MethodInfo method)
+        private static void ExecutePlayerInGas(EnemyHeartHugger instance, PlayerAvatar player)
         {
-            return (instruction.opcode == System.Reflection.Emit.OpCodes.Call || instruction.opcode == System.Reflection.Emit.OpCodes.Callvirt) &&
-                   instruction.operand is System.Reflection.MethodInfo called &&
-                   called == method;
+            foreach (var playersInGas in instance.playersInGas)
+            {
+                if (playersInGas.playerAvatar != player)
+                {
+                    continue;
+                }
+
+                playersInGas.outsideGasTime = 0f;
+                playersInGas.lastPositionInsideGas = GetEffectivePlayerPosition(player);
+                return;
+            }
+
+            var newPlayerInGas = new EnemyHeartHugger.PlayersInGas
+            {
+                playerAvatar = player,
+                outsideGasTime = 0f,
+                lastPositionInsideGas = GetEffectivePlayerPosition(player)
+            };
+            instance.playersInGas.Add(newPlayerInGas);
         }
 
         internal static Vector3 GetEffectivePlayerPosition(PlayerAvatar? player)
