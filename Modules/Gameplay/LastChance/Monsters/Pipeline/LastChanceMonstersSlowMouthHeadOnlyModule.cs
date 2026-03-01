@@ -1,6 +1,6 @@
 #nullable enable
 
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
@@ -133,6 +133,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return !ShouldUseHeadOnlyBehavior(__instance?.enemySlowMouth);
         }
 
+        [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.AttachToPlayer))]
+        [HarmonyPrefix]
+        private static bool EnemySlowMouthAttachToPlayerPrefix(EnemySlowMouth __instance)
+        {
+            return !ShouldUseHeadOnlyBehavior(__instance);
+        }
+
         private static bool ShouldUseHeadOnlyBehavior(EnemySlowMouth? slowMouth)
         {
             if (slowMouth == null)
@@ -145,13 +152,29 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return false;
             }
 
-            var player = slowMouth.playerTarget;
-            if (player == null)
+            var player = ResolveBehaviorTarget(slowMouth);
+            if (player != null && LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
             {
-                return false;
+                return true;
             }
 
-            return LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(player);
+            return LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(PlayerAvatar.instance);
+        }
+
+        private static PlayerAvatar? ResolveBehaviorTarget(EnemySlowMouth slowMouth)
+        {
+            if (slowMouth.playerTarget != null)
+            {
+                return slowMouth.playerTarget;
+            }
+
+            var enemy = slowMouth.enemy;
+            if (enemy != null && enemy.TargetPlayerAvatar != null)
+            {
+                return enemy.TargetPlayerAvatar;
+            }
+
+            return null;
         }
     }
 }

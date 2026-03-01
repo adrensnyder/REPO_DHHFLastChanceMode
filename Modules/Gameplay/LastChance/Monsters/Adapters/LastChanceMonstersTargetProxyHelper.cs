@@ -56,19 +56,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            // Keep LastChance eligibility stable even if DeathHead reference is temporarily unavailable.
+            var head = player.playerDeathHead;
+            if (head == null)
+            {
+                return player.deadSet || IsDisabled(player);
+            }
+
             if (player.deadSet || IsDisabled(player))
             {
                 return true;
             }
 
-            var head = player.playerDeathHead;
-            if (head == null)
-            {
-                return false;
-            }
-
-            return head.triggered || head.physGrabObject != null;
+            return head.triggered || head.physGrabObject != null || head.gameObject.activeInHierarchy;
         }
 
         internal static bool TryGetHeadCenter(PlayerAvatar? player, out Vector3 center)
@@ -118,6 +117,25 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             }
 
             return TryGetHeadCenter(player, out point);
+        }
+
+        internal static bool TryGetHeadProxyVisionTransform(PlayerAvatar? player, out Transform? transform)
+        {
+            transform = null;
+            if (!IsRuntimeEnabled() || !IsHeadProxyActive(player) || player?.playerDeathHead == null)
+            {
+                return false;
+            }
+
+            var eyes = player.playerDeathHead.playerEyes;
+            if (eyes != null)
+            {
+                transform = eyes.transform;
+                return transform != null;
+            }
+
+            transform = player.playerDeathHead.transform;
+            return transform != null;
         }
 
         internal static bool TryGetHeadProxyTransform(PlayerAvatar? player, out Transform? transform)
@@ -186,6 +204,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                     player = fromController;
                     return true;
                 }
+            }
+
+            var visionTarget = transform.GetComponentInParent<PlayerVisionTarget>();
+            if (visionTarget != null && visionTarget.PlayerAvatar != null)
+            {
+                player = visionTarget.PlayerAvatar;
+                return true;
             }
 
             return false;

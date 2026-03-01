@@ -54,7 +54,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var visionTimer = enemy.StateChase != null ? enemy.StateChase.VisionTimer : -1f;
             var targetY = hasTarget ? target!.PlayerVisionTarget.VisionTransform.position.y : -1f;
             Log.LogInfo(
-                $"[HeadmanDebug] enemy={enemy.gameObject.name} state={enemy.CurrentState} hasTarget={hasTarget} " +
+                $"[HeadmanDebug] enemy={enemy.gameObject.name} id={id} state={enemy.CurrentState} hasTarget={hasTarget} " +
                 $"targetDisabled={targetDisabled} treatDisabledAsActive={treatAsActive} visionTimer={visionTimer:F2} targetY={targetY:F2}");
         }
 
@@ -74,7 +74,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             Log.LogInfo(
-                $"[SlowMouthDebug] UpdateState request enemy={__instance.gameObject.name} from={current} to={newState} " +
+                $"[SlowMouthDebug] UpdateState request enemy={__instance.gameObject.name} id={__instance.GetInstanceID()} from={current} to={newState} " +
                 $"targetDisabled={(__instance.playerTarget != null && __instance.playerTarget.isDisabled)} " +
                 $"targetActive={LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(__instance.playerTarget)}");
         }
@@ -88,7 +88,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            Log.LogInfo($"[SlowMouthDebug] UpdateStateRPC applied enemy={__instance.gameObject.name} state={newState}");
+            Log.LogInfo($"[SlowMouthDebug] UpdateStateRPC applied enemy={__instance.gameObject.name} id={__instance.GetInstanceID()} state={newState}");
         }
 
         [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.Update))]
@@ -114,7 +114,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var targetDisabled = target != null && target.isDisabled;
             var targetActive = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
             Log.LogInfo(
-                $"[SlowMouthDebug] enemy={__instance.gameObject.name} state={state} hasTarget={(target != null)} " +
+                $"[SlowMouthDebug] enemy={__instance.gameObject.name} id={id} state={state} hasTarget={(target != null)} " +
                 $"targetDisabled={targetDisabled} targetActive={targetActive}");
         }
 

@@ -32,6 +32,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceMonstersVoiceEnemyOnlyModule),
             typeof(LastChanceMonstersBodyPositionProxyModule),
             typeof(LastChanceMonstersVisionModule),
+            typeof(LastChanceMonstersVisionAnchorProxyModule),
             typeof(LastChanceMonstersHurtColliderHeadProxyModule),
             typeof(LastChanceMonstersOnScreenCameraModule),
             typeof(LastChanceMonstersOnScreenSafeLookupPatch),
