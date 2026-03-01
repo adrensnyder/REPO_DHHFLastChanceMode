@@ -116,6 +116,50 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
         }
 
+        [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
+        internal static class EnemyStateStunnedUpdatePatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(EnemyStateStunned __instance)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || __instance == null || __instance.enemy == null)
+                {
+                    return;
+                }
+
+                var enemy = __instance.enemy;
+                if (enemy.GetComponentInChildren<EnemyHeadController>() == null)
+                {
+                    return;
+                }
+
+                var target = enemy.TargetPlayerAvatar;
+                if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+                {
+                    return;
+                }
+
+                if (enemy.CurrentState != EnemyState.Roaming)
+                {
+                    return;
+                }
+
+                if (__instance.stunTimer > 0f || __instance.overrideDisableTimer > 0f)
+                {
+                    return;
+                }
+
+                if (enemy.StateChase != null)
+                {
+                    enemy.StateChase.ChaseCanReach = true;
+                    enemy.StateChase.VisionTimer = Mathf.Max(enemy.StateChase.VisionTimer, 0.5f);
+                }
+
+                enemy.CurrentState = EnemyState.ChaseBegin;
+                DebugChaseTransition(enemy, "Stunned.Update->ChaseBegin.Override", target, "prevent post-stun roaming reset for eligible LastChance target");
+            }
+        }
+
         private static void ExecuteChaseUpdate(EnemyStateChase state)
         {
             if (!state.Enemy.MasterClient)

@@ -35,8 +35,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            var id = __instance.GetInstanceID();
             var enemy = __instance.enemy;
+            var id = enemy.GetInstanceID();
             var target = enemy.TargetPlayerAvatar;
             var targetDisabled = target != null && target.isDisabled;
 
@@ -59,7 +59,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 : -1f;
             var scopeActive = LastChanceMonstersDisabledOverrideModule.IsOverrideScopeActive;
             Log.LogInfo(
-                $"[HeadmanDebug] enemy={enemy.gameObject.name} id={id} state={enemy.CurrentState} hasTarget={hasTarget} " +
+                $"[HeadmanDebug] enemy={enemy.gameObject.name} id={id} componentId={__instance.GetInstanceID()} state={enemy.CurrentState} hasTarget={hasTarget} " +
                 $"targetDisabled={targetDisabled} treatDisabledAsActive={treatAsActive} " +
                 $"disabledOverrideScopeActive={scopeActive} visionTimer={visionTimer:F2} targetY={targetY:F2} " +
                 $"{BuildPlayerAnchorSummary(target, null)}");
@@ -283,6 +283,62 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             Log.LogInfo(
                 $"[HeadmanDebug] OnStunnedEnd enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
                 $"stateBefore={enemy.CurrentState} -> Roaming");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateStunnedUpdatePrefix(EnemyStateStunned __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.enemy;
+            if (enemy.GetComponentInChildren<EnemyHeadController>() == null)
+            {
+                return;
+            }
+
+            if (!LogLimiter.ShouldLog($"Headman.Stunned.Update.Prefix.{enemy.GetInstanceID()}", 15))
+            {
+                return;
+            }
+
+            var target = enemy.TargetPlayerAvatar;
+            Log.LogInfo(
+                $"[HeadmanDebug] Stunned.Update.Prefix enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"enemyState={enemy.CurrentState} stunTimer={__instance.stunTimer:F2} overrideDisableTimer={__instance.overrideDisableTimer:F2} " +
+                $"active={__instance.active} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
+                $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
+        [HarmonyPostfix]
+        private static void EnemyStateStunnedUpdatePostfix(EnemyStateStunned __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.enemy;
+            if (enemy.GetComponentInChildren<EnemyHeadController>() == null)
+            {
+                return;
+            }
+
+            if (!LogLimiter.ShouldLog($"Headman.Stunned.Update.Postfix.{enemy.GetInstanceID()}", 15))
+            {
+                return;
+            }
+
+            var target = enemy.TargetPlayerAvatar;
+            Log.LogInfo(
+                $"[HeadmanDebug] Stunned.Update.Postfix enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"enemyState={enemy.CurrentState} stunTimer={__instance.stunTimer:F2} overrideDisableTimer={__instance.overrideDisableTimer:F2} " +
+                $"active={__instance.active} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
+                $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget?.VisionTransform)}");
         }
 
         [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.OnSpawn))]
