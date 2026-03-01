@@ -1,6 +1,7 @@
 #nullable enable
 
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.AI;
@@ -69,7 +70,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             hidden.stateTimer -= Time.deltaTime;
             var player = hidden.playerTarget;
-            if (player == null || player.isDisabled || hidden.stateTimer <= 0f)
+            if (player == null || (player.isDisabled && !LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(player)) || hidden.stateTimer <= 0f)
             {
                 hidden.UpdateState(EnemyHidden.State.Leave);
                 return;
@@ -135,7 +136,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
 
             var player = hidden.playerTarget;
-            if (player == null || player.isDisabled)
+            if (player == null || (player.isDisabled && !LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(player)))
             {
                 hidden.UpdateState(EnemyHidden.State.Leave);
                 return;
@@ -171,7 +172,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             hidden.stateTimer -= Time.deltaTime;
             var player = hidden.playerTarget;
-            if (player == null || player.isDisabled)
+            if (player == null || (player.isDisabled && !LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(player)))
             {
                 hidden.UpdateState(EnemyHidden.State.Leave);
                 return;

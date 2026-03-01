@@ -168,7 +168,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 state.Enemy.CurrentState = EnemyState.ChaseSlow;
             }
 
-            if (targetPlayer.isDisabled)
+            if (targetPlayer.isDisabled && !LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(targetPlayer))
             {
                 state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
                 state.Enemy.CurrentState = EnemyState.Roaming;
@@ -199,16 +199,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 state.TargetPlayer = PlayerController.instance.playerAvatarScript;
                 foreach (var playerAvatar in GameDirector.instance.PlayerList)
                 {
-                    if (!playerAvatar.isDisabled && playerAvatar.photonView.ViewID == state.Enemy.TargetPlayerViewID)
-                    {
-                        state.TargetPlayer = playerAvatar;
-                        break;
-                    }
+                        if ((!playerAvatar.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(playerAvatar)) &&
+                            playerAvatar.photonView.ViewID == state.Enemy.TargetPlayerViewID)
+                        {
+                            state.TargetPlayer = playerAvatar;
+                            break;
+                        }
                 }
 
                 foreach (var playerAvatar in GameDirector.instance.PlayerList)
                 {
-                    if (!playerAvatar.isDisabled && playerAvatar.isLocal)
+                    if ((!playerAvatar.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(playerAvatar)) &&
+                        playerAvatar.isLocal)
                     {
                         if (GameManager.instance.gameMode != 0 && !(state.TargetPlayer == playerAvatar) && !state.Enemy.PlayerRoom.SameLocal && !state.Enemy.OnScreen.OnScreenLocal)
                         {
