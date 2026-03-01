@@ -1,119 +1,72 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     internal static class LastChanceMonstersVisualCouplingDecoupleModule
     {
-        private static readonly System.Reflection.FieldInfo? s_tumbleWingPinkTimerField =
-            AccessTools.Field(typeof(ItemUpgradePlayerTumbleWingsLogic), nameof(ItemUpgradePlayerTumbleWingsLogic.tumbleWingPinkTimer));
-
-        private static readonly System.Reflection.MethodInfo? s_upgradeTumbleWingsVisualsActiveMethod =
-            AccessTools.Method(typeof(PlayerAvatar), nameof(PlayerAvatar.UpgradeTumbleWingsVisualsActive), new[] { typeof(bool), typeof(bool) });
-
-        private static readonly System.Reflection.MethodInfo? s_setTumbleWingPinkTimerSafeMethod =
-            AccessTools.Method(typeof(LastChanceMonstersVisualCouplingDecoupleModule), nameof(SetTumbleWingPinkTimerSafe));
-
-        private static readonly System.Reflection.MethodInfo? s_upgradeTumbleWingsVisualsActiveSafeMethod =
-            AccessTools.Method(typeof(LastChanceMonstersVisualCouplingDecoupleModule), nameof(UpgradeTumbleWingsVisualsActiveSafe));
-
         [HarmonyPatch(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic))]
         internal static class EnemyHeartHuggerPlayersInGasLogicPatch
         {
-            [HarmonyTranspiler]
-            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            [HarmonyFinalizer]
+            private static Exception? Finalizer(Exception? __exception)
             {
-                return RewriteInstructions(instructions);
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return __exception;
+                }
+
+                // During LastChance runtime, null tumble-wing visuals are tolerated.
+                if (__exception is NullReferenceException)
+                {
+                    return null;
+                }
+
+                return __exception;
             }
         }
 
         [HarmonyPatch(typeof(EnemyHeartHuggerGasChecker), nameof(EnemyHeartHuggerGasChecker.Update))]
         internal static class EnemyHeartHuggerGasCheckerUpdatePatch
         {
-            [HarmonyTranspiler]
-            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            [HarmonyFinalizer]
+            private static Exception? Finalizer(Exception? __exception)
             {
-                return RewriteInstructions(instructions);
-            }
-        }
-
-        private static IEnumerable<CodeInstruction> RewriteInstructions(IEnumerable<CodeInstruction> instructions)
-        {
-            var list = new List<CodeInstruction>(instructions);
-
-            if (s_tumbleWingPinkTimerField != null && s_setTumbleWingPinkTimerSafeMethod != null)
-            {
-                for (var i = 0; i < list.Count; i++)
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
                 {
-                    var ins = list[i];
-                    if (ins.opcode == System.Reflection.Emit.OpCodes.Stfld &&
-                        ins.operand is System.Reflection.FieldInfo field &&
-                        field == s_tumbleWingPinkTimerField)
-                    {
-                        ins.opcode = System.Reflection.Emit.OpCodes.Call;
-                        ins.operand = s_setTumbleWingPinkTimerSafeMethod;
-                    }
+                    return __exception;
                 }
-            }
 
-            if (s_upgradeTumbleWingsVisualsActiveMethod != null && s_upgradeTumbleWingsVisualsActiveSafeMethod != null)
-            {
-                for (var i = 0; i < list.Count; i++)
+                // During LastChance runtime, null tumble-wing visuals are tolerated.
+                if (__exception is NullReferenceException)
                 {
-                    var ins = list[i];
-                    if ((ins.opcode == System.Reflection.Emit.OpCodes.Call || ins.opcode == System.Reflection.Emit.OpCodes.Callvirt) &&
-                        ins.operand is System.Reflection.MethodInfo method &&
-                        method == s_upgradeTumbleWingsVisualsActiveMethod)
-                    {
-                        ins.opcode = System.Reflection.Emit.OpCodes.Call;
-                        ins.operand = s_upgradeTumbleWingsVisualsActiveSafeMethod;
-                    }
+                    return null;
                 }
-            }
 
-            return list;
+                return __exception;
+            }
         }
 
-        private static void SetTumbleWingPinkTimerSafe(ItemUpgradePlayerTumbleWingsLogic? logic, float value)
+        [HarmonyPatch(typeof(PlayerAvatar), nameof(PlayerAvatar.UpgradeTumbleWingsVisualsActive), new[] { typeof(bool), typeof(bool) })]
+        internal static class PlayerAvatarUpgradeTumbleWingsVisualsActivePatch
         {
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            [HarmonyPrefix]
+            private static bool Prefix(PlayerAvatar? __instance)
             {
-                // Preserve vanilla null semantics when runtime override is not active.
-                logic!.tumbleWingPinkTimer = value;
-                return;
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                if (__instance == null)
+                {
+                    return false;
+                }
+
+                return __instance.upgradeTumbleWingsLogic != null;
             }
-
-            if (logic == null)
-            {
-                return;
-            }
-
-            logic.tumbleWingPinkTimer = value;
-        }
-
-        private static void UpgradeTumbleWingsVisualsActiveSafe(PlayerAvatar player, bool visualsActive, bool pink)
-        {
-            if (player == null)
-            {
-                return;
-            }
-
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
-            {
-                player.UpgradeTumbleWingsVisualsActive(visualsActive, pink);
-                return;
-            }
-
-            if (player.upgradeTumbleWingsLogic == null)
-            {
-                return;
-            }
-
-            player.UpgradeTumbleWingsVisualsActive(visualsActive, pink);
         }
     }
 }
-
