@@ -5,6 +5,7 @@ using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
+using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
@@ -27,7 +28,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 newState == EnemySlowMouth.State.Attached ||
                 newState == EnemySlowMouth.State.Puke ||
                 newState == EnemySlowMouth.State.Detach ||
-                newState == EnemySlowMouth.State.IdlePuke ||
                 newState == EnemySlowMouth.State.Leave)
             {
                 DebugStateRemap(__instance, "UpdateState", newState, EnemySlowMouth.State.GoToPlayer);
@@ -48,7 +48,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 newState == EnemySlowMouth.State.Attached ||
                 newState == EnemySlowMouth.State.Puke ||
                 newState == EnemySlowMouth.State.Detach ||
-                newState == EnemySlowMouth.State.IdlePuke ||
                 newState == EnemySlowMouth.State.Leave)
             {
                 DebugStateRemap(__instance, "UpdateStateRPC", newState, EnemySlowMouth.State.GoToPlayer);
@@ -112,20 +111,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return false;
         }
 
-        [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.StateIdlePuke), new[] { typeof(bool) })]
-        [HarmonyPrefix]
-        private static bool EnemySlowMouthStateIdlePukePrefix(EnemySlowMouth __instance)
-        {
-            if (!ShouldUseHeadOnlyBehavior(__instance))
-            {
-                return true;
-            }
-
-            DebugDirectBlock(__instance, "StateIdlePuke");
-            __instance.UpdateState(EnemySlowMouth.State.GoToPlayer);
-            return false;
-        }
-
         [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update))]
         [HarmonyPrefix]
         private static bool EnemySlowMouthAttachingUpdatePrefix(EnemySlowMouthAttaching __instance)
@@ -156,12 +141,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyPrefix]
         private static bool EnemySlowMouthAttachToPlayerPrefix(EnemySlowMouth __instance)
         {
-            if (ShouldUseHeadOnlyBehavior(__instance))
+            if (!ShouldUseHeadOnlyBehavior(__instance))
             {
-                DebugAttachAction(__instance, "EnemySlowMouth.AttachToPlayer", "Blocked");
+                return true;
             }
 
-            return !ShouldUseHeadOnlyBehavior(__instance);
+            var result = ExecuteHeadOnlyAttack(__instance);
+            DebugAttachAction(__instance, "EnemySlowMouth.AttachToPlayer", result);
+            return false;
         }
 
         private static bool ShouldUseHeadOnlyBehavior(EnemySlowMouth? slowMouth)
@@ -264,7 +251,45 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var playerId = player != null && player.photonView != null ? player.photonView.ViewID : -1;
             var playerDisabled = player != null && player.isDisabled;
             var headActive = LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
-            return $"targetViewId={playerId} targetDisabled={playerDisabled} headProxyActive={headActive}";
+            var state = slowMouth.currentState;
+            var currentTargetDistanceToHead = -1f;
+            var currentTargetDistanceToCamera = -1f;
+
+            if (slowMouth.currentTarget != null && LastChanceMonstersTargetProxyHelper.TryGetHeadProxyVisionTarget(player, out var headVision))
+            {
+                currentTargetDistanceToHead = Vector3.Distance(slowMouth.currentTarget.position, headVision);
+            }
+
+            if (slowMouth.currentTarget != null && player != null && player.localCamera != null)
+            {
+                currentTargetDistanceToCamera = Vector3.Distance(slowMouth.currentTarget.position, player.localCamera.transform.position);
+            }
+
+            return $"state={state} targetViewId={playerId} targetDisabled={playerDisabled} headProxyActive={headActive} " +
+                   $"currentTargetToHead={currentTargetDistanceToHead:F2} currentTargetToCamera={currentTargetDistanceToCamera:F2}";
+        }
+
+        private static string ExecuteHeadOnlyAttack(EnemySlowMouth slowMouth)
+        {
+            if (slowMouth == null || slowMouth.currentTarget == null)
+            {
+                return "HeadOnlyAttack.SkipNoCurrentTarget";
+            }
+
+            var distance = Vector3.Distance(slowMouth.centerTransform.position, slowMouth.currentTarget.position);
+            if (distance > 2f)
+            {
+                return "HeadOnlyAttack.SkipDistance";
+            }
+
+            if (slowMouth.idlePukeCooldown > 0f)
+            {
+                return "HeadOnlyAttack.SkipCooldown";
+            }
+
+            slowMouth.idlePukePreviousState = EnemySlowMouth.State.GoToPlayer;
+            slowMouth.UpdateState(EnemySlowMouth.State.IdlePuke);
+            return "HeadOnlyAttack.TriggerIdlePuke";
         }
     }
 }

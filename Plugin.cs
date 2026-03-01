@@ -21,7 +21,7 @@ namespace DHHFLastChanceMode
         private const string CorePluginGuid = "AdrenSnyder.DeathHeadHopperFix";
         internal const string PluginGuid = "AdrenSnyder.DHHFLastChanceMode";
         internal const string PluginName = "DHHF LastChance Mode";
-        internal const string PluginVersion = "0.1.1";
+        internal const string PluginVersion = "0.1.2";
         private Harmony? _harmony;
         private bool _runtimeInitialized;
         private Coroutine? _deferredBootstrapRoutine;

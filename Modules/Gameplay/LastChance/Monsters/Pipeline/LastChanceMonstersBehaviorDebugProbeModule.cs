@@ -3,9 +3,11 @@
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
+using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
@@ -52,10 +54,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var treatAsActive = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
             var hasTarget = target != null;
             var visionTimer = enemy.StateChase != null ? enemy.StateChase.VisionTimer : -1f;
-            var targetY = hasTarget ? target!.PlayerVisionTarget.VisionTransform.position.y : -1f;
+            var targetY = hasTarget && target!.PlayerVisionTarget != null && target.PlayerVisionTarget.VisionTransform != null
+                ? target.PlayerVisionTarget.VisionTransform.position.y
+                : -1f;
+            var scopeActive = LastChanceMonstersDisabledOverrideModule.IsOverrideScopeActive;
             Log.LogInfo(
                 $"[HeadmanDebug] enemy={enemy.gameObject.name} id={id} state={enemy.CurrentState} hasTarget={hasTarget} " +
-                $"targetDisabled={targetDisabled} treatDisabledAsActive={treatAsActive} visionTimer={visionTimer:F2} targetY={targetY:F2}");
+                $"targetDisabled={targetDisabled} treatDisabledAsActive={treatAsActive} " +
+                $"disabledOverrideScopeActive={scopeActive} visionTimer={visionTimer:F2} targetY={targetY:F2} " +
+                $"{BuildPlayerAnchorSummary(target, null)}");
         }
 
         [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.UpdateState))]
@@ -76,7 +83,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             Log.LogInfo(
                 $"[SlowMouthDebug] UpdateState request enemy={__instance.gameObject.name} id={__instance.GetInstanceID()} from={current} to={newState} " +
                 $"targetDisabled={(__instance.playerTarget != null && __instance.playerTarget.isDisabled)} " +
-                $"targetActive={LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(__instance.playerTarget)}");
+                $"targetActive={LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(__instance.playerTarget)} " +
+                $"disabledOverrideScopeActive={LastChanceMonstersDisabledOverrideModule.IsOverrideScopeActive} " +
+                $"{BuildPlayerAnchorSummary(__instance.playerTarget, __instance.currentTarget)}");
         }
 
         [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.UpdateStateRPC))]
@@ -115,7 +124,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var targetActive = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
             Log.LogInfo(
                 $"[SlowMouthDebug] enemy={__instance.gameObject.name} id={id} state={state} hasTarget={(target != null)} " +
-                $"targetDisabled={targetDisabled} targetActive={targetActive}");
+                $"targetDisabled={targetDisabled} targetActive={targetActive} " +
+                $"disabledOverrideScopeActive={LastChanceMonstersDisabledOverrideModule.IsOverrideScopeActive} " +
+                $"{BuildPlayerAnchorSummary(target, __instance.currentTarget)}");
         }
 
         [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update))]
@@ -136,7 +147,87 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var targetDisabled = target != null && target.isDisabled;
             Log.LogInfo(
                 $"[SlowMouthDebug] Attaching.Update active={__instance.isActive} hasTarget={(target != null)} " +
-                $"targetDisabled={targetDisabled} enemyState={__instance.enemySlowMouth.currentState}");
+                $"targetDisabled={targetDisabled} enemyState={__instance.enemySlowMouth.currentState} " +
+                $"disabledOverrideScopeActive={LastChanceMonstersDisabledOverrideModule.IsOverrideScopeActive} " +
+                $"{BuildPlayerAnchorSummary(target, __instance.targetTransform)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.VisionTriggered))]
+        [HarmonyPostfix]
+        private static void EnemyHeadControllerVisionTriggeredPostfix(EnemyHeadController __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.Enemy;
+            if (!LogLimiter.ShouldLog($"Headman.VisionTriggered.{enemy.GetInstanceID()}", 20))
+            {
+                return;
+            }
+
+            var target = enemy.TargetPlayerAvatar;
+            Log.LogInfo(
+                $"[HeadmanDebug] VisionTriggered enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"state={enemy.CurrentState} targetViewId={(target?.photonView != null ? target.photonView.ViewID : -1)} " +
+                $"{BuildPlayerAnchorSummary(target, target?.PlayerVisionTarget != null ? target.PlayerVisionTarget.VisionTransform : null)}");
+        }
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
+        [HarmonyPrefix]
+        private static void EnemyHeadControllerOnStunnedEndPrefix(EnemyHeadController __instance)
+        {
+            if (!ShouldDebug() || __instance == null || __instance.Enemy == null)
+            {
+                return;
+            }
+
+            var enemy = __instance.Enemy;
+            if (!LogLimiter.ShouldLog($"Headman.StunnedEnd.{enemy.GetInstanceID()}", 20))
+            {
+                return;
+            }
+
+            Log.LogInfo(
+                $"[HeadmanDebug] OnStunnedEnd enemy={enemy.gameObject.name} id={enemy.GetInstanceID()} " +
+                $"stateBefore={enemy.CurrentState} -> Roaming");
+        }
+
+        [HarmonyPatch(typeof(EnemySlowMouth), nameof(EnemySlowMouth.OnSpawn))]
+        [HarmonyPostfix]
+        private static void EnemySlowMouthOnSpawnPostfix(EnemySlowMouth __instance)
+        {
+            if (!ShouldDebug() || __instance == null)
+            {
+                return;
+            }
+
+            Log.LogInfo(
+                $"[SlowMouthDebug] OnSpawn enemy={__instance.gameObject.name} id={__instance.GetInstanceID()} " +
+                $"{BuildPlayerAnchorSummary(__instance.playerTarget, __instance.currentTarget)}");
+        }
+
+        private static string BuildPlayerAnchorSummary(PlayerAvatar? target, Transform? currentTarget)
+        {
+            if (target == null)
+            {
+                return "anchorSummary=target-null";
+            }
+
+            var headDelta = -1f;
+            if (currentTarget != null && LastChanceMonstersTargetProxyHelper.TryGetHeadProxyVisionTarget(target, out var headVision))
+            {
+                headDelta = Vector3.Distance(currentTarget.position, headVision);
+            }
+
+            var cameraDelta = -1f;
+            if (currentTarget != null && target.localCamera != null)
+            {
+                cameraDelta = Vector3.Distance(currentTarget.position, target.localCamera.transform.position);
+            }
+
+            return $"anchorSummary=currentTargetToHead={headDelta:F2} currentTargetToCamera={cameraDelta:F2}";
         }
     }
 }

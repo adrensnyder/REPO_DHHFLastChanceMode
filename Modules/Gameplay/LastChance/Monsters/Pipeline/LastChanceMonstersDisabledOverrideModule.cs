@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 
@@ -10,6 +11,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersDisabledOverrideModule
     {
+        private static int s_activeOverrideScopes;
+
+        internal static bool IsOverrideScopeActive => Volatile.Read(ref s_activeOverrideScopes) > 0;
+
         private readonly struct DisabledOverrideScope : IDisposable
         {
             private readonly PlayerAvatar[] _players;
@@ -62,6 +67,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     return default;
                 }
 
+                Interlocked.Increment(ref s_activeOverrideScopes);
                 return new DisabledOverrideScope(patchedPlayers.ToArray(), originalDisabled.ToArray(), patchedPlayers.Count);
             }
 
@@ -82,6 +88,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
                     player.isDisabled = _originalDisabled[i];
                 }
+
+                Interlocked.Decrement(ref s_activeOverrideScopes);
             }
         }
 

@@ -72,6 +72,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
+            DebugChaseHeartbeat(state.Enemy, "Chase.Heartbeat", targetPlayer, $"visionTimer={state.VisionTimer:F2} stateTimer={state.StateTimer:F2} canReach={state.ChaseCanReach}");
+
             if (!state.Active)
             {
                 targetPlayer.LastNavMeshPositionTimer = 0f;
@@ -189,6 +191,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             {
                 if (state.Active)
                 {
+                    DebugChaseTransition(state.Enemy, "ChaseBegin.ResetActive", state.TargetPlayer, "CurrentState != ChaseBegin");
                     state.Active = false;
                 }
 
@@ -250,6 +253,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
+            DebugChaseHeartbeat(state.Enemy, "ChaseBegin.Heartbeat", state.TargetPlayer, $"active={state.Active} stateTimer={state.StateTimer:F2} targetViewId={state.Enemy.TargetPlayerViewID}");
+
             var targetPlayer = state.TargetPlayer;
             if (targetPlayer == null)
             {
@@ -294,7 +299,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             var enemyId = enemy.GetInstanceID();
-            if (!LogLimiter.ShouldLog($"HeadmanChase.{reason}.{enemyId}", 30))
+            if (!LogLimiter.ShouldLog($"HeadmanChase.{reason}.{enemyId}", 20))
             {
                 return;
             }
@@ -306,6 +311,27 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             Log.LogInfo(
                 $"[HeadmanChase] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
                 $"{targetInfo} targetDisabled={targetDisabled} targetEligible={targetEligible} details={details}");
+        }
+
+        private static void DebugChaseHeartbeat(Enemy? enemy, string reason, PlayerAvatar? target, string details)
+        {
+            if (!InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || enemy == null)
+            {
+                return;
+            }
+
+            var enemyId = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"HeadmanChase.{reason}.{enemyId}", 10))
+            {
+                return;
+            }
+
+            var targetId = target != null && target.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            Log.LogInfo(
+                $"[HeadmanChase] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
+                $"targetViewId={targetId} targetDisabled={targetDisabled} targetEligible={targetEligible} {details}");
         }
     }
 }
