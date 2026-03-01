@@ -403,5 +403,54 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyPatch(typeof(EnemyOogly), nameof(EnemyOogly.StateWrestlePlayer))]
         [HarmonyFinalizer]
         private static Exception? EnemyOoglyStateWrestlePlayerFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer))]
+        [HarmonyPrefix]
+        private static void EnemyRunnerStateAttackPlayerPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayer))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyRunnerStateAttackPlayerFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver))]
+        [HarmonyPrefix]
+        private static void EnemyRunnerStateAttackPlayerOverPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyRunnerStateAttackPlayerOverFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyRobe), nameof(EnemyRobe.StateLookUnderAttack))]
+        [HarmonyPrefix]
+        private static void EnemyRobeStateLookUnderAttackPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyRobe), nameof(EnemyRobe.StateLookUnderAttack))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyRobeStateLookUnderAttackFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyTick), nameof(EnemyTick.Update))]
+        [HarmonyPrefix]
+        private static void EnemyTickUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyTick), nameof(EnemyTick.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyTickUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack))]
+        [HarmonyPrefix]
+        private static void EnemySlowWalkerStateLookUnderAttackPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemySlowWalker), nameof(EnemySlowWalker.StateLookUnderAttack))]
+        [HarmonyFinalizer]
+        private static Exception? EnemySlowWalkerStateLookUnderAttackFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyHeadUp), nameof(EnemyHeadUp.Update))]
+        [HarmonyPrefix]
+        private static void EnemyHeadUpUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyHeadUp), nameof(EnemyHeadUp.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyHeadUpUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyThinMan), nameof(EnemyThinMan.StateStand))]
+        [HarmonyPrefix]
+        private static void EnemyThinManStateStandPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyThinMan), nameof(EnemyThinMan.StateStand))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyThinManStateStandFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
     }
 }
