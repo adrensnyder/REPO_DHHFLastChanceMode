@@ -468,6 +468,55 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyFinalizer]
         private static Exception? EnemyHeadUpUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
+        [HarmonyPatch(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateChaseBeginUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyStateChaseBeginUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateChaseUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyStateChaseUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyStateChaseEnd), nameof(EnemyStateChaseEnd.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateChaseEndUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyStateChaseEnd), nameof(EnemyStateChaseEnd.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyStateChaseEndUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateSneakUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyStateSneakUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
+        [HarmonyPrefix]
+        private static void EnemyStateStunnedUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyStateStunnedUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.VisionTriggered))]
+        [HarmonyPrefix]
+        private static void EnemyHeadControllerVisionTriggeredPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.VisionTriggered))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyHeadControllerVisionTriggeredFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
+        [HarmonyPrefix]
+        private static void EnemyHeadControllerOnStunnedEndPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyHeadControllerOnStunnedEndFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
         [HarmonyPatch(typeof(EnemyTriggerAttack), nameof(EnemyTriggerAttack.OnTriggerStay))]
         [HarmonyPrefix]
         private static void EnemyTriggerAttackOnTriggerStayPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
