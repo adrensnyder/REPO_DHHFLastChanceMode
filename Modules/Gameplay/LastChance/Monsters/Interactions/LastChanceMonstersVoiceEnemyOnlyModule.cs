@@ -14,6 +14,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     {
         private static readonly Dictionary<int, float> OriginalAudioSourceVolumeByViewId = new();
         private static readonly Dictionary<int, float> OriginalTtsVolumeByViewId = new();
+        private static readonly Dictionary<int, PlayerDeathHead> TemporaryHeadSpectatedOverrideByViewId = new();
 
         internal static void ResetRuntimeState()
         {
@@ -33,6 +34,25 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 
             OriginalAudioSourceVolumeByViewId.Clear();
             OriginalTtsVolumeByViewId.Clear();
+            TemporaryHeadSpectatedOverrideByViewId.Clear();
+        }
+
+        [HarmonyPrefix]
+        private static void Prefix(PlayerVoiceChat __instance)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            var playerAvatar = __instance.playerAvatar;
+            var photonView = __instance.photonView;
+            if (playerAvatar == null || photonView == null)
+            {
+                return;
+            }
+
+            TryApplyTemporaryHeadSpectatedOverride(playerAvatar, photonView.ViewID);
         }
 
         [HarmonyPostfix]
@@ -62,27 +82,22 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             ForceTalkAnimationEnabled(__instance);
         }
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        [HarmonyFinalizer]
+        private static Exception? Finalizer(PlayerVoiceChat __instance, Exception? __exception)
         {
-            var replacement = AccessTools.Method(typeof(LastChanceMonstersVoiceEnemyOnlyModule), nameof(GetEffectiveHeadSpectated));
-            if (replacement == null)
+            if (__instance == null)
             {
-                return instructions;
+                return __exception;
             }
 
-            var list = new List<CodeInstruction>(instructions);
-            for (var i = 0; i < list.Count; i++)
+            var photonView = __instance.photonView;
+            if (photonView == null)
             {
-                var ins = list[i];
-                if (ins.opcode == System.Reflection.Emit.OpCodes.Ldfld && ins.operand is System.Reflection.FieldInfo f && f.Name == nameof(PlayerDeathHead.spectated) && f.DeclaringType == typeof(PlayerDeathHead))
-                {
-                    ins.opcode = System.Reflection.Emit.OpCodes.Call;
-                    ins.operand = replacement;
-                }
+                return __exception;
             }
 
-            return list;
+            RestoreTemporaryHeadSpectatedOverride(photonView.ViewID);
+            return __exception;
         }
 
         private static bool ShouldApply(PlayerAvatar player)
@@ -91,32 +106,40 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                    LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
         }
 
-        private static bool GetEffectiveHeadSpectated(PlayerDeathHead? head)
+        private static void TryApplyTemporaryHeadSpectatedOverride(PlayerAvatar player, int viewId)
         {
-            if (head == null)
+            if (TemporaryHeadSpectatedOverrideByViewId.ContainsKey(viewId))
             {
-                return false;
+                return;
             }
 
-            // Vanilla State.Head path.
-            if (head.spectated)
-            {
-                return true;
-            }
-
-            // Outside LastChance, keep vanilla behavior unchanged.
             if (!LastChanceMonstersTargetProxyHelper.IsRuntimeFeatureEnabled(FeatureFlags.LastChanceMonstersVoiceEnemyOnlyEnabled))
             {
-                return false;
+                return;
             }
 
-            // DHH path: SpectateCamera Head is blocked, but DHH controller can still be spectated.
+            var head = player.playerDeathHead;
+            if (head == null || head.spectated)
+            {
+                return;
+            }
+
             if (head.TryGetComponent<DeathHeadController>(out var controller) && controller != null && controller.spectated)
             {
-                return true;
+                head.spectated = true;
+                TemporaryHeadSpectatedOverrideByViewId[viewId] = head;
+            }
+        }
+
+        private static void RestoreTemporaryHeadSpectatedOverride(int viewId)
+        {
+            if (!TemporaryHeadSpectatedOverrideByViewId.TryGetValue(viewId, out var head) || head == null)
+            {
+                return;
             }
 
-            return false;
+            head.spectated = false;
+            TemporaryHeadSpectatedOverrideByViewId.Remove(viewId);
         }
 
         private static void ApplyEnemyOnlyVoiceMix(PlayerVoiceChat voiceChat, int viewId)
