@@ -16,8 +16,8 @@ using Logger = BepInEx.Logging.Logger;
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     // RunManager.Update postfix drives LastChance runtime/timer state every frame.
-    // Vanilla all-dead transition suppression is handled separately via
-    // AllPlayersDeadGuard.RunManagerChangeLevelPatch (typed prefix on ChangeLevel).
+    // Vanilla all-dead suppression is handled separately by AllPlayersDeadGuard:
+    // Update postfix guards allPlayersDead assignment and ChangeLevel prefix blocks fail transition.
     [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
     internal static class RunManagerUpdateLastChanceTimerPatch
     {

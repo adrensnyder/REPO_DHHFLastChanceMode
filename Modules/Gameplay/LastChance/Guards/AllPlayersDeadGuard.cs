@@ -12,6 +12,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
     {
         private const string ModuleTag = "[DHHFLastChanceMode] [Gameplay]";
         private const string LogKey = "SuppressAllDeadTransition";
+        private const string UpdateGuardLogKey = "SuppressAllDeadFlag";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
         private static bool s_enabledLogged;
         private static bool s_suppressedLogged;
@@ -51,22 +52,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
         private static bool ChangeLevelPrefix(RunManager __instance, bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
         {
-            if (!FeatureFlags.LastChangeMode)
-            {
-                return true;
-            }
-
-            if (!CompatibilityGate.IsFeatureUsable(ModFeatureGate.LastChanceCluster))
-            {
-                return true;
-            }
-
-            if (LastChanceTimerController.IsSuppressedForRoom)
-            {
-                return true;
-            }
-
-            if (IsVanillaOnlyContext())
+            if (!ShouldSuppressAllPlayersDeadFlow())
             {
                 s_suppressedLogged = false;
                 s_allowAllPlayersDead = false;
@@ -98,6 +84,51 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             }
 
             return false;
+        }
+
+        private static void UpdatePostfix(RunManager __instance)
+        {
+            if (__instance == null || !__instance.allPlayersDead)
+            {
+                return;
+            }
+
+            if (!ShouldSuppressAllPlayersDeadFlow() || s_allowAllPlayersDead)
+            {
+                return;
+            }
+
+            __instance.allPlayersDead = false;
+
+            if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(UpdateGuardLogKey, 120))
+            {
+                Log.LogDebug($"{ModuleTag} Suppressed RunManager.allPlayersDead assignment during LastChance flow.");
+            }
+        }
+
+        private static bool ShouldSuppressAllPlayersDeadFlow()
+        {
+            if (!FeatureFlags.LastChangeMode)
+            {
+                return false;
+            }
+
+            if (!CompatibilityGate.IsFeatureUsable(ModFeatureGate.LastChanceCluster))
+            {
+                return false;
+            }
+
+            if (LastChanceTimerController.IsSuppressedForRoom)
+            {
+                return false;
+            }
+
+            if (IsVanillaOnlyContext())
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static bool IsVanillaOnlyContext()
@@ -147,6 +178,16 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             private static bool Prefix(RunManager __instance, bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
             {
                 return ChangeLevelPrefix(__instance, _completedLevel, _levelFailed, _changeLevelType);
+            }
+        }
+
+        [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
+        internal static class RunManagerUpdateAllPlayersDeadPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(RunManager __instance)
+            {
+                UpdatePostfix(__instance);
             }
         }
     }

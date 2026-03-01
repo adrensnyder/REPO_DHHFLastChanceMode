@@ -19,6 +19,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(CompatibilityGateStartHookPatch),
             typeof(StatsManagerSaveFileDeleteLastChancePatch),
             typeof(MenuPageSavesOnDeleteGameLastChancePatch),
+            typeof(AllPlayersDeadGuard.RunManagerUpdateAllPlayersDeadPatch),
             typeof(AllPlayersDeadGuard.RunManagerChangeLevelPatch),
             typeof(LastChanceHeadEyesOverrideBypassModule),
             typeof(LastChanceHeadPupilVisualModule),
