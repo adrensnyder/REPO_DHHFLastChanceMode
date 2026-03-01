@@ -245,8 +245,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var targetPlayer = state.TargetPlayer;
             if (targetPlayer == null)
             {
-                state.Enemy.CurrentState = EnemyState.Roaming;
-                return;
+                var enemyTarget = state.Enemy.TargetPlayerAvatar;
+                if (enemyTarget != null &&
+                    (!enemyTarget.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(enemyTarget)))
+                {
+                    targetPlayer = enemyTarget;
+                    state.TargetPlayer = enemyTarget;
+                }
+                else
+                {
+                    state.Enemy.CurrentState = EnemyState.Roaming;
+                    return;
+                }
             }
 
             state.Enemy.NavMeshAgent.UpdateAgent(0f, 5f);

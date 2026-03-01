@@ -21,7 +21,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 newState == EnemySlowMouth.State.Attached ||
                 newState == EnemySlowMouth.State.Puke ||
                 newState == EnemySlowMouth.State.Detach ||
-                newState == EnemySlowMouth.State.IdlePuke)
+                newState == EnemySlowMouth.State.IdlePuke ||
+                newState == EnemySlowMouth.State.Leave)
             {
                 newState = EnemySlowMouth.State.GoToPlayer;
             }
@@ -40,7 +41,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 newState == EnemySlowMouth.State.Attached ||
                 newState == EnemySlowMouth.State.Puke ||
                 newState == EnemySlowMouth.State.Detach ||
-                newState == EnemySlowMouth.State.IdlePuke)
+                newState == EnemySlowMouth.State.IdlePuke ||
+                newState == EnemySlowMouth.State.Leave)
             {
                 newState = EnemySlowMouth.State.GoToPlayer;
             }
