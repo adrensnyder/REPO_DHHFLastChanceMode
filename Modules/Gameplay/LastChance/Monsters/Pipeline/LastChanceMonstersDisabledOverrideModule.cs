@@ -243,6 +243,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyFinalizer]
         private static Exception? EnemyHeadGrabberGotoOverLogicFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
+        [HarmonyPatch(typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.GetClosestDeathHead), new[] { typeof(float) })]
+        [HarmonyPrefix]
+        private static void EnemyHeadGrabberGetClosestDeathHeadPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.GetClosestDeathHead), new[] { typeof(float) })]
+        [HarmonyFinalizer]
+        private static Exception? EnemyHeadGrabberGetClosestDeathHeadFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.NearbyHeadLogic))]
+        [HarmonyPrefix]
+        private static void EnemyHeadGrabberNearbyHeadLogicPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyHeadGrabber), nameof(EnemyHeadGrabber.NearbyHeadLogic))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyHeadGrabberNearbyHeadLogicFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
         [HarmonyPatch(typeof(EnemyHidden), nameof(EnemyHidden.StatePlayerGoTo))]
         [HarmonyPrefix]
         private static void EnemyHiddenStatePlayerGoToPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
