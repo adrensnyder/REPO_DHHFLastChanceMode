@@ -10,6 +10,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
     internal static class LastChanceMonstersTargetProxyHelper
     {
+        private const float EnemyDiscoveryRefreshSeconds = 1f;
+
         private static bool IsRuntimeGateEnabled()
         {
             return FeatureFlags.LastChanceMonstersSearchEnabled &&
@@ -285,7 +287,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 
         internal static IEnumerable<Enemy> EnumerateEnemies()
         {
-            var all = UnityEngine.Object.FindObjectsOfType<Enemy>();
+            var all = LastChanceMonstersDiscoveryCache.GetEnemies(EnemyDiscoveryRefreshSeconds);
             for (var i = 0; i < all.Length; i++)
             {
                 var enemy = all[i];

@@ -1,7 +1,6 @@
 #nullable enable
 
 using HarmonyLib;
-using System;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
@@ -10,15 +9,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
     internal static class LastChanceMonstersBodyPositionProxyModule
     {
         private const float TargetScanIntervalSeconds = 1f;
-        private static Enemy[] s_cachedEnemies = Array.Empty<Enemy>();
-        private static EnemyAnimal[] s_cachedAnimals = Array.Empty<EnemyAnimal>();
-        private static float s_nextTargetScanAt;
 
         internal static void ResetRuntimeState()
         {
-            s_cachedEnemies = Array.Empty<Enemy>();
-            s_cachedAnimals = Array.Empty<EnemyAnimal>();
-            s_nextTargetScanAt = 0f;
+            LastChanceMonstersDiscoveryCache.InvalidateEnemies();
         }
 
         [HarmonyPostfix]
@@ -67,11 +61,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            RefreshTargetCachesIfDue();
+            var enemies = LastChanceMonstersDiscoveryCache.GetEnemies(TargetScanIntervalSeconds);
+            var animals = LastChanceMonstersDiscoveryCache.GetEnemyAnimals(TargetScanIntervalSeconds);
 
-            for (var i = 0; i < s_cachedEnemies.Length; i++)
+            for (var i = 0; i < enemies.Length; i++)
             {
-                var enemy = s_cachedEnemies[i];
+                var enemy = enemies[i];
                 if (enemy == null)
                 {
                     continue;
@@ -84,9 +79,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             }
 
             // EnemyAnimal keeps its own target field on the EnemyAnimal component.
-            for (var i = 0; i < s_cachedAnimals.Length; i++)
+            for (var i = 0; i < animals.Length; i++)
             {
-                var animal = s_cachedAnimals[i];
+                var animal = animals[i];
                 if (animal == null)
                 {
                     continue;
@@ -99,19 +94,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             }
 
             return false;
-        }
-
-        private static void RefreshTargetCachesIfDue()
-        {
-            var now = Time.unscaledTime;
-            if (now < s_nextTargetScanAt)
-            {
-                return;
-            }
-
-            s_cachedEnemies = UnityEngine.Object.FindObjectsOfType<Enemy>();
-            s_cachedAnimals = UnityEngine.Object.FindObjectsOfType<EnemyAnimal>();
-            s_nextTargetScanAt = now + TargetScanIntervalSeconds;
         }
     }
 }

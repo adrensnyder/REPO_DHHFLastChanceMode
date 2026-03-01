@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DeathHeadHopper.DeathHead;
 using HarmonyLib;
 using UnityEngine;
@@ -12,13 +13,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
     [HarmonyPatch(typeof(PlayerVoiceChat), nameof(PlayerVoiceChat.Update))]
     internal static class LastChanceMonstersVoiceEnemyOnlyModule
     {
+        private const float VoiceChatDiscoveryRefreshSeconds = 1f;
         private static readonly Dictionary<int, float> OriginalAudioSourceVolumeByViewId = new();
         private static readonly Dictionary<int, float> OriginalTtsVolumeByViewId = new();
         private static readonly Dictionary<int, PlayerDeathHead> TemporaryHeadSpectatedOverrideByViewId = new();
 
         internal static void ResetRuntimeState()
         {
-            var voiceChats = UnityEngine.Object.FindObjectsOfType<PlayerVoiceChat>();
+            LastChanceMonstersDiscoveryCache.InvalidateVoiceChats();
+            var voiceChats = LastChanceMonstersDiscoveryCache.GetPlayerVoiceChats(VoiceChatDiscoveryRefreshSeconds);
             for (var i = 0; i < voiceChats.Length; i++)
             {
                 var voiceChat = voiceChats[i];

@@ -1,6 +1,7 @@
 #nullable enable
 
 using HarmonyLib;
+using DHHFLastChanceMode.Modules.Config;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
@@ -33,11 +34,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             _vision = GetComponent<EnemyVision>();
             _enemy = GetComponent<Enemy>();
-            _tick = Random.Range(0f, 0.25f);
+            var tickInterval = Mathf.Max(0.01f, InternalConfig.LastChanceMonstersVisionProxyTickSeconds);
+            _tick = Random.Range(0f, tickInterval);
         }
 
         private void Update()
         {
+            if (!InternalConfig.LastChanceMonstersVisionProxyEnabled)
+            {
+                return;
+            }
+
             if (_vision == null || _enemy == null)
             {
                 return;
@@ -59,7 +66,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            _tick = 0.25f;
+            _tick = Mathf.Max(0.01f, InternalConfig.LastChanceMonstersVisionProxyTickSeconds);
 
             var players = GameDirector.instance?.PlayerList;
             if (players == null || players.Count == 0)

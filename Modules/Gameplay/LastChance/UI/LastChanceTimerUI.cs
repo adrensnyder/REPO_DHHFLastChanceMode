@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Utilities;
 using DeathHeadHopper.Managers;
 using DeathHeadHopper.UI;
@@ -72,8 +73,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
         private const float VisibilityRefreshIntervalSeconds = 0.5f;
         private const float AbilitySpotCacheRefreshIntervalSeconds = 0.5f;
-        private static AbilitySpot[] s_cachedAbilitySpots = Array.Empty<AbilitySpot>();
-        private static float s_nextAbilitySpotCacheRefreshAt;
 
         private sealed class PlayerIconSlot
         {
@@ -188,8 +187,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_truckIconImage = null;
             s_truckCounterLabel = null;
             s_lastTruckCounterText = string.Empty;
-            s_cachedAbilitySpots = Array.Empty<AbilitySpot>();
-            s_nextAbilitySpotCacheRefreshAt = 0f;
+            AbilitySpotDiscoveryCache.Invalidate();
             LastChanceTimerChangeEffectsModule.Reset();
         }
 
@@ -736,14 +734,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
         private static AbilitySpot[] GetAbilitySpotsCached()
         {
-            if (Time.unscaledTime < s_nextAbilitySpotCacheRefreshAt)
-            {
-                return s_cachedAbilitySpots;
-            }
-
-            s_cachedAbilitySpots = UnityEngine.Object.FindObjectsOfType<AbilitySpot>();
-            s_nextAbilitySpotCacheRefreshAt = Time.unscaledTime + AbilitySpotCacheRefreshIntervalSeconds;
-            return s_cachedAbilitySpots;
+            return AbilitySpotDiscoveryCache.GetCached(AbilitySpotCacheRefreshIntervalSeconds);
         }
 
         

@@ -19,9 +19,9 @@ namespace DHHFLastChanceMode
     public sealed class Plugin : BaseUnityPlugin
     {
         private const string CorePluginGuid = "AdrenSnyder.DeathHeadHopperFix";
-        private const string PluginGuid = "AdrenSnyder.DHHFLastChanceMode";
-        private const string PluginName = "DHHF LastChance Mode";
-        private const string PluginVersion = "0.1.1";
+        internal const string PluginGuid = "AdrenSnyder.DHHFLastChanceMode";
+        internal const string PluginName = "DHHF LastChance Mode";
+        internal const string PluginVersion = "0.1.1";
         private Harmony? _harmony;
         private bool _runtimeInitialized;
         private Coroutine? _deferredBootstrapRoutine;

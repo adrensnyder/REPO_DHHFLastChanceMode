@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using BepInEx;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Utilities;
 using ExitGames.Client.Photon;
@@ -444,6 +443,11 @@ namespace DHHFLastChanceMode.Modules.Config
 
         private void Update()
         {
+            if (!InternalConfig.CompatibilityGatePresencePollingEnabled)
+            {
+                return;
+            }
+
             ProcessPendingPresenceCycle();
         }
 
@@ -687,7 +691,7 @@ namespace DHHFLastChanceMode.Modules.Config
 
         private static string GetLocalFixVersion()
         {
-            return NormalizeVersion(GetPluginVersionRaw());
+            return NormalizeVersion(Plugin.PluginVersion);
         }
 
         private static string NormalizeVersion(string? value)
@@ -698,12 +702,6 @@ namespace DHHFLastChanceMode.Modules.Config
             }
 
             return value!.Trim();
-        }
-
-        private static string? GetPluginVersionRaw()
-        {
-            var attr = (BepInPlugin?)Attribute.GetCustomAttribute(typeof(Plugin), typeof(BepInPlugin));
-            return attr?.Version?.ToString();
         }
 
         private static string BuildIncompatibilityReason(
