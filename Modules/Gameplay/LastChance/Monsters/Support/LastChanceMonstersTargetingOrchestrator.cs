@@ -13,18 +13,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
             return LastChanceMonstersTargetProxyHelper.ResolveEffectiveTransformTargetPosition(transform);
         }
 
-        internal static List<PlayerAvatar> GetAllPlayersWithinRangeLastChanceAware(float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
+        internal static void ExtendPlayersWithinRangeLastChanceAware(List<PlayerAvatar> list, float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
         {
-            var list = SemiFunc.PlayerGetAllPlayerAvatarWithinRange(range, position, doRaycastCheck, layerMask) ?? new List<PlayerAvatar>();
             if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
-                return list;
+                return;
             }
 
             var players = GameDirector.instance?.PlayerList;
             if (players == null || players.Count == 0)
             {
-                return list;
+                return;
             }
 
             for (var i = 0; i < players.Count; i++)
@@ -53,23 +52,32 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
 
                 list.Add(player);
             }
-
-            return list;
         }
 
-        internal static PlayerAvatar? GetNearestPlayerWithinRangeLastChanceAware(float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
+        internal static PlayerAvatar? ResolveNearestPlayerWithinRangeLastChanceAware(PlayerAvatar? currentNearest, float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
         {
-            var list = GetAllPlayersWithinRangeLastChanceAware(range, position, doRaycastCheck, layerMask);
-            if (list.Count == 0)
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
-                return null;
+                return currentNearest;
+            }
+
+            var candidates = SemiFunc.PlayerGetAllPlayerAvatarWithinRange(range, position, doRaycastCheck, layerMask) ?? new List<PlayerAvatar>();
+            ExtendPlayersWithinRangeLastChanceAware(candidates, range, position, doRaycastCheck, layerMask);
+            if (currentNearest != null && !candidates.Contains(currentNearest))
+            {
+                candidates.Add(currentNearest);
+            }
+
+            if (candidates.Count == 0)
+            {
+                return currentNearest;
             }
 
             var bestDistance = range;
-            PlayerAvatar? bestPlayer = null;
-            for (var i = 0; i < list.Count; i++)
+            var bestPlayer = currentNearest;
+            for (var i = 0; i < candidates.Count; i++)
             {
-                var player = list[i];
+                var player = candidates[i];
                 if (player == null)
                 {
                     continue;
@@ -85,6 +93,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support
             }
 
             return bestPlayer;
+        }
+
+        internal static List<PlayerAvatar> GetAllPlayersWithinRangeLastChanceAware(float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
+        {
+            var list = SemiFunc.PlayerGetAllPlayerAvatarWithinRange(range, position, doRaycastCheck, layerMask) ?? new List<PlayerAvatar>();
+            ExtendPlayersWithinRangeLastChanceAware(list, range, position, doRaycastCheck, layerMask);
+            return list;
+        }
+
+        internal static PlayerAvatar? GetNearestPlayerWithinRangeLastChanceAware(float range, Vector3 position, bool doRaycastCheck, LayerMask layerMask)
+        {
+            return ResolveNearestPlayerWithinRangeLastChanceAware(null, range, position, doRaycastCheck, layerMask);
         }
 
         private static bool IsWallBlocking(Vector3 origin, Vector3 target, float distance, LayerMask layerMask)
