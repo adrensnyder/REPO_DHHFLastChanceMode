@@ -65,7 +65,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceMonstersUpscreamHeadAimModule),
             typeof(LastChanceMonstersValuableThrowerHeadAimModule),
             typeof(LastChanceMonstersBirthdayBoyBalloonHeadProxyModule),
-            typeof(LastChanceMonstersCameraForceLockModule)
+            typeof(LastChanceMonstersCameraForceLockModule),
+            typeof(LastChanceMonstersSlowMouthHeadOnlyModule)
         };
 
         internal static void ApplyAll(Harmony harmony, ManualLogSource? log)
