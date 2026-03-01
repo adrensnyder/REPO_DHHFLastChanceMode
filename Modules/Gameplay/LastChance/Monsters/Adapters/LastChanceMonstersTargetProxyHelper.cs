@@ -56,13 +56,19 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
+            // Keep LastChance eligibility stable even if DeathHead reference is temporarily unavailable.
+            if (player.deadSet || IsDisabled(player))
+            {
+                return true;
+            }
+
             var head = player.playerDeathHead;
             if (head == null)
             {
                 return false;
             }
 
-            return head.triggered || player.deadSet || IsDisabled(player) || head.physGrabObject != null;
+            return head.triggered || head.physGrabObject != null;
         }
 
         internal static bool TryGetHeadCenter(PlayerAvatar? player, out Vector3 center)
