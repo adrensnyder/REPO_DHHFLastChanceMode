@@ -3,6 +3,7 @@
 using System;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions;
@@ -22,6 +23,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceHeadEyesOverrideBypassModule),
             typeof(LastChanceHeadPupilVisualModule),
             typeof(RunManagerUpdateLastChanceTimerPatch),
+            typeof(AbilitySpotAwakeRegistryPatch),
 
             typeof(LastChanceMonstersVoiceEnemyOnlyModule),
             typeof(LastChanceMonstersBodyPositionProxyModule),
