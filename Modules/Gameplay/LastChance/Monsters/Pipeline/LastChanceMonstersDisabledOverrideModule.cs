@@ -411,6 +411,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyFinalizer]
         private static Exception? EnemyRunnerStateAttackPlayerFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
+        [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.Update))]
+        [HarmonyPrefix]
+        private static void EnemyRunnerUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemyRunnerUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
         [HarmonyPatch(typeof(EnemyRunner), nameof(EnemyRunner.StateAttackPlayerOver))]
         [HarmonyPrefix]
         private static void EnemyRunnerStateAttackPlayerOverPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
@@ -439,12 +446,40 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyFinalizer]
         private static Exception? EnemySlowWalkerStateLookUnderAttackFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
+        [HarmonyPatch(typeof(EnemySlowWalker), nameof(EnemySlowWalker.Update))]
+        [HarmonyPrefix]
+        private static void EnemySlowWalkerUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemySlowWalker), nameof(EnemySlowWalker.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemySlowWalkerUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
         [HarmonyPatch(typeof(EnemyHeadUp), nameof(EnemyHeadUp.Update))]
         [HarmonyPrefix]
         private static void EnemyHeadUpUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
         [HarmonyPatch(typeof(EnemyHeadUp), nameof(EnemyHeadUp.Update))]
         [HarmonyFinalizer]
         private static Exception? EnemyHeadUpUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update))]
+        [HarmonyPrefix]
+        private static void EnemySlowMouthAttachingUpdatePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.Update))]
+        [HarmonyFinalizer]
+        private static Exception? EnemySlowMouthAttachingUpdateFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.AttachToPlayer))]
+        [HarmonyPrefix]
+        private static void EnemySlowMouthAttachingAttachToPlayerPrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemySlowMouthAttaching), nameof(EnemySlowMouthAttaching.AttachToPlayer))]
+        [HarmonyFinalizer]
+        private static Exception? EnemySlowMouthAttachingAttachToPlayerFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+
+        [HarmonyPatch(typeof(EnemySlowMouthPlayerAvatarAttached), nameof(EnemySlowMouthPlayerAvatarAttached.OnDisable))]
+        [HarmonyPrefix]
+        private static void EnemySlowMouthPlayerAvatarAttachedOnDisablePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemySlowMouthPlayerAvatarAttached), nameof(EnemySlowMouthPlayerAvatarAttached.OnDisable))]
+        [HarmonyFinalizer]
+        private static Exception? EnemySlowMouthPlayerAvatarAttachedOnDisableFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
         [HarmonyPatch(typeof(EnemyThinMan), nameof(EnemyThinMan.StateStand))]
         [HarmonyPrefix]

@@ -62,7 +62,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                 return false;
             }
 
-            return head.triggered || IsDisabled(player) || head.physGrabObject != null;
+            return head.triggered || player.deadSet || IsDisabled(player) || head.physGrabObject != null;
         }
 
         internal static bool TryGetHeadCenter(PlayerAvatar? player, out Vector3 center)
