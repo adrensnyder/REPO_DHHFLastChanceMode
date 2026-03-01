@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using BepInEx.Logging;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Utilities;
 using ExitGames.Client.Photon;
 using Photon.Pun;
@@ -150,6 +151,7 @@ namespace DHHFLastChanceMode.Modules.Config
             s_hostApprovedLastChanceCluster = true;
             s_lastHostDecisionReason = string.Empty;
             s_lastLoggedIncompatibilityReason = string.Empty;
+            LastChanceRuntimeObjectRegistry.ResetForRoomExit();
             ApplyRuntimeHostOverrides();
             HostApprovalChanged?.Invoke();
         }

@@ -105,6 +105,7 @@ namespace DHHFLastChanceMode
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             CompatibilityGate.EnsureCreated();
+            LastChanceRuntimeObjectRegistry.ResetForSceneChange();
 
             var shouldHandleRuntimeScene = ShouldHandleRuntimeScene();
             LastChanceTimerController.OnLevelLoaded(shouldHandleRuntimeScene);

@@ -2855,6 +2855,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             LastChanceRuntimeOrchestrator.ExitRuntime("lastchance-deactivated");
+            LastChanceRuntimeObjectRegistry.ResetForRuntimeDeactivated();
             ClearDirectionPenaltyCache();
             ClearLastChanceHostRuntimeOverrides();
             LastChanceMonstersNoiseAggroModule.ResetRuntimeState();

@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Generic;
+using DeathHeadHopper.Managers;
 using DeathHeadHopper.UI;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
@@ -105,6 +106,62 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             ClearAbilitySpots();
             ClearEnemies();
             ClearVoiceChats();
+        }
+
+        internal static void ResetForRoomExit()
+        {
+            ClearAll();
+        }
+
+        internal static void ResetForSceneChange()
+        {
+            ClearAll();
+            RepopulateFromKnownManagers();
+        }
+
+        internal static void ResetForRuntimeDeactivated()
+        {
+            ClearAll();
+            RepopulateFromKnownManagers();
+        }
+
+        private static void RepopulateFromKnownManagers()
+        {
+            var abilityManager = DHHAbilityManager.instance;
+            if (abilityManager != null)
+            {
+                var spots = abilityManager.abilitySpots;
+                if (spots != null)
+                {
+                    for (var i = 0; i < spots.Length; i++)
+                    {
+                        RegisterAbilitySpot(spots[i]);
+                    }
+                }
+            }
+
+            var enemyParents = EnemyDirector.instance?.enemiesSpawned;
+            if (enemyParents != null)
+            {
+                for (var i = 0; i < enemyParents.Count; i++)
+                {
+                    var enemy = enemyParents[i]?.Enemy;
+                    RegisterEnemy(enemy);
+                    if (enemy != null && enemy.TryGetComponent<EnemyAnimal>(out var enemyAnimal))
+                    {
+                        RegisterEnemyAnimal(enemyAnimal);
+                    }
+                }
+            }
+
+            var voiceChats = RunManager.instance?.voiceChats;
+            if (voiceChats != null)
+            {
+                for (var i = 0; i < voiceChats.Count; i++)
+                {
+                    RegisterPlayerVoiceChat(voiceChats[i]);
+                }
+            }
         }
 
         private static void Register<T>(List<T> items, HashSet<int> ids, T? item)
