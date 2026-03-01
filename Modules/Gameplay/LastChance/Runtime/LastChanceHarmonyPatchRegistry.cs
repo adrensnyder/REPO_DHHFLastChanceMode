@@ -60,6 +60,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceMonstersCarryProxyModule),
             typeof(LastChanceMonstersPathBlockingModule),
             typeof(LastChanceMonstersSpinnyLockBridgeModule),
+            typeof(LastChanceMonstersHeadGrabberReleaseHeadModule),
             typeof(LastChanceMonstersBeamerHeadAimModule),
             typeof(LastChanceMonstersUpscreamHeadAimModule),
             typeof(LastChanceMonstersValuableThrowerHeadAimModule),
