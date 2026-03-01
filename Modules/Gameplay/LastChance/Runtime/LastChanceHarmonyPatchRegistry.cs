@@ -24,6 +24,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceHeadPupilVisualModule),
             typeof(RunManagerUpdateLastChanceTimerPatch),
             typeof(AbilitySpotAwakeRegistryPatch),
+            typeof(LastChanceEnemyAwakeRegistryPatch),
+            typeof(LastChanceEnemyAnimalAwakeRegistryPatch),
+            typeof(LastChancePlayerVoiceChatAwakeRegistryPatch),
+            typeof(LastChancePlayerVoiceChatDestroyRegistryPatch),
 
             typeof(LastChanceMonstersVoiceEnemyOnlyModule),
             typeof(LastChanceMonstersBodyPositionProxyModule),
