@@ -1,117 +1,182 @@
 #nullable enable
 
-using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
-using HarmonyLib;
-using UnityEngine;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using HarmonyLib;
+using Photon.Pun;
+using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     [HarmonyPatch]
     internal static class LastChanceMonstersGasVictimPositionModule
     {
-        private static readonly MethodInfo? s_componentGetTransform =
-            AccessTools.PropertyGetter(typeof(Component), nameof(Component.transform));
-
-        private static readonly MethodInfo? s_transformGetPosition =
-            AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
-
-        private static readonly MethodInfo? s_getEffectivePosition =
-            AccessTools.Method(typeof(LastChanceMonstersGasVictimPositionModule), nameof(GetEffectivePlayerPosition));
-
-        [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        [HarmonyPatch(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayersInGasLogic))]
+        internal static class EnemyHeartHuggerPlayersInGasLogicPatch
         {
-            Type[] types;
-            try
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyHeartHugger __instance)
             {
-                types = typeof(Enemy).Assembly.GetTypes();
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecutePlayersInGasLogic(__instance);
+                return false;
             }
-            catch
+        }
+
+        [HarmonyPatch(typeof(EnemyHeartHugger), nameof(EnemyHeartHugger.PlayerInGas), new[] { typeof(PlayerAvatar) })]
+        internal static class EnemyHeartHuggerPlayerInGasPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyHeartHugger __instance, PlayerAvatar _player)
             {
-                yield break;
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecutePlayerInGas(__instance, _player);
+                return false;
+            }
+        }
+
+        private static void ExecutePlayersInGasLogic(EnemyHeartHugger instance)
+        {
+            if (!SemiFunc.IsMasterClientOrSingleplayer())
+            {
+                return;
             }
 
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly;
-            for (var i = 0; i < types.Length; i++)
+            if (instance.playersInGas.Count > 0)
             {
-                var type = types[i];
-                if (type == null || type.Name.IndexOf("Enemy", System.StringComparison.OrdinalIgnoreCase) < 0)
+                var toRemove = new List<EnemyHeartHugger.PlayersInGas>();
+                foreach (var playersInGas in instance.playersInGas)
+                {
+                    playersInGas.playerAvatar.upgradeTumbleWingsLogic.tumbleWingPinkTimer = 1f;
+                    if (playersInGas.inGasTime >= 2f)
+                    {
+                        playersInGas.isCaught = true;
+                    }
+
+                    playersInGas.inGasTime += Time.deltaTime;
+                    var currentPosition = GetEffectivePlayerPosition(playersInGas.playerAvatar);
+                    var distance = Vector3.Distance(playersInGas.lastPositionInsideGas, currentPosition);
+                    if (playersInGas.outsideGasTime >= 3f || distance > 2f)
+                    {
+                        toRemove.Add(playersInGas);
+                    }
+
+                    playersInGas.outsideGasTime += Time.deltaTime;
+                }
+
+                foreach (var playersInGas in toRemove)
+                {
+                    instance.playersOnCooldown.Add(playersInGas.playerAvatar, Time.time);
+                    instance.playersInGas.Remove(playersInGas);
+                }
+            }
+
+            if (!SemiFunc.FPSImpulse5())
+            {
+                return;
+            }
+
+            foreach (var playersInGas in instance.playersInGas)
+            {
+                var isNew = true;
+                foreach (var previous in instance.playersInGasPrevious)
+                {
+                    if (playersInGas.playerAvatar == previous.playerAvatar)
+                    {
+                        isNew = false;
+                    }
+                }
+
+                if (!isNew)
                 {
                     continue;
                 }
 
-                // Behavior-based selection:
-                // methods that maintain gas victim tracking and are expected to read PlayerAvatar.transform.position.
-                var playersInGasLogic = type.GetMethod("PlayersInGasLogic", flags, null, System.Type.EmptyTypes, null);
-                if (playersInGasLogic?.GetMethodBody() != null)
+                if (SemiFunc.IsMultiplayer())
                 {
-                    yield return playersInGasLogic;
+                    instance.photonView.RPC("PlayerInGasClientRPC", RpcTarget.All, new object[]
+                    {
+                        playersInGas.playerAvatar.photonView.ViewID,
+                        true
+                    });
                 }
-
-                var playerInGas = type.GetMethod("PlayerInGas", flags, null, new[] { typeof(PlayerAvatar) }, null);
-                if (playerInGas?.GetMethodBody() != null)
+                else
                 {
-                    yield return playerInGas;
+                    instance.PlayerInGasClientRPC(playersInGas.playerAvatar.photonView.ViewID, true, default);
                 }
             }
-        }
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            if (s_componentGetTransform == null || s_transformGetPosition == null || s_getEffectivePosition == null)
+            foreach (var previous in instance.playersInGasPrevious)
             {
-                return instructions;
-            }
+                var removed = true;
+                using (var enumerator = instance.playersInGas.GetEnumerator())
+                {
+                    while (enumerator.MoveNext())
+                    {
+                        if (enumerator.Current.playerAvatar == previous.playerAvatar)
+                        {
+                            removed = false;
+                        }
+                    }
+                }
 
-            var list = new List<CodeInstruction>(instructions);
-            for (var i = 0; i <= list.Count - 2; i++)
-            {
-                var a = list[i];
-                var b = list[i + 1];
-                if (!CallsMethod(a, s_componentGetTransform) || !CallsMethod(b, s_transformGetPosition))
+                if (!removed)
                 {
                     continue;
                 }
 
-                a.opcode = OpCodes.Nop;
-                a.operand = null;
-                b.opcode = OpCodes.Call;
-                b.operand = s_getEffectivePosition;
+                if (SemiFunc.IsMultiplayer())
+                {
+                    instance.photonView.RPC("PlayerInGasClientRPC", RpcTarget.All, new object[]
+                    {
+                        previous.playerAvatar.photonView.ViewID,
+                        false
+                    });
+                }
+                else
+                {
+                    instance.PlayerInGasClientRPC(previous.playerAvatar.photonView.ViewID, false, default);
+                }
             }
 
-            return list;
+            instance.playersInGasPrevious.Clear();
+            instance.playersInGasPrevious.AddRange(instance.playersInGas);
         }
 
-        private static bool CallsMethod(CodeInstruction instruction, MethodInfo method)
+        private static void ExecutePlayerInGas(EnemyHeartHugger instance, PlayerAvatar player)
         {
-            return (instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) &&
-                   instruction.operand is MethodInfo called &&
-                   called == method;
+            foreach (var playersInGas in instance.playersInGas)
+            {
+                if (playersInGas.playerAvatar != player)
+                {
+                    continue;
+                }
+
+                playersInGas.outsideGasTime = 0f;
+                playersInGas.lastPositionInsideGas = GetEffectivePlayerPosition(player);
+                return;
+            }
+
+            var newPlayerInGas = new EnemyHeartHugger.PlayersInGas
+            {
+                playerAvatar = player,
+                outsideGasTime = 0f,
+                lastPositionInsideGas = GetEffectivePlayerPosition(player)
+            };
+            instance.playersInGas.Add(newPlayerInGas);
         }
 
         internal static Vector3 GetEffectivePlayerPosition(PlayerAvatar? player)
         {
-            if (player == null)
-            {
-                return Vector3.zero;
-            }
-
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
-            {
-                return player.transform.position;
-            }
-
-            if (LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
-            {
-                return headCenter;
-            }
-
-            return player.transform.position;
+            return LastChanceMonstersTargetProxyHelper.ResolveEffectivePlayerTargetPosition(player);
         }
     }
 }

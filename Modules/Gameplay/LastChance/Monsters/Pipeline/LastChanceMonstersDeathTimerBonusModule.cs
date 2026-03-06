@@ -5,7 +5,7 @@ using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyHealth), "DeathImpulseRPC")]
+    [HarmonyPatch(typeof(EnemyHealth), nameof(EnemyHealth.DeathImpulseRPC))]
     internal static class LastChanceMonstersDeathTimerBonusModule
     {
         [HarmonyPostfix]

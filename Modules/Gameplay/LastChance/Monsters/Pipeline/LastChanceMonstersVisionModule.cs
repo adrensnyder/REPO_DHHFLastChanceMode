@@ -1,12 +1,12 @@
 #nullable enable
 
 using HarmonyLib;
-using System.Reflection;
+using DHHFLastChanceMode.Modules.Config;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyVision), "Awake")]
+    [HarmonyPatch(typeof(EnemyVision), nameof(EnemyVision.Awake))]
     internal static class LastChanceMonstersVisionModule
     {
         [HarmonyPostfix]
@@ -26,7 +26,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
     internal sealed class LastChanceEnemyVisionHeadProxyRuntime : MonoBehaviour
     {
-        private static readonly FieldInfo? s_enemyVisionMaskField = AccessTools.Field(typeof(Enemy), "VisionMask");
         private EnemyVision? _vision;
         private Enemy? _enemy;
         private float _tick;
@@ -35,11 +34,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         {
             _vision = GetComponent<EnemyVision>();
             _enemy = GetComponent<Enemy>();
-            _tick = Random.Range(0f, 0.25f);
+            var tickInterval = Mathf.Max(0.01f, InternalConfig.LastChanceMonstersVisionProxyTickSeconds);
+            _tick = Random.Range(0f, tickInterval);
         }
 
         private void Update()
         {
+            if (!InternalConfig.LastChanceMonstersVisionProxyEnabled)
+            {
+                return;
+            }
+
             if (_vision == null || _enemy == null)
             {
                 return;
@@ -50,7 +55,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            if (!LastChanceMonstersTargetProxyHelper.IsMasterContext() || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return;
             }
@@ -61,7 +66,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            _tick = 0.25f;
+            _tick = Mathf.Max(0.01f, InternalConfig.LastChanceMonstersVisionProxyTickSeconds);
 
             var players = GameDirector.instance?.PlayerList;
             if (players == null || players.Count == 0)
@@ -75,11 +80,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            var visionMask = s_enemyVisionMaskField?.GetValue(_enemy) as LayerMask?;
-            if (visionMask == null)
-            {
-                return;
-            }
+            var visionMask = _enemy.VisionMask;
 
             for (var i = 0; i < players.Count; i++)
             {
@@ -104,7 +105,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                if (!LastChanceMonstersTargetProxyHelper.IsLineOfSightToHead(origin, headCenter, visionMask.Value, player!))
+                if (!LastChanceMonstersTargetProxyHelper.IsLineOfSightToHead(origin, headCenter, visionMask, player!))
                 {
                     continue;
                 }

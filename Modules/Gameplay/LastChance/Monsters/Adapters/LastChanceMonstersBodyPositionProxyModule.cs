@@ -1,25 +1,24 @@
 #nullable enable
 
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
 {
-    [HarmonyPatch(typeof(EnemyDirector), "Update")]
+    [HarmonyPatch(typeof(EnemyDirector), nameof(EnemyDirector.Update))]
     internal static class LastChanceMonstersBodyPositionProxyModule
     {
-        private static readonly Dictionary<Type, FieldInfo?> PlayerTargetFieldCache = new();
-        private static readonly FieldInfo? EnemyAnimalPlayerTargetField =
-            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyAnimal), "playerTarget");
+        internal static void ResetRuntimeState()
+        {
+            LastChanceMonstersDiscoveryCache.InvalidateEnemies();
+        }
 
         [HarmonyPostfix]
         private static void Postfix()
         {
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
+                ResetRuntimeState();
                 return;
             }
 
@@ -42,68 +41,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
                     continue;
                 }
 
-                // General safety: if any enemy is already tracking this player as target,
-                // avoid rewriting the body position to prevent steering/path regressions.
-                if (IsTargetedByAnyEnemy(player))
-                {
-                    continue;
-                }
-
                 player.transform.position = headCenter;
             }
-        }
-
-        private static bool IsTargetedByAnyEnemy(PlayerAvatar player)
-        {
-            if (player == null)
-            {
-                return false;
-            }
-
-            var enemies = UnityEngine.Object.FindObjectsOfType<Enemy>();
-            for (var i = 0; i < enemies.Length; i++)
-            {
-                var enemy = enemies[i];
-                if (enemy == null)
-                {
-                    continue;
-                }
-
-                var type = enemy.GetType();
-                if (TryGetPlayerTarget(enemy, type) == player)
-                {
-                    return true;
-                }
-            }
-
-            // EnemyAnimal keeps its own target field on the EnemyAnimal component.
-            var animals = UnityEngine.Object.FindObjectsOfType<EnemyAnimal>();
-            for (var i = 0; i < animals.Length; i++)
-            {
-                var animal = animals[i];
-                if (animal == null)
-                {
-                    continue;
-                }
-
-                if (EnemyAnimalPlayerTargetField?.GetValue(animal) as PlayerAvatar == player)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static PlayerAvatar? TryGetPlayerTarget(Enemy enemy, Type type)
-        {
-            if (!PlayerTargetFieldCache.TryGetValue(type, out var field))
-            {
-                field = LastChanceMonstersReflectionHelper.FindFieldInHierarchy(type, "playerTarget");
-                PlayerTargetFieldCache[type] = field;
-            }
-
-            return field?.GetValue(enemy) as PlayerAvatar;
         }
     }
 }

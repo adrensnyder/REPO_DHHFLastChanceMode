@@ -1,12 +1,8 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
@@ -15,151 +11,40 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
     internal static class LastChanceMonstersSearchModule
     {
-        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.MonstersSearch";
-        private const BindingFlags AnyInstanceField = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-        private static readonly FieldInfo? s_playerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
-        private static readonly AccessTools.FieldRef<PlayerAvatar, bool>? s_playerIsDisabledGetter =
-            s_playerIsDisabledField != null ? AccessTools.FieldRefAccess<PlayerAvatar, bool>(s_playerIsDisabledField.Name) : null;
-        private static readonly FieldInfo? s_enemyParentSpawnedField = typeof(EnemyParent).GetField("Spawned", AnyInstanceField);
-        private static readonly FieldInfo? s_enemyParentForceLeaveField = typeof(EnemyParent).GetField("forceLeave", AnyInstanceField);
-        private static readonly FieldInfo? s_enemyParentEnemyField =
-            typeof(EnemyParent).GetField("Enemy", AnyInstanceField) ??
-            typeof(EnemyParent).GetField("enemy", AnyInstanceField);
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.MonstersSearch");
-        private static readonly HashSet<MethodBase> s_patchedMethods = new HashSet<MethodBase>();
-        private static readonly Dictionary<Assembly, List<MethodBase>> s_discoveredMethodsByAssembly = new();
-        private static Harmony? s_harmony;
-        private static bool s_assemblyLoadHooked;
-        private static float s_runtimeStateCachedAt;
-        private static bool s_runtimeStateEnabled;
-        private static bool s_loggedActivationSnapshot;
-        private static float s_lastSelfCheckAt;
+        private static bool s_typedPatchesApplied;
 
         internal static void ResetRuntimeState()
         {
-            s_runtimeStateCachedAt = 0f;
-            s_runtimeStateEnabled = false;
-            s_loggedActivationSnapshot = false;
-            s_lastSelfCheckAt = 0f;
+            // No local runtime cache needed in typed-only mode.
         }
 
-        internal static void Apply(Harmony harmony, Assembly asm)
+        internal static void Apply(Harmony harmony)
         {
-            if (s_harmony != null || harmony == null || s_playerIsDisabledField == null)
+            if (s_typedPatchesApplied || harmony == null)
             {
                 return;
             }
 
-            s_harmony = new Harmony(PatchId);
-            PatchAllLoadedAssemblies();
+            harmony.CreateClassProcessor(typeof(EnemySetChaseTargetPatch)).Patch();
+            harmony.CreateClassProcessor(typeof(EnemyStateSneakUpdatePatch)).Patch();
+            s_typedPatchesApplied = true;
 
-            if (!s_assemblyLoadHooked)
+            if (FeatureFlags.DebugLogging)
             {
-                AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
-                s_assemblyLoadHooked = true;
+                Log.LogInfo("[LastChance] MonstersSearch typed patches applied.");
             }
         }
 
         internal static void Unapply()
         {
-            if (s_harmony == null)
-            {
-                return;
-            }
-
-            try
-            {
-                s_harmony.UnpatchSelf();
-            }
-            catch
-            {
-                // Best-effort unpatch.
-            }
-
-            if (s_assemblyLoadHooked)
-            {
-                AppDomain.CurrentDomain.AssemblyLoad -= OnAssemblyLoad;
-                s_assemblyLoadHooked = false;
-            }
-
-            s_patchedMethods.Clear();
-            s_discoveredMethodsByAssembly.Clear();
-            s_harmony = null;
+            // Typed patches remain installed and are runtime-gated.
             ResetRuntimeState();
-        }
-
-        private static void PatchAllLoadedAssemblies()
-        {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (var i = 0; i < assemblies.Length; i++)
-            {
-                TryPatchAssembly(assemblies[i]);
-            }
-        }
-
-        private static void OnAssemblyLoad(object? sender, AssemblyLoadEventArgs args)
-        {
-            TryPatchAssembly(args.LoadedAssembly);
-        }
-
-        private static void TryPatchAssembly(Assembly? asm)
-        {
-            if (asm == null || asm.IsDynamic || s_harmony == null || s_playerIsDisabledField == null)
-            {
-                return;
-            }
-
-            var methods = DiscoverPatchableMethods(asm);
-            if (methods.Count == 0)
-            {
-                return;
-            }
-
-            var transpiler = new HarmonyMethod(typeof(LastChanceMonstersSearchModule), nameof(ReplaceDisabledChecksTranspiler));
-            var patchedNow = 0;
-            for (var i = 0; i < methods.Count; i++)
-            {
-                var method = methods[i];
-                if (method == null || s_patchedMethods.Contains(method))
-                {
-                    continue;
-                }
-
-                s_harmony.Patch(method, transpiler: transpiler);
-                s_patchedMethods.Add(method);
-                patchedNow++;
-            }
-
-            if (patchedNow > 0 && FeatureFlags.DebugLogging)
-            {
-                Log.LogInfo($"[LastChance] MonstersSearch patched methods in {asm.GetName().Name}: {patchedNow}.");
-            }
-        }
-
-        private static List<MethodBase> DiscoverPatchableMethods(Assembly asm)
-        {
-            if (s_discoveredMethodsByAssembly.TryGetValue(asm, out var cached))
-            {
-                return cached;
-            }
-
-            List<MethodBase> discovered;
-            try
-            {
-                discovered = CollectEnemyMethodsUsingIsDisabled(asm);
-            }
-            catch
-            {
-                discovered = new List<MethodBase>();
-            }
-
-            s_discoveredMethodsByAssembly[asm] = discovered;
-            return discovered;
         }
 
         internal static int GetAliveSearchMonsterCount()
         {
-            if (!FeatureFlags.LastChanceMonstersSearchEnabled || !FeatureFlags.LastChangeMode || !LastChanceRuntimeOrchestrator.IsRuntimeActive)
+            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
                 return 0;
             }
@@ -173,7 +58,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var count = 0;
             foreach (var enemyParent in director.enemiesSpawned)
             {
-                if (enemyParent == null || !IsActiveEnemy(enemyParent))
+                if (enemyParent == null || !enemyParent.Spawned || enemyParent.forceLeave)
                 {
                     continue;
                 }
@@ -184,315 +69,127 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             return count;
         }
 
-        private static bool IsActiveEnemy(EnemyParent enemyParent)
+        [HarmonyPatch(typeof(Enemy), nameof(Enemy.SetChaseTarget), new[] { typeof(PlayerAvatar) })]
+        internal static class EnemySetChaseTargetPatch
         {
-            var spawned = s_enemyParentSpawnedField != null && s_enemyParentSpawnedField.GetValue(enemyParent) is bool spawnedValue && spawnedValue;
-            if (!spawned)
+            [HarmonyPrefix]
+            private static bool Prefix(Enemy __instance, PlayerAvatar playerAvatar)
             {
-                return false;
-            }
-
-            var forceLeave = s_enemyParentForceLeaveField != null && s_enemyParentForceLeaveField.GetValue(enemyParent) is bool forceLeaveValue && forceLeaveValue;
-            return !forceLeave;
-        }
-
-        private static List<MethodBase> CollectEnemyMethodsUsingIsDisabled(Assembly asm)
-        {
-            var methods = new List<MethodBase>();
-            var types = asm.GetTypes();
-            for (var i = 0; i < types.Length; i++)
-            {
-                var type = types[i];
-                if (type == null || !IsMonsterRelatedType(type) || IsSharedEnemyBaseType(type))
-                {
-                    continue;
-                }
-
-                var flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-                var typeMethods = type.GetMethods(flags);
-                for (var j = 0; j < typeMethods.Length; j++)
-                {
-                    var method = typeMethods[j];
-                    if (method == null || method.IsAbstract || method.GetMethodBody() == null)
-                    {
-                        continue;
-                    }
-
-                    if (!MethodReadsPlayerIsDisabled(method))
-                    {
-                        continue;
-                    }
-
-                    methods.Add(method);
-                }
-            }
-
-            return methods;
-        }
-
-        private static bool IsMonsterRelatedType(Type type)
-        {
-            if (type.Name.IndexOf("Enemy", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-
-            if (typeof(Enemy).IsAssignableFrom(type) || typeof(EnemyParent).IsAssignableFrom(type))
-            {
-                return true;
-            }
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-            var fields = type.GetFields(flags);
-            for (var i = 0; i < fields.Length; i++)
-            {
-                var fieldType = fields[i].FieldType;
-                if (typeof(Enemy).IsAssignableFrom(fieldType) || typeof(EnemyParent).IsAssignableFrom(fieldType))
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
                 {
                     return true;
                 }
-            }
 
-            var properties = type.GetProperties(flags);
-            for (var i = 0; i < properties.Length; i++)
-            {
-                var propertyType = properties[i].PropertyType;
-                if (typeof(Enemy).IsAssignableFrom(propertyType) || typeof(EnemyParent).IsAssignableFrom(propertyType))
+                if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(playerAvatar))
                 {
                     return true;
                 }
-            }
 
-            return false;
-        }
-
-        private static bool IsSharedEnemyBaseType(Type type)
-        {
-            return type == typeof(Enemy) ||
-                   type == typeof(EnemyParent) ||
-                   type == typeof(EnemyState) ||
-                   type == typeof(EnemyType);
-        }
-
-        private static bool MethodReadsPlayerIsDisabled(MethodBase method)
-        {
-            if (method == null || s_playerIsDisabledField == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var body = method.GetMethodBody();
-                var il = body?.GetILAsByteArray();
-                if (il == null || il.Length < 5)
+                if (EnemyDirector.instance.debugNoVision ||
+                    __instance.DisableChaseTimer > 0f ||
+                    !__instance.HasVision)
                 {
                     return false;
                 }
 
-                var targetToken = s_playerIsDisabledField.MetadataToken;
-                for (var i = 0; i <= il.Length - 5; i++)
+                if (__instance.Vision.DisableTimer > 0f)
                 {
-                    var op = il[i];
-                    if (op != 0x7B && op != 0x7C) // ldfld / ldflda
-                    {
-                        continue;
-                    }
-
-                    var token = BitConverter.ToInt32(il, i + 1);
-                    if (token == targetToken)
-                    {
-                        return true;
-                    }
+                    return false;
                 }
-            }
-            catch
-            {
-                // IL probe is optional and can fail on non-standard method bodies.
-            }
 
-            return false;
-        }
-
-        private static IEnumerable<CodeInstruction> ReplaceDisabledChecksTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            if (s_playerIsDisabledField == null)
-            {
-                return instructions;
-            }
-
-            var list = new List<CodeInstruction>(instructions);
-            var remapMethod = AccessTools.Method(typeof(LastChanceMonstersSearchModule), nameof(RemapMonsterDisabledCheck));
-            if (remapMethod == null)
-            {
-                return list;
-            }
-
-            for (var i = 0; i < list.Count; i++)
-            {
-                var instruction = list[i];
-                if ((instruction.opcode == OpCodes.Ldfld || instruction.opcode == OpCodes.Ldflda) &&
-                    instruction.operand is FieldInfo field &&
-                    field == s_playerIsDisabledField)
+                __instance.Vision.VisionTrigger(playerAvatar.photonView.ViewID, playerAvatar, false, false);
+                if (!__instance.HasStateChase)
                 {
-                    instruction.opcode = OpCodes.Call;
-                    instruction.operand = remapMethod;
+                    return false;
                 }
-            }
 
-            return list;
-        }
+                if (!__instance.CheckChase() || __instance.CurrentState == EnemyState.ChaseSlow)
+                {
+                    __instance.CurrentState = EnemyState.ChaseBegin;
+                    __instance.TargetPlayerViewID = playerAvatar.photonView.ViewID;
+                    __instance.TargetPlayerAvatar = playerAvatar;
+                }
 
-        private static bool RemapMonsterDisabledCheck(PlayerAvatar? player)
-        {
-            if (player == null || s_playerIsDisabledGetter == null)
-            {
                 return false;
             }
+        }
 
-            if (IsMonstersSearchRuntimeEnabled())
+        [HarmonyPatch(typeof(EnemyStateSneak), nameof(EnemyStateSneak.Update))]
+        internal static class EnemyStateSneakUpdatePatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyStateSneak __instance)
             {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecuteSneakUpdate(__instance);
                 return false;
             }
-
-            return s_playerIsDisabledGetter(player);
         }
 
-        private static bool IsMonstersSearchRuntimeEnabled()
+        private static void ExecuteSneakUpdate(EnemyStateSneak state)
         {
-            // Fast cache for the hot enemy-AI path; refresh often enough for responsive toggles.
-            var now = Time.unscaledTime;
-            if (now - s_runtimeStateCachedAt < 0.1f)
+            if (state.Enemy.CurrentState != EnemyState.Sneak)
             {
-                return s_runtimeStateEnabled;
+                if (state.Active)
+                {
+                    state.Active = false;
+                }
+
+                return;
             }
 
-            s_runtimeStateCachedAt = now;
-            var wasEnabled = s_runtimeStateEnabled;
-            s_runtimeStateEnabled =
-                FeatureFlags.LastChanceMonstersSearchEnabled &&
-                FeatureFlags.LastChangeMode &&
-                LastChanceRuntimeOrchestrator.IsRuntimeActive;
-
-            if (!s_runtimeStateEnabled)
+            if (!state.Active)
             {
-                s_loggedActivationSnapshot = false;
+                state.TargetPlayer = PlayerController.instance.playerAvatarScript;
+                if (GameManager.instance.gameMode == 1)
+                {
+                    foreach (var playerAvatar in GameDirector.instance.PlayerList)
+                    {
+                        if ((!playerAvatar.isDisabled || LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(playerAvatar)) &&
+                            playerAvatar.photonView.ViewID == state.Enemy.TargetPlayerViewID)
+                        {
+                            state.TargetPlayer = playerAvatar;
+                            break;
+                        }
+                    }
+                }
+
+                state.StateTimer = Random.Range(state.StateTimeMin, state.StateTimeMax);
+                state.Active = true;
             }
-            else if (!wasEnabled && !s_loggedActivationSnapshot)
-            {
-                TryLogActivationSnapshot();
-            }
 
-            TryRunRemapSelfCheck(now);
-
-            return s_runtimeStateEnabled;
-        }
-
-        private static void TryRunRemapSelfCheck(float now)
-        {
-            if (!FeatureFlags.DebugLogging || now - s_lastSelfCheckAt < 2f)
+            if (!state.Enemy.MasterClient)
             {
                 return;
             }
 
-            s_lastSelfCheckAt = now;
-            var players = GameDirector.instance?.PlayerList;
-            if (players == null || players.Count == 0)
+            state.Enemy.NavMeshAgent.UpdateAgent(state.Speed, state.Acceleration);
+            if (state.TargetPlayer != null)
             {
-                return;
+                var targetPosition = LastChanceMonstersTargetingOrchestrator.ResolveEffectiveTransformTargetPoint(state.TargetPlayer.transform);
+                state.Enemy.NavMeshAgent.SetDestination(targetPosition);
             }
 
-            for (var i = 0; i < players.Count; i++)
+            if (state.Enemy.HasRigidbody)
             {
-                var player = players[i];
-                if (player == null)
-                {
-                    continue;
-                }
-
-                if (s_playerIsDisabledGetter == null)
-                {
-                    return;
-                }
-
-                var rawDisabled = s_playerIsDisabledGetter(player);
-                var remapped = RemapMonsterDisabledCheck(player);
-                var expected = s_runtimeStateEnabled ? false : rawDisabled;
-                if (remapped != expected)
-                {
-                    Log.LogWarning(
-                        $"[LastChance] MonstersSearch self-check mismatch: player={player.photonView?.ViewID ?? player.GetInstanceID()} " +
-                        $"runtime={s_runtimeStateEnabled} rawDisabled={rawDisabled} remapped={remapped} expected={expected}");
-                }
-            }
-        }
-
-        private static void TryLogActivationSnapshot()
-        {
-            if (!FeatureFlags.DebugLogging || !FeatureFlags.LastChanceMonstersSearchEnabled)
-            {
-                return;
+                state.Enemy.Rigidbody.IdleSet(0.1f);
             }
 
-            s_loggedActivationSnapshot = true;
-
-            var director = EnemyDirector.instance;
-            if (director == null || director.enemiesSpawned == null)
+            if (state.Enemy.TargetPlayerAvatar != null &&
+                state.Enemy.Vision.VisionsTriggered[state.Enemy.TargetPlayerAvatar.photonView.ViewID] >= state.Enemy.Vision.VisionsToTrigger)
             {
-                Log.LogInfo("[LastChance] MonstersSearch activation snapshot: EnemyDirector/enemiesSpawned not available.");
-                return;
+                state.StateTimer = Random.Range(state.StateTimeMin, state.StateTimeMax);
             }
 
-            var enemies = director.enemiesSpawned;
-            Log.LogInfo($"[LastChance] MonstersSearch activation snapshot: total={enemies.Count}.");
-            for (var i = 0; i < enemies.Count; i++)
+            state.StateTimer -= Time.deltaTime;
+            if (state.StateTimer <= 0f)
             {
-                var parent = enemies[i];
-                if (parent == null)
-                {
-                    Log.LogInfo($"[LastChance] MonstersSearch enemy[{i}] = null");
-                    continue;
-                }
-
-                var enemy = s_enemyParentEnemyField?.GetValue(parent);
-                var typeName = GetConcreteEnemyTypeName(enemy);
-                var spawned = s_enemyParentSpawnedField != null && s_enemyParentSpawnedField.GetValue(parent) is bool spawnedValue && spawnedValue;
-                var forceLeave = s_enemyParentForceLeaveField != null && s_enemyParentForceLeaveField.GetValue(parent) is bool forceLeaveValue && forceLeaveValue;
-                Log.LogInfo($"[LastChance] MonstersSearch enemy[{i}] type={typeName} spawned={spawned} forceLeave={forceLeave}");
+                state.Enemy.CurrentState = EnemyState.Roaming;
             }
-        }
-
-        private static string GetConcreteEnemyTypeName(object? enemyObj)
-        {
-            if (enemyObj == null)
-            {
-                return "null";
-            }
-
-            if (enemyObj is not Component component)
-            {
-                return enemyObj.GetType().Name;
-            }
-
-            var baseName = enemyObj.GetType().Name;
-            var behaviours = component.GetComponents<MonoBehaviour>();
-            for (var i = 0; i < behaviours.Length; i++)
-            {
-                var behaviour = behaviours[i];
-                if (behaviour == null)
-                {
-                    continue;
-                }
-
-                var name = behaviour.GetType().Name;
-                if (name.StartsWith("Enemy", StringComparison.Ordinal) && !string.Equals(name, "Enemy", StringComparison.Ordinal))
-                {
-                    return $"{baseName}/{name}";
-                }
-            }
-
-            return baseName;
         }
     }
 }
-

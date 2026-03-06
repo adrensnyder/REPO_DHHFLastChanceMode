@@ -4,7 +4,7 @@
     <OutputType>Library</OutputType>
     <AssemblyName>DHHFLastChanceMode</AssemblyName>
     <RootNamespace>DHHFLastChanceMode</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.1.2</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <Reference Include="BepInEx">
-      <HintPath>..\00Libs\BepInEx\core\BepInEx.dll</HintPath>
+      <HintPath>..\00Libs\BepInEx\core\BepInEx-publicized.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="BepInEx.Harmony">
@@ -55,17 +55,29 @@
       <HintPath>..\00Libs\Unity\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.AIModule">
+      <HintPath>..\00Libs\Unity\UnityEngine.AIModule-publicized.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\00Libs\Unity\UnityEngine.UI-publicized.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>..\00Libs\Unity\Unity.TextMeshPro-publicized.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\00Libs\GameAssemblies\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\00Libs\GameAssemblies\Assembly-CSharp-publicized.dll</HintPath>
       <Private>false</Private>
     </Reference>
 
     <Reference Include="DeathHeadHopper">
-      <HintPath>..\00Libs\OriginalMod\DeathHeadHopper.dll</HintPath>
+      <HintPath>..\00Libs\OriginalMod\DeathHeadHopper-publicized.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="DeathHeadHopperFix">
-      <HintPath>..\REPO_DeathHeadHopperFix\bin\Debug\DeathHeadHopperFix.dll</HintPath>
+      <HintPath>..\REPO_DeathHeadHopperFix\bin\Debug\DeathHeadHopperFix-publicized.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Photon.Pun">

@@ -1,33 +1,25 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
-using BepInEx.Logging;
-using DHHFLastChanceMode.Modules.Config;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions.Debugging;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
-using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(SemiFunc), "LevelPointInTargetRoomGet")]
+    [HarmonyPatch(typeof(SemiFunc), nameof(SemiFunc.LevelPointInTargetRoomGet))]
     internal static class LastChanceMonstersAnimalWreakHavocHeadRoomProxyModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.AnimalRoomProxy");
-        private static readonly FieldInfo? RoomVolumeCheckPlayerField = AccessTools.Field(typeof(RoomVolumeCheck), "player");
-        private static readonly FieldInfo? PlayerNameField = AccessTools.Field(typeof(PlayerAvatar), "playerName");
         private static int s_animalWreakHavocDepth;
 
-        [HarmonyPatch(typeof(EnemyAnimal), "StateWreakHavoc")]
+        [HarmonyPatch(typeof(EnemyAnimal), nameof(EnemyAnimal.StateWreakHavoc))]
         [HarmonyPrefix]
         private static void EnemyAnimalStateWreakHavocPrefix()
         {
             s_animalWreakHavocDepth++;
         }
 
-        [HarmonyPatch(typeof(EnemyAnimal), "StateWreakHavoc")]
+        [HarmonyPatch(typeof(EnemyAnimal), nameof(EnemyAnimal.StateWreakHavoc))]
         [HarmonyPostfix]
         private static void EnemyAnimalStateWreakHavocPostfix()
         {
@@ -43,8 +35,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             __result = default!;
 
             if (_target == null ||
-                !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() ||
-                !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+                !LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return true;
             }
@@ -87,11 +78,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
             if (rooms.Count == 0)
             {
-                if (LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow))
-                {
-                    LogDebug($"no rooms from head overlaps player={GetPlayerName(player)} head={headCenter}");
-                }
-
                 return true;
             }
 
@@ -137,22 +123,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             if (candidates.Count == 0)
             {
-                if (LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow))
-                {
-                    LogDebug(
-                        $"no candidates player={GetPlayerName(player)} head={headCenter} rooms={rooms.Count} range={_minDistance:F1}-{_maxDistance:F1}");
-                }
-
                 return true;
             }
 
             __result = candidates[Random.Range(0, candidates.Count)];
-            if (LastChanceMonstersDebugGate.IsEnabled(InternalDebugFlags.DebugLastChanceAnimalCollisionFlow))
-            {
-                LogDebug(
-                    $"proxy hit player={GetPlayerName(player)} head={headCenter} rooms={rooms.Count} candidates={candidates.Count} chosen={__result.transform.position}");
-            }
-
             return false;
         }
 
@@ -169,7 +143,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return direct;
             }
 
-            return RoomVolumeCheckPlayerField?.GetValue(target) as PlayerAvatar;
+            return target.player;
         }
 
         private static HashSet<RoomVolume> CollectHeadRooms(Vector3 headCenter)
@@ -192,33 +166,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             return rooms;
-        }
-
-        private static string GetPlayerName(PlayerAvatar player)
-        {
-            if (player == null)
-            {
-                return "n/a";
-            }
-
-            var reflected = PlayerNameField?.GetValue(player) as string;
-            if (!string.IsNullOrWhiteSpace(reflected))
-            {
-                return reflected!;
-            }
-
-            return player.photonView != null ? $"view:{player.photonView.ViewID}" : "n/a";
-        }
-
-        private static void LogDebug(string message)
-        {
-            if (!LastChanceMonstersDebugGate.IsVerbose(InternalDebugFlags.DebugLastChanceAnimalCollisionVerbose) &&
-                !LogLimiter.ShouldLog("AnimalRoomProxy.Trace", 2))
-            {
-                return;
-            }
-
-            Log.LogInfo($"[Animal][RoomProxy] {message}");
         }
     }
 }

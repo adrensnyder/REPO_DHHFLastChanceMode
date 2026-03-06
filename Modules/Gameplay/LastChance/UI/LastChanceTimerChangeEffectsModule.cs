@@ -1,9 +1,9 @@
 #nullable enable
 
 using System;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using DHHFLastChanceMode.Modules.Config;
+using TMPro;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
@@ -14,20 +14,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private static readonly Color NegativeDeltaColor = new(1f, 0.35f, 0.35f, 1f);
         private static readonly Regex ColorTagRegex = new("<color=#[0-9A-Fa-f]{6,8}>", RegexOptions.Compiled);
 
-        private static Component? s_timerLabel;
+        private static TextMeshProUGUI? s_timerLabel;
         private static RectTransform? s_timerRect;
-        private static Component? s_floatingLabel;
+        private static TextMeshProUGUI? s_floatingLabel;
         private static RectTransform? s_floatingRect;
-
-        private static PropertyInfo? s_textProperty;
-        private static PropertyInfo? s_colorProperty;
-        private static PropertyInfo? s_alignmentProperty;
-        private static PropertyInfo? s_fontSizeProperty;
-        private static PropertyInfo? s_autoSizeProperty;
-        private static PropertyInfo? s_wordWrapProperty;
-        private static PropertyInfo? s_richTextProperty;
-
-        private static object? s_centerAlignment;
         private static float s_timerFontSize;
         private static bool s_initialized;
 
@@ -44,34 +34,17 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
         internal static void Initialize(
             RectTransform? timerRect,
-            Component? timerLabel,
-            Type? labelType,
-            PropertyInfo? textProperty,
-            PropertyInfo? colorProperty,
-            PropertyInfo? alignmentProperty,
-            PropertyInfo? fontSizeProperty,
-            PropertyInfo? autoSizeProperty,
-            PropertyInfo? wordWrapProperty,
-            PropertyInfo? richTextProperty,
-            object? centerAlignment,
+            TextMeshProUGUI? timerLabel,
             float timerFontSize)
         {
             s_timerRect = timerRect;
             s_timerLabel = timerLabel;
-            s_textProperty = textProperty;
-            s_colorProperty = colorProperty;
-            s_alignmentProperty = alignmentProperty;
-            s_fontSizeProperty = fontSizeProperty;
-            s_autoSizeProperty = autoSizeProperty;
-            s_wordWrapProperty = wordWrapProperty;
-            s_richTextProperty = richTextProperty;
-            s_centerAlignment = centerAlignment;
             s_timerFontSize = Mathf.Max(1f, timerFontSize);
             s_timerBaseScale = timerRect != null ? timerRect.localScale : Vector3.one;
             s_baseTimerText = string.Empty;
             s_lastRenderedTimerText = string.Empty;
 
-            EnsureFloatingLabel(labelType);
+            EnsureFloatingLabel();
             ResetVisualState();
             s_initialized = s_timerRect != null && s_timerLabel != null;
         }
@@ -122,14 +95,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_timerRect = null;
             s_floatingLabel = null;
             s_floatingRect = null;
-            s_textProperty = null;
-            s_colorProperty = null;
-            s_alignmentProperty = null;
-            s_fontSizeProperty = null;
-            s_autoSizeProperty = null;
-            s_wordWrapProperty = null;
-            s_richTextProperty = null;
-            s_centerAlignment = null;
             s_timerFontSize = 0f;
             s_baseTimerText = string.Empty;
             s_lastRenderedTimerText = string.Empty;
@@ -166,12 +131,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             {
                 var rounded = Mathf.Max(1, Mathf.RoundToInt(Mathf.Abs(deltaSeconds)));
                 var sign = deltaSeconds >= 0f ? "+" : "-";
-                s_textProperty?.SetValue(s_floatingLabel, sign + rounded.ToString());
-                s_colorProperty?.SetValue(s_floatingLabel, s_floatingBaseColor);
-                if (s_floatingLabel is Behaviour floatingBehaviour)
-                {
-                    floatingBehaviour.enabled = true;
-                }
+                s_floatingLabel.text = sign + rounded.ToString();
+                s_floatingLabel.color = s_floatingBaseColor;
+                s_floatingLabel.enabled = true;
                 s_floatingLabel.gameObject.SetActive(true);
             }
         }
@@ -232,7 +194,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
             var color = s_floatingBaseColor;
             color.a = 1f - progress;
-            s_colorProperty?.SetValue(s_floatingLabel, color);
+            s_floatingLabel.color = color;
         }
 
         private static void ResetVisualState()
@@ -247,10 +209,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
             if (s_floatingLabel != null)
             {
-                if (s_floatingLabel is Behaviour floatingBehaviour)
-                {
-                    floatingBehaviour.enabled = false;
-                }
+                s_floatingLabel.enabled = false;
                 s_floatingLabel.gameObject.SetActive(false);
             }
 
@@ -262,9 +221,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             RenderTimerText(s_baseTimerText);
         }
 
-        private static void EnsureFloatingLabel(Type? labelType)
+        private static void EnsureFloatingLabel()
         {
-            if (s_timerRect == null || s_floatingLabel != null || labelType == null)
+            if (s_timerRect == null || s_floatingLabel != null)
             {
                 return;
             }
@@ -280,28 +239,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_floatingRect.sizeDelta = new Vector2(240f, 40f);
             s_floatingRect.SetAsLastSibling();
 
-            s_floatingLabel = floatingGo.AddComponent(labelType);
-            if (s_alignmentProperty != null && s_centerAlignment != null)
-            {
-                s_alignmentProperty.SetValue(s_floatingLabel, s_centerAlignment);
-            }
+            s_floatingLabel = floatingGo.AddComponent<TextMeshProUGUI>();
+            s_floatingLabel.alignment = TextAlignmentOptions.Center;
             var floatingFontSize = s_timerFontSize * Mathf.Max(1f, InternalConfig.LastChanceTimerChangeFloatingFontSizeMultiplier);
-            s_fontSizeProperty?.SetValue(s_floatingLabel, floatingFontSize);
-            s_autoSizeProperty?.SetValue(s_floatingLabel, false);
-            s_wordWrapProperty?.SetValue(s_floatingLabel, false);
-            s_richTextProperty?.SetValue(s_floatingLabel, false);
-            s_colorProperty?.SetValue(s_floatingLabel, Color.white);
-
-            if (s_floatingLabel is Behaviour floatingBehaviour)
-            {
-                floatingBehaviour.enabled = false;
-            }
+            s_floatingLabel.fontSize = floatingFontSize;
+            s_floatingLabel.enableAutoSizing = false;
+            s_floatingLabel.enableWordWrapping = false;
+            s_floatingLabel.richText = false;
+            s_floatingLabel.color = Color.white;
+            s_floatingLabel.enabled = false;
             s_floatingLabel.gameObject.SetActive(false);
         }
 
         private static void RenderTimerText(string text)
         {
-            if (s_timerLabel == null || s_textProperty == null)
+            if (s_timerLabel == null)
             {
                 return;
             }
@@ -312,7 +264,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             s_lastRenderedTimerText = text;
-            s_textProperty.SetValue(s_timerLabel, text);
+            s_timerLabel.text = text;
         }
 
         private static string ReplaceFirstColorTag(string text, Color color)

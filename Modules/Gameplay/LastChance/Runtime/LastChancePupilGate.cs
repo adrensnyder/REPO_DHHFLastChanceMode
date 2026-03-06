@@ -1,15 +1,11 @@
 #nullable enable
 
-using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
-using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     internal static class LastChancePupilGate
     {
-        private static readonly FieldInfo? HeadTriggeredField = AccessTools.Field(typeof(PlayerDeathHead), "triggered");
-
         internal static bool IsEnabled()
         {
             return FeatureFlags.LastChancePupilVisualsEnabled && LastChanceRuntimeOrchestrator.IsRuntimeActive;
@@ -44,7 +40,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return false;
             }
 
-            if (!(HeadTriggeredField?.GetValue(head) as bool? ?? false))
+            if (!head.triggered)
             {
                 reason = "NotTriggered";
                 return false;

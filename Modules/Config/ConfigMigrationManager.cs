@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using BepInEx.Configuration;
 
 namespace DHHFLastChanceMode.Modules.Config
@@ -24,10 +23,9 @@ namespace DHHFLastChanceMode.Modules.Config
             public string Value { get; }
         }
 
-        internal static void Apply(ConfigFile config, Type flagsType, string defaultSection)
+        internal static void Apply(ConfigFile config)
         {
             if (config == null ||
-                flagsType == null ||
                 string.IsNullOrWhiteSpace(config.ConfigFilePath) ||
                 !File.Exists(config.ConfigFilePath))
             {
@@ -52,7 +50,7 @@ namespace DHHFLastChanceMode.Modules.Config
                 return;
             }
 
-            var aliases = BuildAliasMap(flagsType, defaultSection);
+            var aliases = BuildAliasMap();
             var activeDefinitionsByKey = BuildActiveByKey(activeDefinitions);
             var orphanedLineIndexes = new HashSet<int>();
 
@@ -132,38 +130,22 @@ namespace DHHFLastChanceMode.Modules.Config
             }
         }
 
-        private static Dictionary<ConfigDefinition, ConfigDefinition> BuildAliasMap(Type flagsType, string defaultSection)
+        private static Dictionary<ConfigDefinition, ConfigDefinition> BuildAliasMap()
         {
             var aliases = new Dictionary<ConfigDefinition, ConfigDefinition>();
 
-            foreach (var field in flagsType.GetFields(BindingFlags.Public | BindingFlags.Static))
+            foreach (var entry in ConfigMetadata.FeatureFlagEntries)
             {
-                var entryAttribute = field.GetCustomAttribute<FeatureConfigEntryAttribute>();
-                if (entryAttribute == null)
-                {
-                    continue;
-                }
+                var currentDefinition = new ConfigDefinition(entry.Section, entry.Key);
 
-                var currentSection = string.IsNullOrWhiteSpace(entryAttribute.Section)
-                    ? defaultSection
-                    : entryAttribute.Section;
-                var currentKey = string.IsNullOrWhiteSpace(entryAttribute.Key)
-                    ? field.Name
-                    : entryAttribute.Key;
-                var currentDefinition = new ConfigDefinition(currentSection, currentKey);
-
-                var aliasAttributes = field.GetCustomAttributes<FeatureConfigAliasAttribute>();
-                foreach (var alias in aliasAttributes)
+                foreach (var alias in entry.Aliases)
                 {
-                    if (alias == null || string.IsNullOrWhiteSpace(alias.OldKey))
+                    if (alias == null || string.IsNullOrWhiteSpace(alias.Key))
                     {
                         continue;
                     }
 
-                    var aliasSection = string.IsNullOrWhiteSpace(alias.OldSection)
-                        ? defaultSection
-                        : alias.OldSection;
-                    var aliasDefinition = new ConfigDefinition(aliasSection, alias.OldKey);
+                    var aliasDefinition = new ConfigDefinition(alias.Section, alias.Key);
                     aliases[aliasDefinition] = currentDefinition;
                 }
             }

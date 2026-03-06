@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
@@ -11,11 +10,16 @@ using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyOnScreen), "Awake")]
+    [HarmonyPatch(typeof(EnemyOnScreen), nameof(EnemyOnScreen.Awake))]
     internal static class LastChanceMonstersOnScreenCameraModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.ThinMan");
         private static readonly System.Collections.Generic.Dictionary<string, bool> s_lastBoolStateByKey = new();
+
+        internal static void ResetRuntimeState()
+        {
+            s_lastBoolStateByKey.Clear();
+        }
 
         [HarmonyPostfix]
         private static void AwakePostfix(EnemyOnScreen __instance)
@@ -70,10 +74,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
     internal sealed class OnScreenCameraSyncRuntime : MonoBehaviour
     {
-        private static readonly FieldInfo? s_mainCameraField = AccessTools.Field(typeof(EnemyOnScreen), "MainCamera");
-        private static readonly FieldInfo? s_onScreenLocalField = AccessTools.Field(typeof(EnemyOnScreen), "OnScreenLocal");
-        private static readonly FieldInfo? s_culledLocalField = AccessTools.Field(typeof(EnemyOnScreen), "CulledLocal");
-        private static readonly MethodInfo? s_onScreenPlayerUpdateMethod = AccessTools.Method(typeof(EnemyOnScreen), "OnScreenPlayerUpdate");
         private EnemyOnScreen? _onScreen;
         private bool _lastSyncedOnScreenLocal;
         private bool _lastSyncedCulledLocal;
@@ -88,7 +88,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         private void LateUpdate()
         {
-            if (_onScreen == null || s_mainCameraField == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+            if (_onScreen == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
                 return;
             }
@@ -96,7 +96,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             var current = CameraUtils.Instance != null ? CameraUtils.Instance.MainCamera : Camera.main;
             if (current != null)
             {
-                s_mainCameraField.SetValue(_onScreen, current);
+                _onScreen.MainCamera = current;
 
                 var currentCameraId = current.GetInstanceID();
                 var cameraChanged = !_hasCameraSnapshot || _lastCameraInstanceId != currentCameraId;
@@ -114,13 +114,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
         private void SyncLocalHeadProxyOnScreenState()
         {
-            if (_onScreen == null || !GameManager.Multiplayer() || s_onScreenLocalField == null || s_culledLocalField == null || s_onScreenPlayerUpdateMethod == null)
+            if (_onScreen == null || !GameManager.Multiplayer())
             {
                 return;
             }
 
             var localPlayer = GetLocalPlayerAvatar();
-            if (localPlayer == null || localPlayer.photonView == null || localPlayer.photonView.ViewID < 0)
+            if (localPlayer?.photonView == null || localPlayer.photonView.ViewID < 0)
             {
                 return;
             }
@@ -132,8 +132,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            var onScreenLocal = s_onScreenLocalField.GetValue(_onScreen) as bool? ?? false;
-            var culledLocal = s_culledLocalField.GetValue(_onScreen) as bool? ?? false;
+            var onScreenLocal = _onScreen.OnScreenLocal;
+            var culledLocal = _onScreen.CulledLocal;
 
             if (_hasSyncSnapshot && onScreenLocal == _lastSyncedOnScreenLocal && culledLocal == _lastSyncedCulledLocal)
             {
@@ -144,7 +144,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             _lastSyncedCulledLocal = culledLocal;
             _hasSyncSnapshot = true;
 
-            s_onScreenPlayerUpdateMethod.Invoke(_onScreen, new object[] { localPlayer.photonView.ViewID, onScreenLocal, culledLocal });
+            _onScreen.OnScreenPlayerUpdate(localPlayer.photonView.ViewID, onScreenLocal, culledLocal);
             LastChanceMonstersOnScreenCameraModule.DebugLogOnBoolTransition(
                 "Sync.PlayerUpdate",
                 $"{_onScreen.GetInstanceID()}.{localPlayer.photonView.ViewID}.OnScreen",
@@ -167,7 +167,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             foreach (var player in director.PlayerList)
             {
-                if (player != null && player.photonView != null && player.photonView.IsMine)
+                if (player?.photonView != null && player.photonView.IsMine)
                 {
                     return player;
                 }
@@ -177,12 +177,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
     }
 
-    [HarmonyPatch(typeof(EnemyOnScreen), "GetOnScreen")]
+    [HarmonyPatch(typeof(EnemyOnScreen), nameof(EnemyOnScreen.GetOnScreen))]
     internal static class LastChanceMonstersOnScreenSafeLookupPatch
     {
-        private static readonly FieldInfo? s_onScreenLocalField = AccessTools.Field(typeof(EnemyOnScreen), "OnScreenLocal");
-        private static readonly FieldInfo? s_onScreenPlayerField = AccessTools.Field(typeof(EnemyOnScreen), "OnScreenPlayer");
-
         [HarmonyPrefix]
         private static bool Prefix(EnemyOnScreen __instance, PlayerAvatar _playerAvatar, ref bool __result)
         {
@@ -194,10 +191,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 
             if (!GameManager.Multiplayer())
             {
-                __result = s_onScreenLocalField?.GetValue(__instance) as bool? ?? false;
+                __result = __instance.OnScreenLocal;
                 LastChanceMonstersOnScreenCameraModule.DebugLog(
                     "GetOnScreen.Singleplayer",
-                    $"enemy={__instance.gameObject.name} player={( _playerAvatar != null && _playerAvatar.photonView != null ? _playerAvatar.photonView.ViewID.ToString() : "n/a")} result={__result}");
+                    $"enemy={__instance.gameObject.name} player={(_playerAvatar.photonView != null ? _playerAvatar.photonView.ViewID.ToString() : "n/a")} result={__result}");
                 return false;
             }
 
@@ -206,16 +203,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 _playerAvatar.photonView != null &&
                 _playerAvatar.photonView.IsMine)
             {
-                __result = s_onScreenLocalField?.GetValue(__instance) as bool? ?? false;
+                __result = __instance.OnScreenLocal;
                 LastChanceMonstersOnScreenCameraModule.DebugLog(
                     "GetOnScreen.HeadProxyLocal",
                     $"enemy={__instance.gameObject.name} player={_playerAvatar.photonView.ViewID} result={__result}");
-                return false;
-            }
-
-            if (s_onScreenPlayerField?.GetValue(__instance) is not System.Collections.IDictionary dictionary)
-            {
-                __result = false;
                 return false;
             }
 
@@ -226,9 +217,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return false;
             }
 
-            if (!dictionary.Contains(key))
+            if (!__instance.OnScreenPlayer.ContainsKey(key))
             {
-                dictionary[key] = false;
+                __instance.OnScreenPlayer[key] = false;
                 __result = false;
                 LastChanceMonstersOnScreenCameraModule.DebugLog(
                     "GetOnScreen.DictMiss",
@@ -236,7 +227,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return false;
             }
 
-            __result = dictionary[key] as bool? ?? false;
+            __result = __instance.OnScreenPlayer[key];
             LastChanceMonstersOnScreenCameraModule.DebugLogOnBoolTransition(
                 "GetOnScreen.DictHit",
                 $"{__instance.GetInstanceID()}.{key}",
@@ -246,4 +237,3 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         }
     }
 }
-

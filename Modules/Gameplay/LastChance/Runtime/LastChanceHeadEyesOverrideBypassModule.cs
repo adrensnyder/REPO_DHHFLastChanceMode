@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
@@ -14,8 +13,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
     internal static class LastChanceHeadEyesOverrideBypassModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Eyes");
-        private static readonly FieldInfo? EyesPlayerAvatarField = AccessTools.Field(typeof(PlayerEyes), "playerAvatar");
-        private static readonly FieldInfo? HeadSpectatedField = AccessTools.Field(typeof(PlayerDeathHead), "spectated");
 
         internal static void ResetRuntimeState()
         {
@@ -31,7 +28,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return true;
             }
 
-            var player = EyesPlayerAvatarField?.GetValue(__instance) as PlayerAvatar;
+            var player = __instance.playerAvatar;
             if (!LastChancePupilGate.TryGetEligibleHead(player, out var head, out var gateReason))
             {
                 DebugLog("Override.Skip.Gate", $"reason={gateReason} playerId={GetPlayerId(player)}");
@@ -44,7 +41,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             // Keep vanilla behavior while spectated; bypass only the non-spectated forced head override.
-            if (HeadSpectatedField?.GetValue(head) as bool? ?? false)
+            if (head.spectated)
             {
                 DebugLog("Override.Pass.Spectated", $"playerId={GetPlayerId(player)}");
                 return true;

@@ -1,25 +1,18 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(HurtCollider), "Update")]
+    [HarmonyPatch(typeof(HurtCollider), nameof(HurtCollider.Update))]
     internal static class LastChanceMonstersHurtColliderHeadProxyModule
     {
-        private static readonly FieldInfo? s_boxColliderField = AccessTools.Field(typeof(HurtCollider), "BoxCollider");
-        private static readonly FieldInfo? s_sphereColliderField = AccessTools.Field(typeof(HurtCollider), "SphereCollider");
-        private static readonly FieldInfo? s_colliderIsBoxField = AccessTools.Field(typeof(HurtCollider), "ColliderIsBox");
-        private static readonly FieldInfo? s_layerMaskField = AccessTools.Field(typeof(HurtCollider), "LayerMask");
-        private static readonly MethodInfo? s_playerHurtMethod = AccessTools.Method(typeof(HurtCollider), "PlayerHurt", new[] { typeof(PlayerAvatar) });
-
         [HarmonyPostfix]
         private static void UpdatePostfix(HurtCollider __instance)
         {
-            if (__instance == null || s_playerHurtMethod == null)
+            if (__instance == null)
             {
                 return;
             }
@@ -34,8 +27,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            var layerMask = s_layerMaskField?.GetValue(__instance) as LayerMask? ?? default;
-            var overlaps = CollectOverlaps(__instance, layerMask);
+            var overlaps = CollectOverlaps(__instance, __instance.LayerMask);
             if (overlaps == null || overlaps.Length == 0)
             {
                 return;
@@ -51,8 +43,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 var player = ResolvePlayer(collider);
-                if (player == null &&
-                    LastChanceMonstersTargetProxyHelper.TryGetPlayerFromDeathHeadCollider(collider, out var headPlayer))
+                if (player == null && LastChanceMonstersTargetProxyHelper.TryGetPlayerFromDeathHeadCollider(collider, out var headPlayer))
                 {
                     player = headPlayer;
                 }
@@ -62,8 +53,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                if (!LastChanceMonstersTargetProxyHelper.IsDisabled(player) ||
-                    !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
+                if (!LastChanceMonstersTargetProxyHelper.IsDisabled(player) || !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
                 {
                     continue;
                 }
@@ -74,16 +64,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                s_playerHurtMethod.Invoke(__instance, new object[] { player });
+                __instance.PlayerHurt(player);
             }
         }
 
         private static Collider[]? CollectOverlaps(HurtCollider instance, LayerMask mask)
         {
-            var colliderIsBox = s_colliderIsBoxField?.GetValue(instance) as bool? ?? true;
-            if (colliderIsBox)
+            if (instance.ColliderIsBox)
             {
-                var box = s_boxColliderField?.GetValue(instance) as BoxCollider;
+                var box = instance.BoxCollider;
                 if (box == null)
                 {
                     return null;
@@ -97,7 +86,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return Physics.OverlapBox(center, scaledSize * 0.5f, instance.transform.rotation, mask, QueryTriggerInteraction.Collide);
             }
 
-            var sphere = s_sphereColliderField?.GetValue(instance) as SphereCollider;
+            var sphere = instance.SphereCollider;
             if (sphere == null)
             {
                 return null;
@@ -117,7 +106,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             }
 
             var controller = collider.GetComponentInParent<PlayerController>();
-            if (controller != null && controller.playerAvatarScript != null)
+            if (controller?.playerAvatarScript != null)
             {
                 return controller.playerAvatarScript;
             }

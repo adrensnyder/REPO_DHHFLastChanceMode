@@ -2,10 +2,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
+using DeathHeadHopper.DeathHead;
+using DeathHeadHopper.DeathHead.Handlers;
 using HarmonyLib;
 using UnityEngine;
 using Logger = BepInEx.Logging.Logger;
@@ -14,82 +15,33 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
     internal static class LastChanceMonstersNoiseAggroModule
     {
-        private const string PatchId = "DHHFLastChanceMode.Gameplay.LastChance.Monsters.NoiseAggro";
         private const float DefaultAggroRadius = 18f;
         private const float DefaultAggroCooldown = 0.75f;
 
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Monsters.NoiseAggro");
         private static readonly Dictionary<int, float> s_lastAggroByPlayerViewId = new();
-        private static Harmony? s_harmony;
-        private static bool s_applied;
-
-        private static readonly Type? s_chargeHandlerType = AccessTools.TypeByName("DeathHeadHopper.DeathHead.Handlers.ChargeHandler");
-        private static readonly Type? s_deathHeadControllerType = AccessTools.TypeByName("DeathHeadHopper.DeathHead.DeathHeadController");
-        private static readonly FieldInfo? s_chargeHandlerControllerField = s_chargeHandlerType == null ? null : AccessTools.Field(s_chargeHandlerType, "controller");
-        private static readonly FieldInfo? s_deathHeadControllerDeathHeadField = s_deathHeadControllerType == null ? null : AccessTools.Field(s_deathHeadControllerType, "deathHead");
-        private static readonly FieldInfo? s_enemyHasStateInvestigateField = AccessTools.Field(typeof(Enemy), "HasStateInvestigate");
-        private static readonly FieldInfo? s_enemyStateInvestigateField = AccessTools.Field(typeof(Enemy), "StateInvestigate");
-        private static readonly FieldInfo? s_enemyHasVisionField = AccessTools.Field(typeof(Enemy), "HasVision");
-        private static readonly FieldInfo? s_enemyVisionField = AccessTools.Field(typeof(Enemy), "Vision");
 
         internal static void ResetRuntimeState()
         {
             s_lastAggroByPlayerViewId.Clear();
         }
 
-        internal static void Apply(Harmony harmony, Assembly asm)
+        internal static void Apply(Harmony harmony)
         {
-            if (s_applied || harmony == null || asm == null)
-            {
-                return;
-            }
-
-            var chargeHandlerType = asm.GetType("DeathHeadHopper.DeathHead.Handlers.ChargeHandler", throwOnError: false);
-            var windupMethod = chargeHandlerType == null
-                ? null
-                : AccessTools.Method(chargeHandlerType, "ChargeWindup", new[] { typeof(Vector3) });
-
-            if (windupMethod == null)
-            {
-                if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.NoiseAggro.Missing", 120))
-                {
-                    Log.LogWarning("[LastChance] NoiseAggro skipped: ChargeHandler.ChargeWindup not found.");
-                }
-                return;
-            }
-
-            s_harmony = new Harmony(PatchId);
-            var postfix = new HarmonyMethod(typeof(LastChanceMonstersNoiseAggroModule), nameof(ChargeWindupPostfix));
-            s_harmony.Patch(windupMethod, postfix: postfix);
-            s_applied = true;
+            // Typed patch is registered in LastChanceHarmonyPatchRegistry.
         }
 
         internal static void Unapply()
         {
-            if (!s_applied || s_harmony == null)
-            {
-                return;
-            }
-
-            try
-            {
-                s_harmony.UnpatchSelf();
-            }
-            catch
-            {
-                // Best-effort unpatch.
-            }
-
-            s_applied = false;
-            s_harmony = null;
             ResetRuntimeState();
         }
 
-        private static void ChargeWindupPostfix(object __instance)
+        [HarmonyPatch(typeof(ChargeHandler), nameof(ChargeHandler.ChargeWindup), new[] { typeof(Vector3) })]
+        [HarmonyPostfix]
+        private static void ChargeWindupPostfix(ChargeHandler __instance)
         {
             if (__instance == null ||
-                !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() ||
-                !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+                !LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return;
             }
@@ -132,15 +84,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                     continue;
                 }
 
-                var hasInvestigate = s_enemyHasStateInvestigateField?.GetValue(enemy) as bool? ?? false;
-                var investigate = s_enemyStateInvestigateField?.GetValue(enemy) as EnemyStateInvestigate;
+                var hasInvestigate = enemy.HasStateInvestigate;
+                var investigate = enemy.StateInvestigate;
                 if (hasInvestigate && investigate != null)
                 {
                     investigate.Set(headCenter, false);
                 }
 
-                var hasVision = s_enemyHasVisionField?.GetValue(enemy) as bool? ?? false;
-                var vision = s_enemyVisionField?.GetValue(enemy) as EnemyVision;
+                var hasVision = enemy.HasVision;
+                var vision = enemy.Vision;
                 if (hasVision && vision != null)
                 {
                     var near = dist <= vision.VisionDistanceClose;
@@ -157,15 +109,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
             }
         }
 
-        private static PlayerAvatar? TryGetOwnerPlayer(object chargeHandler)
+        private static PlayerAvatar? TryGetOwnerPlayer(ChargeHandler chargeHandler)
         {
-            var controller = s_chargeHandlerControllerField?.GetValue(chargeHandler);
+            var controller = chargeHandler.controller;
             if (controller == null)
             {
                 return null;
             }
 
-            var deathHead = s_deathHeadControllerDeathHeadField?.GetValue(controller) as PlayerDeathHead;
+            var deathHead = controller.deathHead;
             return deathHead?.playerAvatar;
         }
     }

@@ -1,8 +1,5 @@
 #nullable enable
 
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
@@ -15,53 +12,32 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
     {
         private const string ModuleTag = "[DHHFLastChanceMode] [Gameplay]";
         private const string LogKey = "SuppressAllDeadTransition";
+        private const string UpdateGuardLogKey = "SuppressAllDeadFlag";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
-        private static readonly FieldInfo? AllPlayersDeadField = AccessTools.Field(typeof(RunManager), "allPlayersDead");
-        private static readonly FieldInfo? PlayerIsDisabledField = AccessTools.Field(typeof(PlayerAvatar), "isDisabled");
-        private static Harmony? _harmony;
+        private static bool s_enabledLogged;
         private static bool s_suppressedLogged;
         private static bool s_allowAllPlayersDead;
 
         internal static void EnsureEnabled()
         {
-            if (_harmony != null)
+            if (s_enabledLogged)
             {
                 return;
             }
 
-            var changeLevelMethod = AccessTools.Method(typeof(RunManager), nameof(RunManager.ChangeLevel), new[] { typeof(bool), typeof(bool), typeof(RunManager.ChangeLevelType) });
-            if (changeLevelMethod == null)
-            {
-                if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey))
-                {
-                    Log.LogWarning($"{ModuleTag} Cannot find RunManager methods for patching.");
-                }
-                return;
-            }
-
-            _harmony = new Harmony("DHHFLastChanceMode.Gameplay.AllPlayersDeadGuard");
-            // This transpiler intentionally coexists with RunManagerUpdateLastChanceTimerPatch.Postfix.
-            // It owns only the guard of vanilla allPlayersDead assignment flow.
-            _harmony.Patch(
-                AccessTools.Method(typeof(RunManager), "Update"),
-                transpiler: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(UpdateTranspiler)));
-            _harmony.Patch(changeLevelMethod, prefix: new HarmonyMethod(typeof(AllPlayersDeadGuard), nameof(ChangeLevelPrefix)));
+            s_enabledLogged = true;
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey))
             {
-                Log.LogInfo($"{ModuleTag} Override enabled (debug players count).");
+                Log.LogInfo($"{ModuleTag} Guard enabled via typed ChangeLevel prefix patch.");
             }
         }
 
         internal static void Disable()
         {
-            if (_harmony == null)
-            {
-                return;
-            }
-
-            _harmony.UnpatchSelf();
-            _harmony = null;
+            s_enabledLogged = false;
+            s_suppressedLogged = false;
+            s_allowAllPlayersDead = false;
         }
 
         internal static void AllowVanillaAllPlayersDead()
@@ -76,22 +52,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
         private static bool ChangeLevelPrefix(RunManager __instance, bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
         {
-            if (!FeatureFlags.LastChangeMode)
-            {
-                return true;
-            }
-
-            if (!CompatibilityGate.IsFeatureUsable(ModFeatureGate.LastChanceCluster))
-            {
-                return true;
-            }
-
-            if (LastChanceTimerController.IsSuppressedForRoom)
-            {
-                return true;
-            }
-
-            if (IsVanillaOnlyContext())
+            if (!ShouldSuppressAllPlayersDeadFlow())
             {
                 s_suppressedLogged = false;
                 s_allowAllPlayersDead = false;
@@ -125,61 +86,49 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             return false;
         }
 
-        private static IEnumerable<CodeInstruction> UpdateTranspiler(IEnumerable<CodeInstruction> instructions)
+        private static void UpdatePostfix(RunManager __instance)
         {
-            if (AllPlayersDeadField == null)
+            if (__instance == null || !__instance.allPlayersDead)
             {
-                foreach (var instruction in instructions)
-                {
-                    yield return instruction;
-                }
-                yield break;
+                return;
             }
 
-            var guardMethod = AccessTools.Method(typeof(AllPlayersDeadGuard), nameof(GuardAllPlayersDead));
-            if (guardMethod == null)
+            if (!ShouldSuppressAllPlayersDeadFlow() || s_allowAllPlayersDead)
             {
-                foreach (var instruction in instructions)
-                {
-                    yield return instruction;
-                }
-                yield break;
+                return;
             }
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand is FieldInfo field && field == AllPlayersDeadField)
-                {
-                    yield return new CodeInstruction(OpCodes.Call, guardMethod);
-                }
+            __instance.allPlayersDead = false;
 
-                yield return instruction;
+            if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(UpdateGuardLogKey, 120))
+            {
+                Log.LogDebug($"{ModuleTag} Suppressed RunManager.allPlayersDead assignment during LastChance flow.");
             }
         }
 
-        private static bool GuardAllPlayersDead(bool value)
+        private static bool ShouldSuppressAllPlayersDeadFlow()
         {
-            if (!value)
-                return false;
-
             if (!FeatureFlags.LastChangeMode)
-                return true;
+            {
+                return false;
+            }
 
             if (!CompatibilityGate.IsFeatureUsable(ModFeatureGate.LastChanceCluster))
-                return true;
+            {
+                return false;
+            }
 
             if (LastChanceTimerController.IsSuppressedForRoom)
-                return true;
+            {
+                return false;
+            }
 
             if (IsVanillaOnlyContext())
-                return true;
+            {
+                return false;
+            }
 
-            if (s_allowAllPlayersDead)
-                return true;
-            
-            // Prevent vanilla all-players-dead transitions while LastChance mode is enabled.
-            // Vanilla flow is re-enabled explicitly via AllowVanillaAllPlayersDead().
-            return false;
+            return true;
         }
 
         private static bool IsVanillaOnlyContext()
@@ -191,29 +140,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
                    SemiFunc.RunIsLobby() ||
                    SemiFunc.RunIsTutorial() ||
                    SemiFunc.MenuLevel();
-        }
-
-        private static bool IsProceduralMonsterLevelContext()
-        {
-            if (!SemiFunc.RunIsLevel())
-            {
-                return false;
-            }
-
-            var runManager = RunManager.instance;
-            if (runManager == null || runManager.levelCurrent == null)
-            {
-                return false;
-            }
-
-            // Whitelist: only levels in the procedural run list.
-            if (runManager.levels == null || !runManager.levels.Contains(runManager.levelCurrent))
-            {
-                return false;
-            }
-
-            // LastChance should run only where monsters are expected.
-            return runManager.levelCurrent.HasEnemies;
         }
 
         internal static bool AllPlayersDisabled()
@@ -236,18 +162,33 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
                     continue;
                 }
 
-                if (PlayerIsDisabledField == null)
-                {
-                    return false;
-                }
-
-                if (PlayerIsDisabledField.GetValue(player) is bool disabled && !disabled)
+                if (!player.isDisabled)
                 {
                     return false;
                 }
             }
 
             return true;
+        }
+
+        [HarmonyPatch(typeof(RunManager), nameof(RunManager.ChangeLevel), new[] { typeof(bool), typeof(bool), typeof(RunManager.ChangeLevelType) })]
+        internal static class RunManagerChangeLevelPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(RunManager __instance, bool _completedLevel, bool _levelFailed, RunManager.ChangeLevelType _changeLevelType)
+            {
+                return ChangeLevelPrefix(__instance, _completedLevel, _levelFailed, _changeLevelType);
+            }
+        }
+
+        [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
+        internal static class RunManagerUpdateAllPlayersDeadPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(RunManager __instance)
+            {
+                UpdatePostfix(__instance);
+            }
         }
     }
 }

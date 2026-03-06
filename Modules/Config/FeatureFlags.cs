@@ -10,7 +10,7 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChanceTimer = "1b. LastChance: Timer Calculation";
             public const string LastChanceGameplay = "1c. LastChance: Gameplay & UI";
             public const string Spectate = "2. Spectate";
-            public const string Debug = "9. Debug";
+            public const string Debug = "3. Debug";
         }
 
         internal static class Descriptions

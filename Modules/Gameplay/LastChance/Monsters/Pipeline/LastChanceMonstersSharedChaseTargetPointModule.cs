@@ -1,11 +1,8 @@
 #nullable enable
 
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
 using UnityEngine;
@@ -16,96 +13,591 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
     [HarmonyPatch]
     internal static class LastChanceMonstersSharedChaseTargetPointModule
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Headman");
-        private static readonly MethodInfo? s_transformGetPositionMethod =
-            AccessTools.PropertyGetter(typeof(Transform), nameof(Transform.position));
-
-        private static readonly MethodInfo? s_effectiveTransformPositionMethod =
-            AccessTools.Method(typeof(LastChanceMonstersSharedChaseTargetPointModule), nameof(GetEffectiveTransformPosition));
-
-        [HarmonyTargetMethods]
-        private static IEnumerable<MethodBase> TargetMethods()
+        private sealed class HeadmanDeathHeadWindowState
         {
-            var methods = new List<MethodBase>();
-
-            AddIfFound(methods, typeof(EnemyStateChase), "Update");
-            AddIfFound(methods, typeof(EnemyStateChaseBegin), "Update");
-            AddIfFound(methods, typeof(EnemyStateChaseSlow), "Update");
-
-            return methods;
+            internal float FocusStartAt = -1f;
+            internal float CooldownUntil = -1f;
+            internal float LastTouchAt = -1f;
         }
 
-        [HarmonyPrepare]
-        private static bool Prepare()
-        {
-            return s_transformGetPositionMethod != null && s_effectiveTransformPositionMethod != null;
-        }
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeadmanChase");
+        private static readonly System.Collections.Generic.Dictionary<int, HeadmanDeathHeadWindowState> HeadmanWindowByEnemyId = new();
+        private static float s_nextHeadmanWindowCleanupAt;
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> ReplaceTargetPositionReads(IEnumerable<CodeInstruction> instructions)
+        [HarmonyPatch(typeof(EnemyStateChase), nameof(EnemyStateChase.Update))]
+        internal static class EnemyStateChaseUpdatePatch
         {
-            if (s_transformGetPositionMethod == null || s_effectiveTransformPositionMethod == null)
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyStateChase __instance)
             {
-                return instructions;
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecuteChaseUpdate(__instance);
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(EnemyStateChaseBegin), nameof(EnemyStateChaseBegin.Update))]
+        internal static class EnemyStateChaseBeginUpdatePatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyStateChaseBegin __instance)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
+                {
+                    return true;
+                }
+
+                ExecuteChaseBeginUpdate(__instance);
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.VisionTriggered))]
+        internal static class EnemyHeadControllerVisionTriggeredPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(EnemyHeadController __instance)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || __instance == null)
+                {
+                    return;
+                }
+
+                var enemy = __instance.Enemy;
+                if (enemy == null || enemy.CurrentState != EnemyState.ChaseBegin)
+                {
+                    return;
+                }
+
+                var target = enemy.TargetPlayerAvatar;
+                if (!ShouldTreatDisabledAsActiveForEnemy(enemy, target, out var eligibilityReason))
+                {
+                    DebugChaseProbe(enemy, "VisionTriggered.Skip", target, $"target not eligible reason={eligibilityReason}");
+                    return;
+                }
+
+                if (enemy.StateChase != null)
+                {
+                    enemy.StateChase.ChaseCanReach = true;
+                    enemy.StateChase.VisionTimer = Mathf.Max(enemy.StateChase.VisionTimer, 0.5f);
+                }
+
+                enemy.CurrentState = EnemyState.Chase;
+                DebugChaseTransition(enemy, "VisionTriggered->Chase.Force", target, "LastChance target eligible");
+            }
+        }
+
+        [HarmonyPatch(typeof(EnemyHeadController), nameof(EnemyHeadController.OnStunnedEnd))]
+        internal static class EnemyHeadControllerOnStunnedEndPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(EnemyHeadController __instance)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || __instance == null)
+                {
+                    return true;
+                }
+
+                var enemy = __instance.Enemy;
+                if (enemy == null)
+                {
+                    return true;
+                }
+
+                var target = enemy.TargetPlayerAvatar;
+                if (!ShouldTreatDisabledAsActiveForEnemy(enemy, target, out var eligibilityReason))
+                {
+                    DebugChaseProbe(enemy, "OnStunnedEnd.Skip", target, $"target not eligible reason={eligibilityReason}");
+                    return true;
+                }
+
+                if (enemy.StateChase != null)
+                {
+                    enemy.StateChase.ChaseCanReach = true;
+                    enemy.StateChase.VisionTimer = Mathf.Max(enemy.StateChase.VisionTimer, 0.5f);
+                }
+
+                enemy.CurrentState = EnemyState.ChaseBegin;
+                DebugChaseTransition(enemy, "OnStunnedEnd->ChaseBegin.Override", target, "prevent forced roaming for eligible LastChance target");
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(EnemyStateStunned), nameof(EnemyStateStunned.Update))]
+        internal static class EnemyStateStunnedUpdatePatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(EnemyStateStunned __instance)
+            {
+                if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || __instance == null || __instance.enemy == null)
+                {
+                    return;
+                }
+
+                var enemy = __instance.enemy;
+                if (enemy.GetComponentInChildren<EnemyHeadController>() == null)
+                {
+                    return;
+                }
+
+                var target = enemy.TargetPlayerAvatar;
+                if (!ShouldTreatDisabledAsActiveForEnemy(enemy, target, out var eligibilityReason))
+                {
+                    DebugChaseProbe(enemy, "Stunned.Update.Skip", target, $"target not eligible reason={eligibilityReason}");
+                    return;
+                }
+
+                if (enemy.CurrentState != EnemyState.Roaming)
+                {
+                    return;
+                }
+
+                if (__instance.stunTimer > 0f || __instance.overrideDisableTimer > 0f)
+                {
+                    return;
+                }
+
+                if (enemy.StateChase != null)
+                {
+                    enemy.StateChase.ChaseCanReach = true;
+                    enemy.StateChase.VisionTimer = Mathf.Max(enemy.StateChase.VisionTimer, 0.5f);
+                }
+
+                enemy.CurrentState = EnemyState.ChaseBegin;
+                DebugChaseTransition(enemy, "Stunned.Update->ChaseBegin.Override", target, "prevent post-stun roaming reset for eligible LastChance target");
+            }
+        }
+
+        private static void ExecuteChaseUpdate(EnemyStateChase state)
+        {
+            if (!state.Enemy.MasterClient)
+            {
+                DebugChaseProbe(state.Enemy, "Chase.Return.NotMaster", state.Enemy.TargetPlayerAvatar, "skipping custom chase update on non-master");
+                return;
             }
 
-            var list = new List<CodeInstruction>(instructions);
-            for (var i = 0; i < list.Count; i++)
+            if (state.Enemy.CurrentState != EnemyState.Chase)
             {
-                var ins = list[i];
-                if ((ins.opcode != OpCodes.Call && ins.opcode != OpCodes.Callvirt) || ins.operand is not MethodInfo called)
+                if (state.Active)
                 {
+                    state.Active = false;
+                    DebugChaseProbe(state.Enemy, "Chase.ResetActive", state.Enemy.TargetPlayerAvatar, "CurrentState != Chase");
+                }
+
+                return;
+            }
+
+            var targetPlayer = state.Enemy.TargetPlayerAvatar;
+            if (targetPlayer == null)
+            {
+                DebugChaseTransition(state.Enemy, "Chase->Roaming.NoTarget", null, "TargetPlayerAvatar is null");
+                state.Enemy.CurrentState = EnemyState.Roaming;
+                return;
+            }
+
+            if (!ShouldTreatDisabledAsActiveForEnemy(state.Enemy, targetPlayer, out var targetEligibilityReason))
+            {
+                DebugChaseTransition(state.Enemy, "Chase->Roaming.TargetWindowClosed", targetPlayer, $"reason={targetEligibilityReason}");
+                state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
+                state.Enemy.CurrentState = EnemyState.Roaming;
+                return;
+            }
+
+            DebugChaseHeartbeat(state.Enemy, "Chase.Heartbeat", targetPlayer, $"visionTimer={state.VisionTimer:F2} stateTimer={state.StateTimer:F2} canReach={state.ChaseCanReach}");
+
+            if (!state.Active)
+            {
+                targetPlayer.LastNavMeshPositionTimer = 0f;
+                state.ChasePosition = ResolveTargetPosition(targetPlayer);
+                state.VisionTimer = state.VisionTime;
+                state.ChaseCanReachSet = false;
+                state.SawPlayerHide = false;
+                state.CantReachTime = 0f;
+                state.StateTimer = Random.Range(state.StateTimeMin, state.StateTimeMax);
+                state.Active = true;
+            }
+
+            state.Enemy.SetChaseTimer();
+            state.Enemy.NavMeshAgent.UpdateAgent(state.Speed, state.Acceleration);
+            if (state.Enemy.Vision.VisionTriggered[targetPlayer.photonView.ViewID])
+            {
+                state.VisionTimer = state.VisionTime;
+            }
+            else if (state.VisionTimer > 0f)
+            {
+                state.VisionTimer -= Time.deltaTime;
+            }
+
+            var effectiveTargetPosition = ResolveTargetPosition(targetPlayer);
+            if (state.VisionTimer > 0f)
+            {
+                if (state.ChaseOnlyOnNavmesh || targetPlayer.LastNavMeshPositionTimer <= 0.25f)
+                {
+                    state.Enemy.NavMeshAgent.Enable();
+                    state.Enemy.NavMeshAgent.SetDestination(targetPlayer.LastNavmeshPosition);
+                    if (state.ChaseCanReachSet)
+                    {
+                        var point = state.Enemy.NavMeshAgent.GetPoint();
+                        state.ChaseCanReach = Vector3.Distance(point, effectiveTargetPosition) <= 0.5f;
+
+                        if (targetPlayer.isCrawling && !state.ChaseCanReach && SemiFunc.EnemyLookUnderCondition(state.Enemy, state.StateTimer, 5f, targetPlayer))
+                        {
+                            state.SawPlayerHidePosition = effectiveTargetPosition;
+                            state.SawPlayerNavmeshPosition = targetPlayer.LastNavmeshPosition;
+                            state.SawPlayerHide = true;
+                        }
+
+                        state.ChasePosition = point;
+                    }
+
+                    state.ChaseCanReachSet = true;
+                }
+                else
+                {
+                    state.Enemy.NavMeshAgent.Disable(0.1f);
+                    state.transform.position = Vector3.MoveTowards(state.transform.position, effectiveTargetPosition, state.Speed * Time.deltaTime);
+                }
+            }
+            else
+            {
+                if (state.SawPlayerHide)
+                {
+                    DebugChaseProbe(state.Enemy, "Chase->LookUnder.SawPlayerHide", targetPlayer, "vision timer expired while saw player hide");
+                    state.Enemy.CurrentState = EnemyState.LookUnder;
+                    return;
+                }
+
+                state.Enemy.NavMeshAgent.SetDestination(state.ChasePosition);
+                if (Vector3.Distance(state.transform.position, state.ChasePosition) < 1f)
+                {
+                    var levelPointAhead = state.Enemy.GetLevelPointAhead(state.ChasePosition);
+                    if (levelPointAhead)
+                    {
+                        state.Enemy.NavMeshAgent.SetDestination(levelPointAhead.transform.position);
+                    }
+
+                    state.ChasePosition = state.Enemy.NavMeshAgent.GetDestination();
+                }
+
+                state.ChaseCanReach = true;
+                state.ChaseCanReachSet = false;
+            }
+
+            if (state.ChaseCanReach && state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] >= state.VisionsToReset)
+            {
+                state.StateTimer = Random.Range(state.StateTimeMin, state.StateTimeMax);
+            }
+
+            if (!state.ChaseCanReach)
+            {
+                state.CantReachTime += Time.deltaTime;
+                if (state.CantReachTime > 2f)
+                {
+                    state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
+                    DebugChaseProbe(state.Enemy, "Chase->ChaseSlow.CantReach", targetPlayer, $"cantReachTime={state.CantReachTime:F2}");
+                    state.Enemy.CurrentState = EnemyState.ChaseSlow;
+                    return;
+                }
+            }
+            else
+            {
+                state.CantReachTime = 0f;
+            }
+
+            state.StateTimer -= Time.deltaTime;
+            if (state.StateTimer <= 0f)
+            {
+                DebugChaseProbe(state.Enemy, "Chase->ChaseSlow.TimerElapsed", targetPlayer, "state timer elapsed");
+                state.Enemy.CurrentState = EnemyState.ChaseSlow;
+            }
+
+            if (targetPlayer.isDisabled && !ShouldTreatDisabledAsActiveForEnemy(state.Enemy, targetPlayer, out _))
+            {
+                DebugChaseTransition(state.Enemy, "Chase->Roaming.DisabledTarget", targetPlayer, "target is disabled and not eligible");
+                state.Enemy.Vision.VisionsTriggered[targetPlayer.photonView.ViewID] = 0;
+                state.Enemy.CurrentState = EnemyState.Roaming;
+            }
+        }
+
+        private static void ExecuteChaseBeginUpdate(EnemyStateChaseBegin state)
+        {
+            if (state.Enemy.CurrentState != EnemyState.ChaseBegin)
+            {
+                if (state.Active)
+                {
+                    DebugChaseTransition(state.Enemy, "ChaseBegin.ResetActive", state.TargetPlayer, "CurrentState != ChaseBegin");
+                    state.Active = false;
+                }
+                else
+                {
+                    DebugChaseProbe(state.Enemy, "ChaseBegin.Return.NotInState", state.TargetPlayer, $"currentState={state.Enemy.CurrentState}");
+                }
+
+                return;
+            }
+
+            if (!state.Active)
+            {
+                if (state.Enemy.MasterClient)
+                {
+                    state.Enemy.StateChase.ChaseCanReach = true;
+                    state.Enemy.NavMeshAgent.ResetPath();
+                    state.StateTimer = Random.Range(state.StateTimeMin, state.StateTimeMax);
+                }
+
+                state.TargetPlayer = PlayerController.instance.playerAvatarScript;
+                foreach (var playerAvatar in GameDirector.instance.PlayerList)
+                {
+                        if ((!playerAvatar.isDisabled || ShouldTreatDisabledAsActiveForEnemy(state.Enemy, playerAvatar, out _)) &&
+                            playerAvatar.photonView.ViewID == state.Enemy.TargetPlayerViewID)
+                        {
+                            state.TargetPlayer = playerAvatar;
+                            break;
+                        }
+                }
+
+                foreach (var playerAvatar in GameDirector.instance.PlayerList)
+                {
+                    if ((!playerAvatar.isDisabled || ShouldTreatDisabledAsActiveForEnemy(state.Enemy, playerAvatar, out _)) &&
+                        playerAvatar.isLocal)
+                    {
+                        if (GameManager.instance.gameMode != 0 && !(state.TargetPlayer == playerAvatar) && !state.Enemy.PlayerRoom.SameLocal && !state.Enemy.OnScreen.OnScreenLocal)
+                        {
+                            state.LocalEffect = false;
+                            GameDirector.instance.CameraImpact.ShakeDistance(5f, 5f, 10f, state.transform.position, 0.25f);
+                            GameDirector.instance.CameraShake.ShakeDistance(3f, 5f, 10f, state.transform.position, 0.5f);
+                            break;
+                        }
+
+                        state.LocalEffect = true;
+                        GameDirector.instance.CameraImpact.Shake(5f, 0.25f);
+                        GameDirector.instance.CameraShake.Shake(3f, 0.5f);
+                        if (state.Stinger)
+                        {
+                            CameraGlitch.Instance.PlayShort();
+                            AudioScare.instance.PlayImpact();
+                        }
+
+                        break;
+                    }
+                }
+
+                state.Active = true;
+                DebugChaseProbe(state.Enemy, "ChaseBegin.ActiveInit", state.TargetPlayer, $"targetViewId={state.Enemy.TargetPlayerViewID}");
+            }
+
+            state.Enemy.SetChaseTimer();
+            if (!state.Enemy.MasterClient)
+            {
+                DebugChaseProbe(state.Enemy, "ChaseBegin.Return.NotMaster", state.TargetPlayer, "skipping chase begin update on non-master");
+                return;
+            }
+
+            DebugChaseHeartbeat(state.Enemy, "ChaseBegin.Heartbeat", state.TargetPlayer, $"active={state.Active} stateTimer={state.StateTimer:F2} targetViewId={state.Enemy.TargetPlayerViewID}");
+
+            var targetPlayer = state.TargetPlayer;
+            if (targetPlayer == null)
+            {
+                var enemyTarget = state.Enemy.TargetPlayerAvatar;
+                if (enemyTarget != null &&
+                    (!enemyTarget.isDisabled || ShouldTreatDisabledAsActiveForEnemy(state.Enemy, enemyTarget, out _)))
+                {
+                    targetPlayer = enemyTarget;
+                    state.TargetPlayer = enemyTarget;
+                    DebugChaseTransition(state.Enemy, "ChaseBegin.TargetFallback", enemyTarget, "using Enemy.TargetPlayerAvatar fallback");
+                }
+                else
+                {
+                    DebugChaseTransition(state.Enemy, "ChaseBegin->Roaming.NoUsableTarget", enemyTarget, "TargetPlayer null and fallback invalid");
+                    state.Enemy.CurrentState = EnemyState.Roaming;
+                    return;
+                }
+            }
+
+            state.Enemy.NavMeshAgent.UpdateAgent(0f, 5f);
+            state.Enemy.NavMeshAgent.Stop(0.1f);
+            state.transform.LookAt(ResolveTargetPosition(targetPlayer));
+            state.transform.localEulerAngles = new Vector3(0f, state.transform.localEulerAngles.y, 0f);
+            state.StateTimer -= Time.deltaTime;
+            if (state.StateTimer <= 0f)
+            {
+                DebugChaseTransition(state.Enemy, "ChaseBegin->Chase.TimerElapsed", targetPlayer, "transitioning to chase");
+                state.Enemy.CurrentState = EnemyState.Chase;
+            }
+            else
+            {
+                DebugChaseProbe(state.Enemy, "ChaseBegin.WaitingTimer", targetPlayer, $"stateTimer={state.StateTimer:F2}");
+            }
+        }
+
+        private static bool ShouldTreatDisabledAsActiveForEnemy(Enemy? enemy, PlayerAvatar? target, out string reason)
+        {
+            reason = "DisabledGateFalse";
+            if (!LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target))
+            {
+                return false;
+            }
+
+            if (enemy == null || !IsHeadmanEnemy(enemy))
+            {
+                reason = "Allowed.NonHeadman";
+                return true;
+            }
+
+            return EvaluateHeadmanDeathHeadWindow(enemy, out reason);
+        }
+
+        private static bool IsHeadmanEnemy(Enemy enemy)
+        {
+            return enemy.GetComponentInChildren<EnemyHeadController>() != null;
+        }
+
+        private static bool EvaluateHeadmanDeathHeadWindow(Enemy enemy, out string reason)
+        {
+            var now = Time.unscaledTime;
+            CleanupHeadmanWindowState(now);
+
+            var enemyId = enemy.GetInstanceID();
+            if (!HeadmanWindowByEnemyId.TryGetValue(enemyId, out var state))
+            {
+                state = new HeadmanDeathHeadWindowState();
+                HeadmanWindowByEnemyId[enemyId] = state;
+            }
+
+            state.LastTouchAt = now;
+
+            if (state.CooldownUntil > now)
+            {
+                reason = "Blocked.Cooldown";
+                return false;
+            }
+
+            if (state.FocusStartAt < 0f)
+            {
+                state.FocusStartAt = now;
+            }
+
+            var maxFocus = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersHeadmanDeathHeadFocusMaxSeconds);
+            if (now - state.FocusStartAt >= maxFocus)
+            {
+                var cooldown = Mathf.Max(0.1f, InternalConfig.LastChanceMonstersHeadmanDeathHeadFocusCooldownSeconds);
+                state.CooldownUntil = now + cooldown;
+                state.FocusStartAt = -1f;
+                reason = "Blocked.StartCooldown";
+                return false;
+            }
+
+            reason = "Allowed.FocusWindow";
+            return true;
+        }
+
+        private static void CleanupHeadmanWindowState(float now)
+        {
+            if (now < s_nextHeadmanWindowCleanupAt)
+            {
+                return;
+            }
+
+            s_nextHeadmanWindowCleanupAt = now + 5f;
+            if (HeadmanWindowByEnemyId.Count == 0)
+            {
+                return;
+            }
+
+            var stale = new System.Collections.Generic.List<int>();
+            foreach (var pair in HeadmanWindowByEnemyId)
+            {
+                var state = pair.Value;
+                if (state == null)
+                {
+                    stale.Add(pair.Key);
                     continue;
                 }
 
-                if (called == s_transformGetPositionMethod)
+                var lastRelevant = Mathf.Max(state.LastTouchAt, state.CooldownUntil);
+                if (lastRelevant < 0f || now - lastRelevant > 30f)
                 {
-                    ins.opcode = OpCodes.Call;
-                    ins.operand = s_effectiveTransformPositionMethod;
+                    stale.Add(pair.Key);
                 }
             }
 
-            return list;
+            for (var i = 0; i < stale.Count; i++)
+            {
+                HeadmanWindowByEnemyId.Remove(stale[i]);
+            }
         }
 
-        private static Vector3 GetEffectiveTransformPosition(Transform transform)
+        private static Vector3 ResolveTargetPosition(PlayerAvatar targetPlayer)
         {
-            if (transform == null)
-            {
-                return Vector3.zero;
-            }
-
-            if (!LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
-            {
-                return transform.position;
-            }
-
-            LastChanceMonstersTargetProxyHelper.TryResolvePlayerAvatarFromTransform(transform, out var player);
-            if (player != null && LastChanceMonstersTargetProxyHelper.TryGetHeadProxyTarget(player, out var headCenter))
-            {
-                if (InternalDebugFlags.DebugLastChanceHeadmanFlow)
-                {
-                    var key = $"Headman.TargetPointProxy.{player.GetInstanceID()}";
-                    if (InternalDebugFlags.DebugLastChanceHeadmanVerbose || LogLimiter.ShouldLog(key, 15))
-                    {
-                        Log.LogInfo(
-                            $"[Headman][TargetPointProxy] runtime=True player={player.name} playerId={player.GetInstanceID()} " +
-                            $"body={transform.position} head={headCenter}");
-                    }
-                }
-                return headCenter;
-            }
-
-            return transform.position;
+            return LastChanceMonstersTargetingOrchestrator.ResolveEffectiveTransformTargetPoint(targetPlayer.transform);
         }
 
-        private static void AddIfFound(List<MethodBase> methods, System.Type type, string methodName)
+        private static void DebugChaseTransition(Enemy? enemy, string reason, PlayerAvatar? target, string details)
         {
-            var method = AccessTools.Method(type, methodName);
-            if (method != null)
+            if (!InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || enemy == null)
             {
-                methods.Add(method);
+                return;
             }
+
+            var enemyId = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"HeadmanChase.{reason}.{enemyId}", 20))
+            {
+                return;
+            }
+
+            var targetId = target != null && target.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            var targetInfo = target == null ? "target=n/a" : $"target='{target.gameObject.name}' targetViewId={targetId}";
+            Log.LogInfo(
+                $"[HeadmanChase] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
+                $"{targetInfo} targetDisabled={targetDisabled} targetEligible={targetEligible} details={details}");
+        }
+
+        private static void DebugChaseHeartbeat(Enemy? enemy, string reason, PlayerAvatar? target, string details)
+        {
+            if (!InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || enemy == null)
+            {
+                return;
+            }
+
+            var enemyId = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"HeadmanChase.{reason}.{enemyId}", 10))
+            {
+                return;
+            }
+
+            var targetId = target != null && target.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            Log.LogInfo(
+                $"[HeadmanChase] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
+                $"targetViewId={targetId} targetDisabled={targetDisabled} targetEligible={targetEligible} {details}");
+        }
+
+        private static void DebugChaseProbe(Enemy? enemy, string reason, PlayerAvatar? target, string details)
+        {
+            if (!InternalDebugFlags.DebugLastChanceHeadmanSlowMouthFlow || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || enemy == null)
+            {
+                return;
+            }
+
+            var enemyId = enemy.GetInstanceID();
+            if (!LogLimiter.ShouldLog($"HeadmanChase.Probe.{reason}.{enemyId}", 8))
+            {
+                return;
+            }
+
+            var targetId = target != null && target.photonView != null ? target.photonView.ViewID : -1;
+            var targetDisabled = target != null && target.isDisabled;
+            var targetEligible = LastChanceMonstersDisabledGateHelper.ShouldTreatDisabledAsActive(target);
+            Log.LogInfo(
+                $"[HeadmanChaseProbe] enemy='{enemy.gameObject.name}' enemyId={enemyId} state={enemy.CurrentState} reason={reason} " +
+                $"targetViewId={targetId} targetDisabled={targetDisabled} targetEligible={targetEligible} details={details}");
         }
     }
 }

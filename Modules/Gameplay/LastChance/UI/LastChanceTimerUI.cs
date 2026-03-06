@@ -2,16 +2,23 @@
 
 using System;
 using System.Collections.Generic;
-using System.Reflection;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Utilities;
+using DeathHeadHopper.Managers;
+using DeathHeadHopper.UI;
 using HarmonyLib;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 {
     internal static class LastChanceTimerUI
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.TimerUI");
         private const string SemibotWhiteFileName = "SemibotWhite.png";
         private const string TruckWhiteFileName = "TruckWhite.png";
         private const string SemibotSurrenderedFileName = "SemibotSurrendered.png";
@@ -35,29 +42,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private const float TruckCounterBadgeBorderThickness = 2f;
         private const float TruckCounterFontSize = 11f;
 
-        private static readonly Type? LabelType = AccessTools.TypeByName("TMPro.TextMeshProUGUI");
-        private static readonly Type? AlignmentType = AccessTools.TypeByName("TMPro.TextAlignmentOptions");
-        private static readonly Type? ImageType = AccessTools.TypeByName("UnityEngine.UI.Image");
-        private static readonly FieldInfo? CurrentMenuPageField = AccessTools.Field(typeof(MenuManager), "currentMenuPage");
+        private static readonly TextAlignmentOptions CenterAlignment = TextAlignmentOptions.Center;
+        private static readonly TextAlignmentOptions TopAlignment = TextAlignmentOptions.Top;
 
-        private static readonly PropertyInfo? TextProperty = LabelType?.GetProperty("text");
-        private static readonly PropertyInfo? ColorProperty = LabelType?.GetProperty("color");
-        private static readonly PropertyInfo? AlignmentProperty = LabelType?.GetProperty("alignment");
-        private static readonly PropertyInfo? FontSizeProperty = LabelType?.GetProperty("fontSize");
-        private static readonly PropertyInfo? AutoSizeProperty = LabelType?.GetProperty("enableAutoSizing");
-        private static readonly PropertyInfo? WordWrapProperty = LabelType?.GetProperty("enableWordWrapping");
-        private static readonly PropertyInfo? RichTextProperty = LabelType?.GetProperty("richText");
-
-        private static readonly PropertyInfo? ImageSpriteProperty = ImageType?.GetProperty("sprite");
-        private static readonly PropertyInfo? ImageColorProperty = ImageType?.GetProperty("color");
-        private static readonly PropertyInfo? ImagePreserveAspectProperty = ImageType?.GetProperty("preserveAspect");
-
-        private static readonly object? CenterAlignment = AlignmentType != null ? Enum.Parse(AlignmentType, "Center") : null;
-        private static readonly object? TopAlignment = AlignmentType != null ? Enum.Parse(AlignmentType, "Top") : null;
-
-        private static Component? s_label;
+        private static TextMeshProUGUI? s_label;
         private static RectTransform? s_rect;
-        private static Component? s_hintLabel;
+        private static TextMeshProUGUI? s_hintLabel;
         private static RectTransform? s_hintRect;
         private static string s_defaultHintText = string.Empty;
         private static string s_lastTimerText = string.Empty;
@@ -69,8 +59,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private static RectTransform? s_playersRoot;
         private static readonly List<PlayerIconSlot> s_playerSlots = new(MaxPlayerIcons);
         private static RectTransform? s_truckRoot;
-        private static Component? s_truckIconImage;
-        private static Component? s_truckCounterLabel;
+        private static Image? s_truckIconImage;
+        private static TextMeshProUGUI? s_truckCounterLabel;
         private static string s_lastTruckCounterText = string.Empty;
 
         private static Sprite? s_semibotWhiteSprite;
@@ -82,13 +72,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private const float AssetRetryIntervalSeconds = 2f;
 
         private const float VisibilityRefreshIntervalSeconds = 0.5f;
+        private const float AbilitySpotCacheRefreshIntervalSeconds = 0.5f;
 
         private sealed class PlayerIconSlot
         {
             internal RectTransform? Root;
-            internal Component? BaseImage;
-            internal Component? SurrenderImage;
-            internal Component? SafeImage;
+            internal Image? BaseImage;
+            internal Image? SurrenderImage;
+            internal Image? SafeImage;
         }
 
         internal static void Show(string defaultHintText)
@@ -103,7 +94,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             var parent = ResolvePreferredUiParent();
-            if (LabelType == null || parent == null)
+            if (parent == null)
             {
                 return;
             }
@@ -120,20 +111,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_rect.anchoredPosition = new Vector2(0f, DefaultTimerVerticalPosition);
             s_rect.sizeDelta = new Vector2(700f, 120f);
 
-            s_label = go.AddComponent(LabelType);
+            s_label = go.AddComponent<TextMeshProUGUI>();
             SetDefaults(s_label);
             LastChanceTimerChangeEffectsModule.Initialize(
                 s_rect,
                 s_label,
-                LabelType,
-                TextProperty,
-                ColorProperty,
-                AlignmentProperty,
-                FontSizeProperty,
-                AutoSizeProperty,
-                WordWrapProperty,
-                RichTextProperty,
-                CenterAlignment,
                 TimerFontSize);
             SetEnabled(false);
 
@@ -149,7 +131,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
                 s_hintRect.anchoredPosition = new Vector2(0f, GetSurrenderOffsetY());
             }
 
-            s_hintLabel = hintGo.AddComponent(LabelType);
+            s_hintLabel = hintGo.AddComponent<TextMeshProUGUI>();
             SetHintDefaults(s_hintLabel);
             s_lastHintText = string.Empty;
             SetSurrenderHintText(s_defaultHintText);
@@ -205,6 +187,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_truckIconImage = null;
             s_truckCounterLabel = null;
             s_lastTruckCounterText = string.Empty;
+            AbilitySpotDiscoveryCache.Invalidate();
             LastChanceTimerChangeEffectsModule.Reset();
         }
 
@@ -307,7 +290,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
         internal static void SetSurrenderHintText(string text)
         {
-            if (s_hintLabel == null || TextProperty == null)
+            if (s_hintLabel == null)
             {
                 return;
             }
@@ -318,7 +301,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             s_lastHintText = text;
-            TextProperty.SetValue(s_hintLabel, text);
+            s_hintLabel.text = text;
         }
 
         internal static void ResetSurrenderHint()
@@ -425,7 +408,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
         private static void SetTruckCounterText(string text)
         {
-            if (s_truckCounterLabel == null || TextProperty == null)
+            if (s_truckCounterLabel == null)
             {
                 return;
             }
@@ -436,11 +419,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             s_lastTruckCounterText = text;
-            TextProperty.SetValue(s_truckCounterLabel, text);
-            if (s_truckCounterLabel is Behaviour behaviour)
-            {
-                behaviour.enabled = true;
-            }
+            s_truckCounterLabel.text = text;
+            s_truckCounterLabel.enabled = true;
             s_truckCounterLabel.gameObject.SetActive(true);
         }
 
@@ -478,55 +458,28 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             labelRect.pivot = new Vector2(0.5f, 0.5f);
             labelRect.anchoredPosition = Vector2.zero;
             labelRect.sizeDelta = Vector2.zero;
-            s_truckCounterLabel = labelGo.AddComponent(LabelType!);
+            s_truckCounterLabel = labelGo.AddComponent<TextMeshProUGUI>();
             SetHintDefaults(s_truckCounterLabel);
-            if (FontSizeProperty != null)
-            {
-                FontSizeProperty.SetValue(s_truckCounterLabel, TruckCounterFontSize);
-            }
-            if (ColorProperty != null)
-            {
-                ColorProperty.SetValue(s_truckCounterLabel, new Color(1f, 0.92f, 0.3f, 1f));
-            }
+            s_truckCounterLabel.fontSize = TruckCounterFontSize;
+            s_truckCounterLabel.color = new Color(1f, 0.92f, 0.3f, 1f);
         }
 
-        private static Component? AddImageComponent(GameObject go)
+        private static Image? AddImageComponent(GameObject go)
         {
-            if (ImageType == null)
-            {
-                return null;
-            }
-
-            return go.AddComponent(ImageType);
+            return go.AddComponent<Image>();
         }
 
-        private static void SetImage(Component? image, Sprite? sprite, Color color, bool enabled)
+        private static void SetImage(Image? image, Sprite? sprite, Color color, bool enabled)
         {
             if (image == null)
             {
                 return;
             }
 
-            if (ImageSpriteProperty != null)
-            {
-                ImageSpriteProperty.SetValue(image, sprite);
-            }
-
-            if (ImageColorProperty != null)
-            {
-                ImageColorProperty.SetValue(image, color);
-            }
-
-            if (ImagePreserveAspectProperty != null)
-            {
-                ImagePreserveAspectProperty.SetValue(image, true);
-            }
-
-            if (image is Behaviour behaviour)
-            {
-                behaviour.enabled = enabled;
-            }
-
+            image.sprite = sprite;
+            image.color = color;
+            image.preserveAspect = true;
+            image.enabled = enabled;
             image.gameObject.SetActive(enabled);
         }
 
@@ -565,7 +518,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.UI.Sprites", 30))
             {
-                Debug.Log(
+                Log.LogDebug(
                     $"[LastChance] UI sprites status: semibot={(s_semibotWhiteSprite != null)} truck={(s_truckWhiteSprite != null)} " +
                     $"surrendered={(s_semibotSurrenderedSprite != null)} safe={(s_semibotSafeSprite != null)}");
             }
@@ -655,7 +608,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
                 return false;
             }
 
-            if (MenuManager.instance != null && CurrentMenuPageField != null && CurrentMenuPageField.GetValue(MenuManager.instance) != null)
+            if (MenuManager.instance != null && MenuManager.instance.currentMenuPage != null)
             {
                 return false;
             }
@@ -684,18 +637,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
         private static Transform? ResolvePreferredUiParent()
         {
-            var dhhUiMgrType = AccessTools.TypeByName("DeathHeadHopper.Managers.DHHUIManager");
-            if (dhhUiMgrType != null)
+            if (DHHUIManager.instance != null)
             {
-                var instanceProperty = dhhUiMgrType.GetProperty("instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                var instance = instanceProperty?.GetValue(null);
-                if (instance != null)
+                var gameHud = DHHUIManager.instance.gameHUD;
+                if (gameHud != null)
                 {
-                    var gameHudField = dhhUiMgrType.GetField("gameHUD", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (gameHudField?.GetValue(instance) is GameObject gameHud && gameHud != null)
-                    {
-                        return gameHud.transform;
-                    }
+                    return gameHud.transform;
                 }
             }
 
@@ -713,36 +660,24 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             return s_cachedUiParent;
         }
 
-        private static void SetDefaults(Component label)
+        private static void SetDefaults(TextMeshProUGUI label)
         {
-            if (ColorProperty != null)
-                ColorProperty.SetValue(label, Color.white);
-            if (FontSizeProperty != null)
-                FontSizeProperty.SetValue(label, TimerFontSize);
-            if (AutoSizeProperty != null)
-                AutoSizeProperty.SetValue(label, false);
-            if (WordWrapProperty != null)
-                WordWrapProperty.SetValue(label, false);
-            if (RichTextProperty != null)
-                RichTextProperty.SetValue(label, true);
-            if (AlignmentProperty != null && TopAlignment != null)
-                AlignmentProperty.SetValue(label, TopAlignment);
+            label.color = Color.white;
+            label.fontSize = TimerFontSize;
+            label.enableAutoSizing = false;
+            label.enableWordWrapping = false;
+            label.richText = true;
+            label.alignment = TopAlignment;
         }
 
-        private static void SetHintDefaults(Component label)
+        private static void SetHintDefaults(TextMeshProUGUI label)
         {
-            if (ColorProperty != null)
-                ColorProperty.SetValue(label, Color.white);
-            if (FontSizeProperty != null)
-                FontSizeProperty.SetValue(label, SurrenderHintFontSize);
-            if (AutoSizeProperty != null)
-                AutoSizeProperty.SetValue(label, false);
-            if (WordWrapProperty != null)
-                WordWrapProperty.SetValue(label, false);
-            if (RichTextProperty != null)
-                RichTextProperty.SetValue(label, true);
-            if (AlignmentProperty != null && CenterAlignment != null)
-                AlignmentProperty.SetValue(label, CenterAlignment);
+            label.color = Color.white;
+            label.fontSize = SurrenderHintFontSize;
+            label.enableAutoSizing = false;
+            label.enableWordWrapping = false;
+            label.richText = true;
+            label.alignment = CenterAlignment;
         }
 
         private static void SetEnabled(bool enabled)
@@ -758,52 +693,25 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
             s_isVisible = enabled;
 
-            if (s_label is Behaviour behaviour)
+            s_label.enabled = enabled;
+            s_label.gameObject.SetActive(enabled);
+            if (s_hintLabel != null)
             {
-                behaviour.enabled = enabled;
-            }
-
-            if (s_label is Component component)
-            {
-                component.gameObject.SetActive(enabled);
-            }
-
-            if (s_hintLabel is Behaviour hintBehaviour)
-            {
-                hintBehaviour.enabled = enabled;
-            }
-
-            if (s_hintLabel is Component hintComponent)
-            {
-                hintComponent.gameObject.SetActive(enabled);
+                s_hintLabel.enabled = enabled;
+                s_hintLabel.gameObject.SetActive(enabled);
             }
 
             LastChanceTimerChangeEffectsModule.SetVisible(enabled);
         }
 
-        private static void TryApplyAbilityCostTextStyle(Component? label)
+        private static void TryApplyAbilityCostTextStyle(TextMeshProUGUI? label)
         {
-            if (label == null || LabelType == null)
+            if (label == null)
             {
                 return;
             }
 
-            var spotType = AccessTools.TypeByName("DeathHeadHopper.UI.AbilitySpot");
-            if (spotType == null)
-            {
-                return;
-            }
-
-            var energyCostField = AccessTools.Field(spotType, "energyCost");
-            if (energyCostField == null)
-            {
-                return;
-            }
-
-            var fontProperty = LabelType.GetProperty("font", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            var materialProperty = LabelType.GetProperty("fontSharedMaterial", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-            var spots = UnityEngine.Object.FindObjectsOfType(spotType);
+            var spots = GetAbilitySpotsCached();
             if (spots == null || spots.Length == 0)
             {
                 return;
@@ -811,36 +719,22 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
 
             for (var i = 0; i < spots.Length; i++)
             {
-                if (energyCostField.GetValue(spots[i]) is not Component costLabel)
+                if (spots[i].energyCost is not TextMeshProUGUI costLabel)
                 {
                     continue;
                 }
 
-                var sourceType = costLabel.GetType();
-                if (sourceType != LabelType)
-                {
-                    continue;
-                }
-
-                if (fontProperty != null)
-                {
-                    var font = fontProperty.GetValue(costLabel);
-                    fontProperty.SetValue(label, font);
-                }
-
-                if (materialProperty != null)
-                {
-                    var material = materialProperty.GetValue(costLabel);
-                    materialProperty.SetValue(label, material);
-                }
-
-                if (ColorProperty != null)
-                {
-                    ColorProperty.SetValue(label, Color.black);
-                }
+                label.font = costLabel.font;
+                label.fontSharedMaterial = costLabel.fontSharedMaterial;
+                label.color = Color.black;
 
                 return;
             }
+        }
+
+        private static AbilitySpot[] GetAbilitySpotsCached()
+        {
+            return AbilitySpotDiscoveryCache.GetCached(AbilitySpotCacheRefreshIntervalSeconds);
         }
 
         

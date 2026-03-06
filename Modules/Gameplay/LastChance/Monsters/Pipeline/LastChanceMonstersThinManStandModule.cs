@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Reflection;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Utilities;
@@ -8,48 +7,35 @@ using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
 {
-    [HarmonyPatch(typeof(EnemyThinMan), "StateStand")]
+    [HarmonyPatch(typeof(EnemyThinMan), nameof(EnemyThinMan.StateStand))]
     internal static class LastChanceMonstersThinManStandModule
     {
-        private static readonly FieldInfo? s_playerTargetField = AccessTools.Field(typeof(EnemyThinMan), "playerTarget");
-        private static readonly FieldInfo? s_enemyField = AccessTools.Field(typeof(EnemyThinMan), "enemy");
-        private static readonly FieldInfo? s_enemyOnScreenField =
-            AccessTools.Field(typeof(Enemy), "OnScreen") ??
-            AccessTools.Field(typeof(Enemy), "onScreen");
-        private static readonly FieldInfo? s_debugNoVisionField =
-            AccessTools.Field(typeof(EnemyDirector), "debugNoVision");
-        private static readonly MethodInfo? s_setTargetMethod = AccessTools.Method(typeof(EnemyThinMan), "SetTarget");
-        private static readonly MethodInfo? s_updateStateMethod = AccessTools.Method(typeof(EnemyThinMan), "UpdateState");
         private static readonly System.Collections.Generic.Dictionary<int, int> s_lastTransitionFrameByEnemy = new();
+
+        internal static void ResetRuntimeState()
+        {
+            s_lastTransitionFrameByEnemy.Clear();
+        }
 
         [HarmonyPostfix]
         private static void Postfix(EnemyThinMan __instance)
         {
-            if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+            if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return;
             }
 
-            if (EnemyDirector.instance != null &&
-                s_debugNoVisionField != null &&
-                s_debugNoVisionField.GetValue(EnemyDirector.instance) is bool debugNoVision &&
-                debugNoVision)
+            if (EnemyDirector.instance != null && EnemyDirector.instance.debugNoVision)
             {
                 return;
             }
 
-            if (s_playerTargetField == null || s_enemyField == null || s_setTargetMethod == null || s_updateStateMethod == null)
+            if (__instance.playerTarget is PlayerAvatar)
             {
                 return;
             }
 
-            if (s_playerTargetField.GetValue(__instance) is PlayerAvatar)
-            {
-                return;
-            }
-
-            var enemy = s_enemyField.GetValue(__instance) as Enemy;
-            var onScreen = s_enemyOnScreenField?.GetValue(enemy) as EnemyOnScreen;
+            var onScreen = __instance.enemy?.OnScreen;
             if (onScreen == null)
             {
                 return;
@@ -69,19 +55,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     continue;
                 }
 
-                // Vanilla requires !isDisabled; in LastChance, consider active head proxy as a valid "alive for ThinMan" target.
                 var eligible = !LastChanceMonstersTargetProxyHelper.IsDisabled(player) || LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
                 if (!eligible || !onScreen.GetOnScreen(player))
                 {
                     continue;
                 }
 
-                s_setTargetMethod.Invoke(__instance, new object[] { player });
-                var onScreenState = ResolveOnScreenStateValue();
-                if (onScreenState != null)
-                {
-                    s_updateStateMethod.Invoke(__instance, new[] { onScreenState });
-                }
+                __instance.SetTarget(player);
+                __instance.UpdateState(EnemyThinMan.State.OnScreen);
 
                 if (InternalDebugFlags.DebugLastChanceThinManFlow)
                 {
@@ -97,24 +78,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 return;
-            }
-        }
-
-        private static object? ResolveOnScreenStateValue()
-        {
-            var enumType = AccessTools.Inner(typeof(EnemyThinMan), "State");
-            if (enumType == null || !enumType.IsEnum)
-            {
-                return null;
-            }
-
-            try
-            {
-                return System.Enum.Parse(enumType, "OnScreen");
-            }
-            catch
-            {
-                return null;
             }
         }
     }

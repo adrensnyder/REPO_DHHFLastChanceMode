@@ -1,10 +1,12 @@
 #nullable enable
 
 using System;
+using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Utilities;
 using HarmonyLib;
+using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 {
@@ -39,9 +41,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         }
     }
 
-    [HarmonyPatch(typeof(StatsManager), "SaveFileDelete")]
+    [HarmonyPatch(typeof(StatsManager), nameof(StatsManager.SaveFileDelete))]
     internal static class StatsManagerSaveFileDeleteLastChancePatch
     {
+        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.SaveDelete");
         [ThreadStatic]
         private static bool s_allowManualDelete;
 
@@ -65,7 +68,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.SaveDelete.Blocked", 120))
             {
-                UnityEngine.Debug.Log($"[LastChance] Blocked auto delete '{saveFileName}'.");
+                Log.LogDebug($"[LastChance] Blocked auto delete '{saveFileName}'.");
             }
 
             return false;
@@ -78,7 +81,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
         }
     }
 
-    [HarmonyPatch(typeof(MenuPageSaves), "OnDeleteGame")]
+    [HarmonyPatch(typeof(MenuPageSaves), nameof(MenuPageSaves.OnDeleteGame))]
     internal static class MenuPageSavesOnDeleteGameLastChancePatch
     {
         [HarmonyPrefix]

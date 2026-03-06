@@ -1,63 +1,53 @@
 #nullable enable
 
 using HarmonyLib;
-using System.Reflection;
 using BepInEx.Logging;
 using UnityEngine;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Support;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Utilities;
 using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
 {
-    [HarmonyPatch(typeof(EnemyHeartHuggerGasGuider), "FixedUpdate")]
+    [HarmonyPatch(typeof(EnemyHeartHuggerGasGuider), nameof(EnemyHeartHuggerGasGuider.FixedUpdate))]
     internal static class LastChanceMonstersGasGuiderHeadProxyModule
     {
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.HeartHugger");
-        private static readonly FieldInfo? s_playerField =
-            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyHeartHuggerGasGuider), "player");
-        private static readonly FieldInfo? s_physGrabObjectField =
-            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyHeartHuggerGasGuider), "physGrabObject");
-        private static readonly FieldInfo? s_startPositionField =
-            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyHeartHuggerGasGuider), "startPosition");
-        private static readonly FieldInfo? s_enemyHeartHuggerField =
-            LastChanceMonstersReflectionHelper.FindFieldInHierarchy(typeof(EnemyHeartHuggerGasGuider), "enemyHeartHugger");
 
         [HarmonyPrefix]
-        private static bool Prefix(object __instance)
+        private static bool Prefix(EnemyHeartHuggerGasGuider __instance)
         {
-            if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled() || !LastChanceMonstersTargetProxyHelper.IsMasterContext())
+            if (__instance == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeMasterContextEnabled())
             {
                 return true;
             }
 
-            var player = s_playerField?.GetValue(__instance) as PlayerAvatar;
+            var player = __instance.player;
             if (player == null || !LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player))
             {
                 return true;
             }
 
-            var phys = s_physGrabObjectField?.GetValue(__instance) as PhysGrabObject;
+            var phys = __instance.physGrabObject;
             if (phys?.rb == null)
             {
                 DebugLog("Guider.Fixed.SkipNoPhys", $"player={GetPlayerId(player)}");
                 return true;
             }
 
-            var enemyHeartHugger = s_enemyHeartHuggerField?.GetValue(__instance) as EnemyHeartHugger;
-            if (enemyHeartHugger?.headCenterTransform == null || __instance is not Component guiderComponent)
+            var enemyHeartHugger = __instance.enemyHeartHugger;
+            if (enemyHeartHugger?.headCenterTransform == null)
             {
                 DebugLog("Guider.Fixed.SkipNoEnemyHead", $"player={GetPlayerId(player)}");
                 return true;
             }
 
             var rb = phys.rb;
-            var start = s_startPositionField?.GetValue(__instance) as Vector3? ?? rb.position;
+            var start = __instance.startPosition;
             var dirToHead = (enemyHeartHugger.headCenterTransform.position - start).normalized;
             var from = rb.position;
-            var to = guiderComponent.transform.position;
+            var to = __instance.transform.position;
 
             phys.OverrideZeroGravity(0.1f);
             if (rb.isKinematic)
