@@ -85,7 +85,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                     return true;
                 }
 
-                if (EnemyDirector.instance.debugNoVision ||
+                if (LastChanceMonstersTargetProxyHelper.IsDebugNoVision(playerAvatar) ||
                     __instance.DisableChaseTimer > 0f ||
                     !__instance.HasVision)
                 {

@@ -545,12 +545,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         [HarmonyFinalizer]
         private static Exception? EnemySlowMouthAttachingAttachToPlayerFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
-        [HarmonyPatch(typeof(EnemySlowMouthPlayerAvatarAttached), nameof(EnemySlowMouthPlayerAvatarAttached.OnDisable))]
+        [HarmonyPatch(typeof(EnemySlowMouthAttached), nameof(EnemySlowMouthAttached.OnDisable))]
         [HarmonyPrefix]
-        private static void EnemySlowMouthPlayerAvatarAttachedOnDisablePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
-        [HarmonyPatch(typeof(EnemySlowMouthPlayerAvatarAttached), nameof(EnemySlowMouthPlayerAvatarAttached.OnDisable))]
+        private static void EnemySlowMouthAttachedOnDisablePrefix(out DisabledOverrideScope __state) => __state = EnterScope();
+        [HarmonyPatch(typeof(EnemySlowMouthAttached), nameof(EnemySlowMouthAttached.OnDisable))]
         [HarmonyFinalizer]
-        private static Exception? EnemySlowMouthPlayerAvatarAttachedOnDisableFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
+        private static Exception? EnemySlowMouthAttachedOnDisableFinalizer(DisabledOverrideScope __state, Exception? __exception) => ExitScope(__state, __exception);
 
         [HarmonyPatch(typeof(EnemyThinMan), nameof(EnemyThinMan.StateStand))]
         [HarmonyPrefix]

@@ -78,8 +78,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
         private bool _lastSyncedOnScreenLocal;
         private bool _lastSyncedCulledLocal;
         private bool _hasSyncSnapshot;
-        private int _lastCameraInstanceId;
-        private bool _hasCameraSnapshot;
 
         private void Awake()
         {
@@ -91,22 +89,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             if (_onScreen == null || !LastChanceMonstersTargetProxyHelper.IsRuntimeEnabled())
             {
                 return;
-            }
-
-            var current = CameraUtils.Instance != null ? CameraUtils.Instance.MainCamera : Camera.main;
-            if (current != null)
-            {
-                _onScreen.MainCamera = current;
-
-                var currentCameraId = current.GetInstanceID();
-                var cameraChanged = !_hasCameraSnapshot || _lastCameraInstanceId != currentCameraId;
-                if (cameraChanged)
-                {
-                    LastChanceMonstersOnScreenCameraModule.DebugLog("Camera.Sync", $"enemy={_onScreen.gameObject.name} camera={current.name} changed={cameraChanged}");
-                }
-
-                _lastCameraInstanceId = currentCameraId;
-                _hasCameraSnapshot = true;
             }
 
             SyncLocalHeadProxyOnScreenState();
@@ -144,7 +126,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
             _lastSyncedCulledLocal = culledLocal;
             _hasSyncSnapshot = true;
 
-            _onScreen.OnScreenPlayerUpdate(localPlayer.photonView.ViewID, onScreenLocal, culledLocal);
+            _onScreen.OnScreenPlayerUpdate(onScreenLocal, culledLocal);
             LastChanceMonstersOnScreenCameraModule.DebugLogOnBoolTransition(
                 "Sync.PlayerUpdate",
                 $"{_onScreen.GetInstanceID()}.{localPlayer.photonView.ViewID}.OnScreen",

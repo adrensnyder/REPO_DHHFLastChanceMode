@@ -79,7 +79,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions
                 }
             }
 
-            if (!SemiFunc.FPSImpulse5())
+            if (!SemiFunc.PerSecond(5f, instance))
             {
                 return;
             }

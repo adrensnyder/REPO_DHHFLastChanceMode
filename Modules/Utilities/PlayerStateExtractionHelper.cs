@@ -132,7 +132,7 @@ namespace DHHFLastChanceMode.Modules.Utilities
                 return Color.black;
             }
 
-            return visuals.color;
+            return SemiFunc.PlayerGetColorMain(player);
         }
 
         private static bool IsDeadSet(PlayerAvatar player)

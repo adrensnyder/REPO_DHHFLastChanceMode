@@ -49,6 +49,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters
             return player != null && player.isDisabled;
         }
 
+        internal static bool IsDebugNoVision(PlayerAvatar? player)
+        {
+            return player != null &&
+                   EnemyDirector.instance?.debugNoVision != null &&
+                   EnemyDirector.instance.debugNoVision.Contains(player.steamID);
+        }
+
         internal static bool IsHeadProxyActive(PlayerAvatar? player)
         {
             if (player == null)

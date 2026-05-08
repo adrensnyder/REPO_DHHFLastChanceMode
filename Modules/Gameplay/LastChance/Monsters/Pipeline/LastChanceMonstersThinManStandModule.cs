@@ -25,11 +25,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 return;
             }
 
-            if (EnemyDirector.instance != null && EnemyDirector.instance.debugNoVision)
-            {
-                return;
-            }
-
             if (__instance.playerTarget is PlayerAvatar)
             {
                 return;
@@ -56,7 +51,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline
                 }
 
                 var eligible = !LastChanceMonstersTargetProxyHelper.IsDisabled(player) || LastChanceMonstersTargetProxyHelper.IsHeadProxyActive(player);
-                if (!eligible || !onScreen.GetOnScreen(player))
+                if (!eligible || LastChanceMonstersTargetProxyHelper.IsDebugNoVision(player) || !onScreen.GetOnScreen(player))
                 {
                     continue;
                 }
