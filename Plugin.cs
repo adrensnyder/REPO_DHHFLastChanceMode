@@ -14,6 +14,7 @@ using UnityEngine.SceneManagement;
 
 namespace DHHFLastChanceMode
 {
+    [BepInDependency("Vippy.ScalerCore", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency(CorePluginGuid, BepInDependency.DependencyFlags.HardDependency)]
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
     public sealed class Plugin : BaseUnityPlugin

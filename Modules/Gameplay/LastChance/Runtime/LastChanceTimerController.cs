@@ -2917,6 +2917,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
+            ScalerCoreInteropBridge.TryRestoreLocalPlayerCameraState();
+
             if (s_lastChanceBatteryOverrideApplied)
             {
                 return;
