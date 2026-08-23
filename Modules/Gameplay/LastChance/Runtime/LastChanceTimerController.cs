@@ -38,6 +38,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static bool s_active;
         private static int s_baseCurrency;
         private static bool s_currencyCaptured;
+        private static bool s_successHandled;
         private static readonly Color TimerColor = new(1f, 0.85f, 0.1f, 1f);
         private static readonly Color FlashColor = new(1f, 0.2f, 0.2f, 1f);
         private static readonly InputKey SurrenderInputKey = InputKey.Crouch;
@@ -342,6 +343,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             SetLastChanceActive(false);
             s_currencyCaptured = false;
+            s_successHandled = false;
             s_timerRemaining = 0f;
             s_timerSyncedFromHost = false;
             LastChanceTimerUI.Hide();
@@ -477,6 +479,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_previousTimerWarningCheckSeconds = s_timerRemaining;
             s_lastNetworkTimerBroadcastSecond = -1;
             s_currencyCaptured = false;
+            s_successHandled = false;
             s_indicatorNoneLoggedThisCycle = false;
             CaptureBaseCurrency();
             if (profileEnabled)
@@ -552,6 +555,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void HandleSuccess()
         {
+            if (s_successHandled)
+            {
+                return;
+            }
+
+            s_successHandled = true;
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey, 30))
             {
                 Log.LogDebug("[LastChance] All heads in truck; sending to shop.");
@@ -577,7 +586,9 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             CaptureBaseCurrency();
             var bonus = Mathf.Max(0, FeatureFlags.LastChanceConsolationMoney);
-            var newCurrency = s_baseCurrency + bonus;
+            var preservedCurrency = FeatureFlags.LastChancePreserveExtractedMoney ? s_baseCurrency : 0;
+            var newCurrency = preservedCurrency + bonus;
+            LastChanceSurrenderNetwork.BroadcastExtractionReward();
             SemiFunc.StatSetRunCurrency(newCurrency);
             NormalizeDirectorsBeforeShopReturn();
 
@@ -665,6 +676,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             SetLastChanceActive(false);
             s_currencyCaptured = false;
+            s_successHandled = false;
             s_timerRemaining = 0f;
             s_timerSyncedFromHost = false;
             s_hasNetworkUiState = false;

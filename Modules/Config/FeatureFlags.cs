@@ -9,6 +9,7 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChanceQuick = "1a. LastChance: Quick Setup";
             public const string LastChanceTimer = "1b. LastChance: Timer Calculation";
             public const string LastChanceGameplay = "1c. LastChance: Gameplay & UI";
+            public const string LastChanceExtraction = "1d. LastChance: Extraction";
             public const string Spectate = "2. Spectate";
             public const string Debug = "3. Debug";
         }
@@ -29,6 +30,8 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChanceDynamicMaxMinutesAtLevel = "Level where level-based growth stops increasing (timer still only capped by MaxMinutes).";
             public const string LastChanceDynamicMaxMinutes = "Hard cap (minutes) for final LastChance timer after dynamic scaling.";
             public const string LastChanceConsolationMoney = "LastChance consolation money added on success (integer).";
+            public const string LastChancePreserveExtractedCosmeticTokens = "When true, cosmetic tokens from extracted cosmetic crates are preserved for every player after a successful LastChance return.";
+            public const string LastChancePreserveExtractedMoney = "When true, run currency already extracted before LastChance success is preserved; consolation money remains independent.";
             public const string LastChanceMissingPlayers = "Number of players allowed to stay outside the truck before LastChance success triggers (0 = all players required).";
             public const string LastChanceTimerBonusPerMonsterDeathSeconds = "Seconds added to LastChance timer whenever a monster dies during active LastChance.";
             public const string LastChanceSurrenderSeconds = "Seconds the player must hold Crouch to surrender during LastChance.";
@@ -74,8 +77,14 @@ namespace DHHFLastChanceMode.Modules.Config
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceMonstersVoiceEnemyOnlyEnabled)]
         public static bool LastChanceMonstersVoiceEnemyOnlyEnabled = true;
 
-        [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceConsolationMoney, Min = 0f, Max = 5f)]
-        public static int LastChanceConsolationMoney = 1;
+        [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.LastChanceConsolationMoney, Min = 0f, Max = 30f)]
+        public static int LastChanceConsolationMoney = 5;
+
+        [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.LastChancePreserveExtractedCosmeticTokens)]
+        public static bool LastChancePreserveExtractedCosmeticTokens = true;
+
+        [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.LastChancePreserveExtractedMoney)]
+        public static bool LastChancePreserveExtractedMoney = true;
 
         [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerMonsterSeconds, Min = 0f, Max = 60f)]
         public static float LastChanceTimerPerMonsterSeconds = 3f;

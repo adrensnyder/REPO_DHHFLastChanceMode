@@ -1,5 +1,7 @@
 #nullable enable
 
+using System;
+using DHHFLastChanceMode.Modules.Config;
 using ExitGames.Client.Photon;
 using DHHFLastChanceMode.Modules.Utilities;
 using Photon.Pun;
@@ -22,6 +24,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private const string LastChanceUiStateMessageType = "LastChanceUiState";
         private const string LastChancePlayerTruckHintMessageType = "LastChancePlayerTruckHint";
         private const string LastChanceSurrenderSnapshotMessageType = "LastChanceSurrenderSnapshot";
+        private const string LastChanceExtractionRewardMessageType = "LastChanceExtractionReward";
+        private static readonly System.Collections.Generic.HashSet<int> s_appliedExtractionRewardIds = new();
 
         internal static void EnsureCreated()
         {
@@ -31,7 +35,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             var go = new GameObject("DHHFix.LastChanceSurrender");
-            Object.DontDestroyOnLoad(go);
+            UnityEngine.Object.DontDestroyOnLoad(go);
             s_instance = go.AddComponent<LastChanceSurrenderNetwork>();
         }
 
@@ -85,6 +89,46 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             var envelope = CreateEnvelope(LastChanceSurrenderSnapshotMessageType, surrenderedActorsPayload ?? System.Array.Empty<object>());
             PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceSurrender, envelope.ToEventPayload(), options, SendOptions.SendReliable);
+        }
+
+        internal static void BroadcastExtractionReward()
+        {
+            if (!SemiFunc.IsMasterClientOrSingleplayer() ||
+                !FeatureFlags.LastChancePreserveExtractedCosmeticTokens ||
+                RoundDirector.instance == null ||
+                RoundDirector.instance.cosmeticWorldObjectsExtracted == null ||
+                RoundDirector.instance.cosmeticWorldObjectsExtracted.Count == 0)
+            {
+                return;
+            }
+
+            EnsureCreated();
+
+            var rarities = new object[RoundDirector.instance.cosmeticWorldObjectsExtracted.Count];
+            for (var i = 0; i < rarities.Length; i++)
+            {
+                rarities[i] = (int)RoundDirector.instance.cosmeticWorldObjectsExtracted[i];
+            }
+
+            var rewardId = unchecked(++s_messageSeq);
+            if (rewardId <= 0)
+            {
+                rewardId = s_messageSeq = 1;
+            }
+
+            ApplyExtractionReward(rewardId, rarities);
+
+            if (!PhotonNetwork.InRoom || !SemiFunc.IsMultiplayer())
+            {
+                return;
+            }
+
+            var options = new RaiseEventOptions
+            {
+                Receivers = ReceiverGroup.All
+            };
+            var envelope = CreateEnvelope(LastChanceExtractionRewardMessageType, new object[] { rewardId, rarities });
+            PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceExtractionReward, envelope.ToEventPayload(), options, SendOptions.SendReliable);
         }
 
         internal static void NotifyDirectionPenaltyRequest()
@@ -179,6 +223,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         public override void OnJoinedRoom()
         {
             base.OnJoinedRoom();
+            s_appliedExtractionRewardIds.Clear();
             LastChanceTimerController.ClearRoomSuppression();
             if (PhotonNetwork.IsMasterClient)
             {
@@ -200,11 +245,32 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         public override void OnLeftRoom()
         {
             base.OnLeftRoom();
+            s_appliedExtractionRewardIds.Clear();
             LastChanceTimerController.ClearRoomSuppression();
         }
 
         public void OnEvent(EventData photonEvent)
         {
+            if (photonEvent.Code == PhotonEventCodes.LastChanceExtractionReward)
+            {
+                var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
+                if (masterActor <= 0 ||
+                    photonEvent.Sender != masterActor ||
+                    !NetworkEnvelope.TryParse(photonEvent.CustomData, out var rewardEnvelope) ||
+                    !rewardEnvelope.IsExpectedSource() ||
+                    !string.Equals(rewardEnvelope.MessageType, LastChanceExtractionRewardMessageType, System.StringComparison.Ordinal) ||
+                    rewardEnvelope.Payload is not object[] rewardPayload ||
+                    rewardPayload.Length < 2 ||
+                    rewardPayload[0] is not int rewardId ||
+                    rewardPayload[1] is not object[] rarities)
+                {
+                    return;
+                }
+
+                ApplyExtractionReward(rewardId, rarities);
+                return;
+            }
+
             if (photonEvent.Code == PhotonEventCodes.LastChanceTimerState)
             {
                 var masterActor = PhotonNetwork.MasterClient?.ActorNumber ?? -1;
@@ -342,6 +408,28 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             LastChanceTimerController.RegisterRemoteSurrender(payloadActor);
+        }
+
+        private static void ApplyExtractionReward(int rewardId, object[] rarities)
+        {
+            if (rewardId <= 0 ||
+                rarities == null ||
+                s_appliedExtractionRewardIds.Contains(rewardId) ||
+                MetaManager.instance == null)
+            {
+                return;
+            }
+
+            foreach (var rarityPayload in rarities)
+            {
+                if (rarityPayload is int rarityValue &&
+                    Enum.IsDefined(typeof(SemiFunc.Rarity), rarityValue))
+                {
+                    MetaManager.instance.CosmeticTokenAdd((SemiFunc.Rarity)rarityValue);
+                }
+            }
+
+            s_appliedExtractionRewardIds.Add(rewardId);
         }
 
         private static NetworkEnvelope CreateEnvelope(string messageType, object? payload)

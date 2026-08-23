@@ -13,5 +13,6 @@ namespace DHHFLastChanceMode.Modules.Utilities
         internal const byte HostGateState = 85;
         internal const byte LastChancePlayerTruckHint = 86;
         internal const byte HostFixPresenceRequest = 87;
+        internal const byte LastChanceExtractionReward = 88;
     }
 }
