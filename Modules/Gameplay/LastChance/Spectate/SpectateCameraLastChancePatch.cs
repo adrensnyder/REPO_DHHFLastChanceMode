@@ -23,7 +23,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
 
     internal static class LastChanceSpectateHelper
     {
-        private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spectate");
+        internal static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.LastChance.Spectate");
         private const string ForceSpectateLogKey = "LastChance.ForceDeathHeadSpectate";
         private const string DebugStateLogKey = "LastChance.SpectateState";
         private const string OrbitProxyName = "DHHFLastChanceMode.Spectate.OrbitProxy";
@@ -541,6 +541,15 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate
         {
             if (!LastChanceSpectateHelper.IsActiveRuntimeGate())
             {
+                return true;
+            }
+
+            // Debug mode bypasses only the disabled-player switch handler; camera support remains active.
+            if (FeatureFlags.DebugLogging)
+            {
+                LastChanceSpectateHelper.Log.LogInfo(
+                    $"[LastChance] PlayerSwitch gate bypassed by DebugLogging; " +
+                    $"vanilla/DHH handler will run (next={_next}, state={__instance.currentState}).");
                 return true;
             }
 
