@@ -46,7 +46,8 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChanceMonstersVoiceEnemyOnlyEnabled = "During LastChance, disabled death-head voice keeps enemy reactions/talk animation but mutes playback to players (enemy-only voice aggro).";
             public const string LastChanceTimerPerMonsterSeconds = "Extra seconds added per active spawned monster when LastChanceMonstersSearch is enabled.";
             public const string SpectateDeadPlayers = "Allow SpectateCamera to cycle through disabled players (dead bodies) when toggling targets.";
-            public const string SpectateDeadPlayersMode = "Mode for dead-player spectate switch: Always, LastChanceOnly, Disabled.";
+            public const string SpectateDeadPlayersMode = "Dead-player spectate during active LastChance: LastChanceOnly enables cycling, Disabled forces local DeathHead spectate, Always is a legacy alias now scoped to active LastChance only.";
+            public const string LastChanceSpectateDefaultFov = "Field of view enforced only during active LastChance spectate. Set 0 to disable. Replaces DeathHeadHopperFix [8. Camera] DHHSpectateDefaultFov; copy legacy values manually if needed.";
             public const string DebugLogging = "Dump extra log lines that help trace LastChance logic.";
         }
 
@@ -142,6 +143,9 @@ namespace DHHFLastChanceMode.Modules.Config
 
         [FeatureConfigEntry(Sections.Spectate, Descriptions.SpectateDeadPlayersMode, Options = new[] { "Always", "LastChanceOnly", "Disabled" })]
         public static string SpectateDeadPlayersMode = "Always";
+
+        [FeatureConfigEntry(Sections.Spectate, Descriptions.LastChanceSpectateDefaultFov, Min = 0f, Max = 120f, HostControlled = false)]
+        public static int LastChanceSpectateDefaultFov = 70;
 
         [FeatureConfigEntry(Sections.Debug, Descriptions.DebugLogging, HostControlled = false)]
         public static bool DebugLogging = false;

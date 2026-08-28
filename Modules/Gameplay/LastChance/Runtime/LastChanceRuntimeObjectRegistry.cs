@@ -1,17 +1,12 @@
 #nullable enable
 
 using System.Collections.Generic;
-using DeathHeadHopper.Managers;
-using DeathHeadHopper.UI;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     // Central runtime registry used by LastChance modules to share typed object discovery without global scans.
     internal static class LastChanceRuntimeObjectRegistry
     {
-        private static readonly List<AbilitySpot> AbilitySpots = new();
-        private static readonly HashSet<int> AbilitySpotIds = new();
-
         private static readonly List<Enemy> Enemies = new();
         private static readonly HashSet<int> EnemyIds = new();
 
@@ -20,21 +15,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static readonly List<PlayerVoiceChat> PlayerVoiceChats = new();
         private static readonly HashSet<int> PlayerVoiceChatIds = new();
-
-        internal static void RegisterAbilitySpot(AbilitySpot? spot)
-        {
-            Register(AbilitySpots, AbilitySpotIds, spot);
-        }
-
-        internal static void UnregisterAbilitySpot(AbilitySpot? spot)
-        {
-            Unregister(AbilitySpots, AbilitySpotIds, spot);
-        }
-
-        internal static AbilitySpot[] GetAbilitySpotsSnapshot()
-        {
-            return Snapshot(AbilitySpots, AbilitySpotIds);
-        }
 
         internal static void RegisterEnemy(Enemy? enemy)
         {
@@ -81,12 +61,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             return Snapshot(PlayerVoiceChats, PlayerVoiceChatIds);
         }
 
-        internal static void ClearAbilitySpots()
-        {
-            AbilitySpots.Clear();
-            AbilitySpotIds.Clear();
-        }
-
         internal static void ClearEnemies()
         {
             Enemies.Clear();
@@ -103,7 +77,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         internal static void ClearAll()
         {
-            ClearAbilitySpots();
             ClearEnemies();
             ClearVoiceChats();
         }
@@ -127,19 +100,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void RepopulateFromKnownManagers()
         {
-            var abilityManager = DHHAbilityManager.instance;
-            if (abilityManager != null)
-            {
-                var spots = abilityManager.abilitySpots;
-                if (spots != null)
-                {
-                    for (var i = 0; i < spots.Length; i++)
-                    {
-                        RegisterAbilitySpot(spots[i]);
-                    }
-                }
-            }
-
             var enemyParents = EnemyDirector.instance?.enemiesSpawned;
             if (enemyParents != null)
             {

@@ -1,327 +1,133 @@
 #nullable enable
 
-using System;
-using DeathHeadHopper.Abilities;
-using DeathHeadHopper.UI;
-using DeathHeadHopperFix.Modules.Gameplay.Spectate;
+using DeathHeadHopperFix.API.Abilities;
 using DHHFLastChanceMode.Modules.Config;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
 using DHHFLastChanceMode.Modules.Utilities;
 using UnityEngine;
-using DhhFixAbilityModule = DeathHeadHopperFix.Modules.Gameplay.Core.Abilities.AbilityModule;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.Core.Abilities
 {
     public static class AbilityModule
     {
-        private const int DirectionIndicatorSlotIndex = 1;
-        private const string AbilityBarDemandSourceId = "DHHFLastChanceMode.Direction";
-        private const float AbilitySpotCacheRefreshSeconds = 0.5f;
+        private const string DirectionOwnerId = "AdrenSnyder.DHHFLastChanceMode.Direction";
+        private const string DirectionAbilityName = "DirectionAbility";
+        private const float AssetRetryIntervalSeconds = 2f;
+
         private static Sprite? s_directionSprite;
-        private static float s_nextDirectionIconFallbackApplyAt;
-        private static DirectionIndicatorAbility? s_directionAbility;
+        private static float s_nextAssetRetryAt;
+        private static float s_activationProgress01;
+        private static bool s_registered;
+        private static bool s_registrationAttemptedForVisibleCycle;
 
         internal static void RefreshDirectionSlotVisuals()
         {
-            EnsureDirectionAbilitySlotState();
-            PushDirectionAbilityBarDemand();
-            DhhFixAbilityModule.RefreshDirectionSlotVisuals();
-            TryApplyDirectionIconFallback();
+            var visible = LastChanceTimerController.IsDirectionIndicatorUiVisible &&
+                          LastChanceRuntimeOrchestrator.IsRuntimeActive;
+            if (!visible)
+            {
+                ReleaseDirectionSlot();
+                return;
+            }
+
+            EnsureDirectionSpriteLoaded();
+            EnsureRegistered();
+            PublishDirectionState();
         }
 
         internal static void SetDirectionSlotActivationProgress(float progress01)
         {
-            DhhFixAbilityModule.SetDirectionSlotActivationProgress(progress01);
+            s_activationProgress01 = Mathf.Clamp01(progress01);
+            if (s_registered)
+            {
+                PublishDirectionState();
+            }
         }
 
         internal static void TriggerDirectionSlotCooldown(float cooldownSeconds)
         {
-            DhhFixAbilityModule.TriggerDirectionSlotCooldown(cooldownSeconds);
-        }
-
-        private static void PushDirectionAbilityBarDemand()
-        {
-            var visible = LastChanceTimerController.IsDirectionIndicatorUiVisible;
-            try
-            {
-                AbilityBarVisibilityAnchor.SetExternalDemand(AbilityBarDemandSourceId, visible);
-            }
-            catch
-            {
-                // Keep LastChance flow resilient if DHHFix is not present or updated.
-            }
-        }
-
-        private static void TryApplyDirectionIconFallback()
-        {
-            if (Time.unscaledTime < s_nextDirectionIconFallbackApplyAt)
-            {
-                return;
-            }
-            s_nextDirectionIconFallbackApplyAt = Time.unscaledTime + 0.5f;
-
-            if (s_directionSprite == null &&
-                !ImageAssetLoader.TryLoadSprite(
-                    "Direction.png",
-                    ImageAssetLoader.GetDefaultAssetsDirectory(),
-                    out s_directionSprite,
-                    out _))
+            s_activationProgress01 = 0f;
+            if (!s_registered)
             {
                 return;
             }
 
-            if (s_directionSprite == null)
+            AbilitySlotOrchestrator.TryUpdate(DirectionOwnerId, BuildState());
+            AbilitySlotOrchestrator.TryStartCooldown(DirectionOwnerId, Mathf.Max(0f, cooldownSeconds));
+        }
+
+        internal static void ReleaseDirectionSlot()
+        {
+            s_activationProgress01 = 0f;
+            if (s_registered)
+            {
+                AbilitySlotOrchestrator.Unregister(DirectionOwnerId);
+            }
+
+            s_registered = false;
+            s_registrationAttemptedForVisibleCycle = false;
+        }
+
+        private static void EnsureRegistered()
+        {
+            if (s_registered || s_registrationAttemptedForVisibleCycle)
             {
                 return;
             }
 
-            var spots = GetAbilitySpotsCached();
-            if (spots == null || spots.Length == 0)
+            s_registrationAttemptedForVisibleCycle = true;
+            var registration = new AbilitySlotRegistration
+            {
+                OwnerId = DirectionOwnerId,
+                Slot = ExtensibleAbilitySlot.Slot2,
+                AbilityName = DirectionAbilityName,
+                Icon = s_directionSprite,
+                OnDown = LastChanceTimerController.OnDirectionAbilityInputDown,
+                OnHold = LastChanceTimerController.OnDirectionAbilityInputHold,
+                OnUp = LastChanceTimerController.OnDirectionAbilityInputUp,
+                OnCancel = LastChanceTimerController.OnDirectionAbilityInputCancel
+            };
+
+            s_registered = AbilitySlotOrchestrator.TryRegister(registration);
+        }
+
+        private static void PublishDirectionState()
+        {
+            if (!s_registered)
             {
                 return;
             }
 
-            for (var i = 0; i < spots.Length; i++)
-            {
-                var spot = spots[i];
-                if (spot == null)
-                {
-                    continue;
-                }
-
-                if (spot.abilitySpotIndex != DirectionIndicatorSlotIndex)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    ApplyDirectionIcon(spot, s_directionSprite);
-                }
-                catch
-                {
-                    // Ability UI can be rebuilt during scene transitions.
-                }
-            }
+            AbilitySlotOrchestrator.TryUpdate(DirectionOwnerId, BuildState());
         }
 
-        private static void EnsureDirectionAbilitySlotState()
+        private static AbilitySlotState BuildState()
         {
-            var shouldBeVisible = LastChanceTimerController.IsDirectionIndicatorUiVisible;
-            var spots = GetAbilitySpotsCached();
-            if (spots == null || spots.Length == 0)
+            var penaltySeconds = Mathf.Max(0f, LastChanceTimerController.GetDirectionIndicatorPenaltySecondsPreview());
+            var seconds = Mathf.RoundToInt(penaltySeconds);
+            return new AbilitySlotState
+            {
+                Visible = LastChanceTimerController.IsDirectionIndicatorUiVisible && LastChanceRuntimeOrchestrator.IsRuntimeActive,
+                Available = LastChanceTimerController.IsDirectionIndicatorEnergySufficientPreview(),
+                ActivationProgress01 = s_activationProgress01,
+                Label = $"{seconds}s",
+                Icon = s_directionSprite
+            };
+        }
+
+        private static void EnsureDirectionSpriteLoaded()
+        {
+            if (s_directionSprite != null || Time.unscaledTime < s_nextAssetRetryAt)
             {
                 return;
             }
 
-            AbilitySpot? directionSpot = null;
-            for (var i = 0; i < spots.Length; i++)
-            {
-                var spot = spots[i];
-                if (spot == null)
-                {
-                    continue;
-                }
-
-                if (GetSpotIndex(spot) == DirectionIndicatorSlotIndex)
-                {
-                    directionSpot = spot;
-                    break;
-                }
-            }
-
-            if (directionSpot == null)
-            {
-                return;
-            }
-
-            if (!shouldBeVisible)
-            {
-                if (s_directionAbility != null && ReferenceEquals(directionSpot.CurrentAbility, s_directionAbility))
-                {
-                    directionSpot.RemoveAbility();
-                }
-
-                return;
-            }
-
-            s_directionAbility ??= CreateDirectionAbilityInstance();
-            if (s_directionAbility == null)
-            {
-                return;
-            }
-
-            if (s_directionSprite != null)
-            {
-                s_directionAbility.icon = s_directionSprite;
-            }
-
-            if (directionSpot.CurrentAbility == null)
-            {
-                directionSpot.EquipAbility(s_directionAbility);
-                return;
-            }
-
-            if (ReferenceEquals(directionSpot.CurrentAbility, s_directionAbility))
-            {
-                return;
-            }
-
-            var hasDirectionElsewhere = false;
-            for (var i = 0; i < spots.Length; i++)
-            {
-                var spot = spots[i];
-                if (spot == null)
-                {
-                    continue;
-                }
-
-                if (ReferenceEquals(spot.CurrentAbility, s_directionAbility))
-                {
-                    hasDirectionElsewhere = true;
-                    break;
-                }
-            }
-
-            if (hasDirectionElsewhere && TryRemoveDirectionAbilityFromSpots(spots))
-            {
-                directionSpot.EquipAbility(s_directionAbility);
-            }
-        }
-
-        private static bool TryRemoveDirectionAbilityFromSpots(AbilitySpot[] spots)
-        {
-            var removed = false;
-            for (var i = 0; i < spots.Length; i++)
-            {
-                var spot = spots[i];
-                if (spot == null)
-                {
-                    continue;
-                }
-
-                if (!ReferenceEquals(spot.CurrentAbility, s_directionAbility))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    spot.RemoveAbility();
-                    removed = true;
-                }
-                catch
-                {
-                    // Ignore transient UI teardown issues.
-                }
-            }
-
-            return removed;
-        }
-
-        private static DirectionIndicatorAbility CreateDirectionAbilityInstance()
-        {
-            var ability = ScriptableObject.CreateInstance<DirectionIndicatorAbility>();
-            if (s_directionSprite != null)
-            {
-                ability.icon = s_directionSprite;
-            }
-            return ability;
-        }
-
-        private static AbilitySpot[] GetAbilitySpotsCached()
-        {
-            return AbilitySpotDiscoveryCache.GetCached(AbilitySpotCacheRefreshSeconds);
-        }
-
-        public static string DirectionAbility_GetName()
-        {
-            return "DirectionAbility";
-        }
-
-        public static float DirectionAbility_GetCooldown()
-        {
-            return Mathf.Max(1f, FeatureFlags.LastChanceIndicatorDirectionCooldownSeconds);
-        }
-
-        public static float DirectionAbility_GetEnergyCost()
-        {
-            return Mathf.Max(0f, LastChanceTimerController.GetDirectionIndicatorPenaltySecondsPreview());
-        }
-
-        public static int DirectionAbility_GetLevel()
-        {
-            return 1;
-        }
-
-        public static void DirectionAbility_OnDown()
-        {
-            LastChanceTimerController.OnDirectionAbilityInputDown();
-        }
-
-        public static void DirectionAbility_OnHold()
-        {
-            LastChanceTimerController.OnDirectionAbilityInputHold();
-        }
-
-        public static void DirectionAbility_OnUp()
-        {
-            LastChanceTimerController.OnDirectionAbilityInputUp();
-        }
-
-        public static void DirectionAbility_OnCancel()
-        {
-            LastChanceTimerController.OnDirectionAbilityInputCancel();
-        }
-
-        private static int GetSpotIndex(AbilitySpot spot)
-        {
-            return spot == null ? -1 : spot.abilitySpotIndex;
-        }
-
-        private static void ApplyDirectionIcon(AbilitySpot spot, Sprite sprite)
-        {
-            if (spot == null || sprite == null)
-            {
-                return;
-            }
-
-            spot.backgroundIcon.enabled = true;
-            spot.backgroundIcon.sprite = sprite;
-            spot.cooldownIcon.enabled = true;
-            spot.cooldownIcon.sprite = sprite;
-            spot.noAbility.enabled = false;
-        }
-
-        private sealed class DirectionIndicatorAbility : AbilityBase
-        {
-            public override string AbilityName => DirectionAbility_GetName();
-
-            public override float Cooldown => DirectionAbility_GetCooldown();
-
-            public override float EnergyCost => DirectionAbility_GetEnergyCost();
-
-            public override int AbilityLevel => DirectionAbility_GetLevel();
-
-            public override void OnAbilityDown()
-            {
-                DirectionAbility_OnDown();
-            }
-
-            public override void OnAbilityHold()
-            {
-                DirectionAbility_OnHold();
-            }
-
-            public override void OnAbilityUp()
-            {
-                DirectionAbility_OnUp();
-            }
-
-            public override void OnAbilityCancel()
-            {
-                DirectionAbility_OnCancel();
-            }
+            s_nextAssetRetryAt = Time.unscaledTime + AssetRetryIntervalSeconds;
+            ImageAssetLoader.TryLoadSprite(
+                "Direction.png",
+                ImageAssetLoader.GetDefaultAssetsDirectory(),
+                out s_directionSprite,
+                out _);
         }
     }
 }

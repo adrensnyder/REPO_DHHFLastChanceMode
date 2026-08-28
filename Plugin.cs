@@ -5,9 +5,11 @@ using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -37,6 +39,10 @@ namespace DHHFLastChanceMode
 
         private void OnDestroy()
         {
+            AbilityModule.ReleaseDirectionSlot();
+            LastChanceTimerController.ReleaseBatteryOverrideForExternalTeardown();
+            LastChanceSpectateHelper.ResetOwnedState();
+            LastChanceReviveReleaseTracker.ResetForPluginDestroy();
             SceneManager.sceneLoaded -= OnSceneLoaded;
             ConfigManager.HostControlledChanged -= OnHostControlledChanged;
 
@@ -106,6 +112,7 @@ namespace DHHFLastChanceMode
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             CompatibilityGate.EnsureCreated();
+            LastChanceReviveReleaseTracker.ResetForSceneChange();
             LastChanceRuntimeObjectRegistry.ResetForSceneChange();
 
             var shouldHandleRuntimeScene = ShouldHandleRuntimeScene();

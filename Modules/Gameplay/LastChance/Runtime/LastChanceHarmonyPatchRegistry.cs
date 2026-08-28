@@ -3,11 +3,11 @@
 using System;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate;
 using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
@@ -24,7 +24,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChanceHeadEyesOverrideBypassModule),
             typeof(LastChanceHeadPupilVisualModule),
             typeof(RunManagerUpdateLastChanceTimerPatch),
-            typeof(AbilitySpotAwakeRegistryPatch),
+            typeof(LastChancePlayerDeathOriginPatch),
+            typeof(LastChancePlayerReviveReleasePatch),
+            typeof(LastChancePlayerDestroyReviveCleanupPatch),
+            typeof(SpectateCameraLastChancePlayerSwitchPatch),
+            typeof(SpectateCameraLastChanceStateNormalPatch),
+            typeof(SpectateCameraLastChanceUpdateStatePatch),
+            typeof(SpectateCameraLastChanceLateUpdatePatch),
             typeof(LastChanceEnemyAwakeRegistryPatch),
             typeof(LastChanceEnemyAnimalAwakeRegistryPatch),
             typeof(LastChancePlayerVoiceChatAwakeRegistryPatch),

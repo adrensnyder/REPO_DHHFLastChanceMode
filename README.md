@@ -20,6 +20,8 @@ Every player (host and clients) must have this mod, and the original, installed.
 ## Configuration
 `BepInEx/config/AdrenSnyder.DHHFLastChanceMode.cfg` lets you tune sections labeled “LastChance: Quick Setup”, “Timer Calculation”, and “Gameplay & UI”. Use it to adjust the direction penalty, dynamic timer caps, and monster search flags so the Last Chance flow matches your group’s feel.
 
+Spectate FOV is now owned by LastChance through `[2. Spectate] LastChanceSpectateDefaultFov` (default `70`, `0` disables enforcement). If you previously customized DeathHeadHopperFix `[8. Camera] DHHSpectateDefaultFov`, copy that value manually; LastChance does not read or migrate another plugin's config file.
+
 ## Credits
 Thanks to Cronchy for the original DeathHeadHopper mod that inspired this extension.  
 Thanks also to Omniscye for the code i used from the Keep_Saves mod

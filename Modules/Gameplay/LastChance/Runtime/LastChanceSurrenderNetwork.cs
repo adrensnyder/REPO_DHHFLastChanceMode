@@ -125,7 +125,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             var options = new RaiseEventOptions
             {
-                Receivers = ReceiverGroup.All
+                // The master applies the reward locally above; send the event only to the other clients.
+                Receivers = ReceiverGroup.Others
             };
             var envelope = CreateEnvelope(LastChanceExtractionRewardMessageType, new object[] { rewardId, rarities });
             PhotonNetwork.RaiseEvent(PhotonEventCodes.LastChanceExtractionReward, envelope.ToEventPayload(), options, SendOptions.SendReliable);
@@ -246,6 +247,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             base.OnLeftRoom();
             s_appliedExtractionRewardIds.Clear();
+            LastChanceTimerController.ReleaseBatteryOverrideForExternalTeardown();
+            DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate.LastChanceSpectateHelper.ResetOwnedState();
             LastChanceTimerController.ClearRoomSuppression();
         }
 

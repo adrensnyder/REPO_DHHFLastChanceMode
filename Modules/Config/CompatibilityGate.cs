@@ -151,6 +151,7 @@ namespace DHHFLastChanceMode.Modules.Config
             s_hostApprovedLastChanceCluster = true;
             s_lastHostDecisionReason = string.Empty;
             s_lastLoggedIncompatibilityReason = string.Empty;
+            LastChanceReviveReleaseTracker.ResetForRoomExit();
             LastChanceRuntimeObjectRegistry.ResetForRoomExit();
             ApplyRuntimeHostOverrides();
             HostApprovalChanged?.Invoke();
@@ -185,6 +186,7 @@ namespace DHHFLastChanceMode.Modules.Config
                 _playersWithFixVersion.Remove(otherPlayer.ActorNumber);
                 _pendingPresenceSince.Remove(otherPlayer.ActorNumber);
                 _pendingPresenceNextRetryAt.Remove(otherPlayer.ActorNumber);
+                LastChanceReviveReleaseTracker.ClearForActorNumber(otherPlayer.ActorNumber);
             }
 
             if (!PhotonNetwork.IsMasterClient)

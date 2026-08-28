@@ -151,6 +151,7 @@ namespace DHHFLastChanceMode.Modules.Config
 
             new BoolEntryDefinition(FeatureFlags.Sections.Spectate, nameof(FeatureFlags.SpectateDeadPlayers), FeatureFlags.Descriptions.SpectateDeadPlayers, () => FeatureFlags.SpectateDeadPlayers, value => FeatureFlags.SpectateDeadPlayers = value),
             new StringEntryDefinition(FeatureFlags.Sections.Spectate, nameof(FeatureFlags.SpectateDeadPlayersMode), FeatureFlags.Descriptions.SpectateDeadPlayersMode, new[] { "Always", "LastChanceOnly", "Disabled" }, () => FeatureFlags.SpectateDeadPlayersMode, value => FeatureFlags.SpectateDeadPlayersMode = value),
+            new IntEntryDefinition(FeatureFlags.Sections.Spectate, nameof(FeatureFlags.LastChanceSpectateDefaultFov), FeatureFlags.Descriptions.LastChanceSpectateDefaultFov, 0, 120, () => FeatureFlags.LastChanceSpectateDefaultFov, value => FeatureFlags.LastChanceSpectateDefaultFov = value, hostControlled: false),
 
             new BoolEntryDefinition(FeatureFlags.Sections.Debug, nameof(FeatureFlags.DebugLogging), FeatureFlags.Descriptions.DebugLogging, () => FeatureFlags.DebugLogging, value => FeatureFlags.DebugLogging = value, hostControlled: false),
         };

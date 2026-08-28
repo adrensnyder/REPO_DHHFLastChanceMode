@@ -4,10 +4,8 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
-using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Utilities;
 using DeathHeadHopper.Managers;
-using DeathHeadHopper.UI;
 using HarmonyLib;
 using TMPro;
 using UnityEngine;
@@ -72,7 +70,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
         private const float AssetRetryIntervalSeconds = 2f;
 
         private const float VisibilityRefreshIntervalSeconds = 0.5f;
-        private const float AbilitySpotCacheRefreshIntervalSeconds = 0.5f;
 
         private sealed class PlayerIconSlot
         {
@@ -187,7 +184,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             s_truckIconImage = null;
             s_truckCounterLabel = null;
             s_lastTruckCounterText = string.Empty;
-            AbilitySpotDiscoveryCache.Invalidate();
             LastChanceTimerChangeEffectsModule.Reset();
         }
 
@@ -702,39 +698,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.UI
             }
 
             LastChanceTimerChangeEffectsModule.SetVisible(enabled);
-        }
-
-        private static void TryApplyAbilityCostTextStyle(TextMeshProUGUI? label)
-        {
-            if (label == null)
-            {
-                return;
-            }
-
-            var spots = GetAbilitySpotsCached();
-            if (spots == null || spots.Length == 0)
-            {
-                return;
-            }
-
-            for (var i = 0; i < spots.Length; i++)
-            {
-                if (spots[i].energyCost is not TextMeshProUGUI costLabel)
-                {
-                    continue;
-                }
-
-                label.font = costLabel.font;
-                label.fontSharedMaterial = costLabel.fontSharedMaterial;
-                label.color = Color.black;
-
-                return;
-            }
-        }
-
-        private static AbilitySpot[] GetAbilitySpotsCached()
-        {
-            return AbilitySpotDiscoveryCache.GetCached(AbilitySpotCacheRefreshIntervalSeconds);
         }
 
         

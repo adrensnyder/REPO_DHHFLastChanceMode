@@ -4,9 +4,11 @@ using System;
 using System.Collections.Generic;
 using BepInEx.Logging;
 using DHHFLastChanceMode.Modules.Config;
+using DeathHeadHopperFix.API.Battery;
 using DHHFLastChanceMode.Modules.Utilities;
 using DHHFLastChanceMode.Modules.Gameplay.Core.Abilities;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.UI;
+using DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate;
 using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
@@ -112,8 +114,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static int s_lastUiStateHash;
         private static bool s_suppressedForRoom;
         private static bool s_suppressedLogEmitted;
+        private const string LastChanceBatteryLeaseOwnerId = "AdrenSnyder.DHHFLastChanceMode.Battery";
         private static bool s_lastChanceBatteryOverrideApplied;
-        private static bool s_lastChancePreviousBatteryJumpEnabled;
         private static DynamicTimerInputs s_cachedDynamicTimerInputs;
         private static bool s_hasCachedDynamicTimerInputs;
         private static string? s_lastTruckStateDebugMessage;
@@ -318,6 +320,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         internal static void OnLevelLoaded(bool shouldPrewarmAssets)
         {
+            LastChanceSpectateHelper.ResetOwnedState();
             LastChanceRuntimeOrchestrator.OnLevelTransition();
             s_suppressedForRoom = false;
             s_suppressedLogEmitted = false;
@@ -671,6 +674,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             if (!s_active)
             {
+                ClearLastChanceHostRuntimeOverrides();
                 return;
             }
 
@@ -756,7 +760,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return true;
             }
 
-            return false;
+            return s_lastChanceBatteryOverrideApplied;
         }
 
         private static bool IsValidRunContext()
@@ -2858,14 +2862,21 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
         private static void SetLastChanceActive(bool active)
         {
+            var wasActive = s_active;
             s_active = active;
             if (active)
             {
                 LastChanceRuntimeOrchestrator.EnterActiveRuntime();
+                if (!wasActive)
+                {
+                    LastChanceReviveReleaseTracker.CapturePendingDeathsAtActivation();
+                }
                 ApplyLastChanceHostRuntimeOverrides();
                 return;
             }
 
+            AbilityModule.ReleaseDirectionSlot();
+            LastChanceSpectateHelper.ResetOwnedState();
             LastChanceRuntimeOrchestrator.ExitRuntime("lastchance-deactivated");
             LastChanceRuntimeObjectRegistry.ResetForRuntimeDeactivated();
             ClearDirectionPenaltyCache();
@@ -2936,20 +2947,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            if (!CoreBatteryInterop.TryGetBatteryJumpEnabled(out var batteryJumpEnabled) || !batteryJumpEnabled)
-            {
-                return;
-            }
+            s_lastChanceBatteryOverrideApplied = BatteryJumpOverrideLease.TryAcquireHostOverride(
+                LastChanceBatteryLeaseOwnerId,
+                batteryJumpEnabled: false);
+        }
 
-            s_lastChancePreviousBatteryJumpEnabled = batteryJumpEnabled;
-            if (!CoreBatteryInterop.TrySetBatteryJumpEnabled(false))
-            {
-                return;
-            }
-
-            CoreBatteryInterop.SetCoreHostRuntimeOverride(enabled: false);
-            CoreBatteryInterop.RequestCoreConfigSyncBroadcast();
-            s_lastChanceBatteryOverrideApplied = true;
+        internal static void ReleaseBatteryOverrideForExternalTeardown()
+        {
+            ClearLastChanceHostRuntimeOverrides();
         }
 
         private static void ClearLastChanceHostRuntimeOverrides()
@@ -2959,11 +2964,8 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 return;
             }
 
-            CoreBatteryInterop.TrySetBatteryJumpEnabled(s_lastChancePreviousBatteryJumpEnabled);
-            CoreBatteryInterop.ClearCoreHostRuntimeOverride();
-            CoreBatteryInterop.RequestCoreConfigSyncBroadcast();
+            BatteryJumpOverrideLease.ReleaseHostOverride(LastChanceBatteryLeaseOwnerId);
             s_lastChanceBatteryOverrideApplied = false;
-            s_lastChancePreviousBatteryJumpEnabled = false;
         }
 
         private static object[] BuildSurrenderedActorsPayload()
