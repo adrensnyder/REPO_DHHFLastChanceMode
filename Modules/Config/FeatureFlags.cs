@@ -29,7 +29,7 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChanceTimerPerRoomStepSeconds = "Extra seconds added per total room-step count (sum of required players shortest paths to truck).";
             public const string LastChanceDynamicMaxMinutesAtLevel = "Level where level-based growth stops increasing (timer still only capped by MaxMinutes).";
             public const string LastChanceDynamicMaxMinutes = "Hard cap (minutes) for final LastChance timer after dynamic scaling.";
-            public const string ConsolationMoneyPercent = "Percentage of the minimum first-extraction reward for this level awarded when LastChance succeeds before any extraction is completed.";
+            public const string ConsolationMoneyPercent = "Percentage of the minimum first-extraction reward used as the minimum currency threshold when LastChance succeeds before any extraction is completed.";
             public const string LastChancePreserveExtractedCosmeticTokens = "When true, cosmetic tokens from extracted cosmetic crates are preserved for every player after a successful LastChance return.";
             public const string LastChancePreserveExtractedMoney = "When true, run currency already extracted before LastChance success is preserved; consolation money remains independent.";
             public const string LastChanceMissingPlayers = "Number of players allowed to stay outside the truck before LastChance success triggers (0 = all players required).";

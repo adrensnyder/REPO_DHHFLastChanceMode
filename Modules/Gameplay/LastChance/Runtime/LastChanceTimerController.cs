@@ -592,9 +592,33 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             CaptureBaseCurrency();
             var preservedCurrency = FeatureFlags.LastChancePreserveExtractedMoney ? s_baseCurrency : 0;
-            var consolationBonus = 0;
-            s_consolationMoneyPending = !TryCalculatePrimaryConsolationBonus(out consolationBonus);
-            var newCurrency = preservedCurrency + consolationBonus;
+            var targetCurrency = 0;
+            var primaryTargetAvailable = TryCalculatePrimaryConsolationTarget(out targetCurrency);
+            s_consolationMoneyPending = !primaryTargetAvailable;
+            var newCurrency = Mathf.Max(preservedCurrency, targetCurrency);
+
+            if (FeatureFlags.DebugLogging)
+            {
+                var extractionPointsCompleted = RoundDirector.instance?.extractionPointsCompleted ?? -1;
+                var extractionPointsTotal = RoundDirector.instance?.extractionPoints ?? -1;
+                var gateStatus = extractionPointsCompleted > 0
+                    ? "blocked"
+                    : extractionPointsCompleted == 0
+                        ? "passed"
+                        : "unavailable";
+                var gateReason = extractionPointsCompleted > 0
+                    ? "extractionPointsCompleted > 0"
+                    : extractionPointsCompleted == 0
+                    ? (primaryTargetAvailable ? "primary reference available" : "primary reference unavailable; crystal fallback pending")
+                    : "RoundDirector unavailable; crystal fallback pending";
+                Log.LogInfo(
+                    $"[LastChance] ConsolationMoney evaluation: extractions={extractionPointsCompleted}/{extractionPointsTotal} " +
+                    $"extractionPointsCompleted={extractionPointsCompleted} " +
+                    $"gate={gateStatus} reason={gateReason} preserved={preservedCurrency}k " +
+                    $"target={targetCurrency}k final={newCurrency}k topUp={Mathf.Max(0, newCurrency - preservedCurrency)}k " +
+                    $"primaryApplied={primaryTargetAvailable && newCurrency > preservedCurrency}.");
+            }
+
             LastChanceSurrenderNetwork.BroadcastExtractionReward();
             SemiFunc.StatSetRunCurrency(newCurrency);
             NormalizeDirectorsBeforeShopReturn();
@@ -645,30 +669,31 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 rawMaxValue = Mathf.Max(rawMaxValue, 1000f);
                 var baseCrystalValue = Mathf.Ceil(rawMaxValue / 1000f);
                 var referenceCost = Mathf.CeilToInt(shopManager.CrystalValueGet(baseCrystalValue));
-                var bonus = CalculateConsolationBonus(referenceCost);
+                var targetCurrency = CalculateConsolationTarget(referenceCost);
                 var currentCurrency = SemiFunc.StatGetRunCurrency();
+                var newCurrency = Mathf.Max(currentCurrency, targetCurrency);
 
-                SemiFunc.StatSetRunCurrency(currentCurrency + bonus);
+                SemiFunc.StatSetRunCurrency(newCurrency);
                 s_consolationMoneyPending = false;
 
                 if (FeatureFlags.DebugLogging)
                 {
-                    Log.LogDebug(
+                    Log.LogInfo(
                         $"[LastChance] Applied crystal fallback consolation money: crystalReference={referenceCost}k " +
                         $"percentage={Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500)}% " +
-                        $"bonus={bonus}k total={currentCurrency + bonus}k.");
+                        $"target={targetCurrency}k topUp={Mathf.Max(0, newCurrency - currentCurrency)}k total={newCurrency}k.");
                 }
             }
             catch (Exception ex)
             {
                 s_consolationMoneyPending = false;
-                Log.LogWarning($"[LastChance] Failed to apply crystal fallback consolation money; bonus cancelled. {ex.GetType().Name}: {ex.Message}");
+                Log.LogWarning($"[LastChance] Failed to apply crystal fallback consolation money; threshold application cancelled. {ex.GetType().Name}: {ex.Message}");
             }
         }
 
-        private static bool TryCalculatePrimaryConsolationBonus(out int bonus)
+        private static bool TryCalculatePrimaryConsolationTarget(out int target)
         {
-            bonus = 0;
+            target = 0;
             var roundDirector = RoundDirector.instance;
 
             // Once an extraction has been completed, LastChance does not grant
@@ -694,20 +719,20 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             var firstExtractionGoalK = Mathf.CeilToInt(firstExtractionGoal / 1000f);
-            bonus = CalculateConsolationBonus(firstExtractionGoalK);
+            target = CalculateConsolationTarget(firstExtractionGoalK);
 
             if (FeatureFlags.DebugLogging)
             {
                 Log.LogDebug(
                     $"[LastChance] Calculated extraction consolation money: " +
                     $"extractionGoal={firstExtractionGoal} firstExtractionReference={firstExtractionGoalK}k " +
-                    $"percentage={Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500)}% bonus={bonus}k.");
+                    $"percentage={Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500)}% target={target}k.");
             }
 
             return true;
         }
 
-        private static int CalculateConsolationBonus(int referenceCostK)
+        private static int CalculateConsolationTarget(int referenceCostK)
         {
             var percentage = Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500);
             return Mathf.CeilToInt(Mathf.Max(0, referenceCostK) * percentage / 100f);
