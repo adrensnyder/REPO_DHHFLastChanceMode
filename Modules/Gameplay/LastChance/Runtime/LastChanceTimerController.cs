@@ -41,6 +41,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static int s_baseCurrency;
         private static bool s_currencyCaptured;
         private static bool s_successHandled;
+        private static bool s_consolationMoneyPending;
         private static readonly Color TimerColor = new(1f, 0.85f, 0.1f, 1f);
         private static readonly Color FlashColor = new(1f, 0.2f, 0.2f, 1f);
         private static readonly InputKey SurrenderInputKey = InputKey.Crouch;
@@ -347,6 +348,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             SetLastChanceActive(false);
             s_currencyCaptured = false;
             s_successHandled = false;
+            s_consolationMoneyPending = false;
             s_timerRemaining = 0f;
             s_timerSyncedFromHost = false;
             LastChanceTimerUI.Hide();
@@ -483,6 +485,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_lastNetworkTimerBroadcastSecond = -1;
             s_currencyCaptured = false;
             s_successHandled = false;
+            s_consolationMoneyPending = false;
             s_indicatorNoneLoggedThisCycle = false;
             CaptureBaseCurrency();
             if (profileEnabled)
@@ -588,9 +591,10 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             CaptureBaseCurrency();
-            var bonus = Mathf.Max(0, FeatureFlags.LastChanceConsolationMoney);
             var preservedCurrency = FeatureFlags.LastChancePreserveExtractedMoney ? s_baseCurrency : 0;
-            var newCurrency = preservedCurrency + bonus;
+            var consolationBonus = 0;
+            s_consolationMoneyPending = !TryCalculatePrimaryConsolationBonus(out consolationBonus);
+            var newCurrency = preservedCurrency + consolationBonus;
             LastChanceSurrenderNetwork.BroadcastExtractionReward();
             SemiFunc.StatSetRunCurrency(newCurrency);
             NormalizeDirectorsBeforeShopReturn();
@@ -599,6 +603,120 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             TryLogShopReturnSnapshot(runMgr, newCurrency, "before-change-level");
             runMgr.ChangeLevel(false, false, RunManager.ChangeLevelType.Shop);
+        }
+
+        internal static void TryApplyPendingConsolationMoney(ShopManager shopManager)
+        {
+            if (!s_consolationMoneyPending ||
+                shopManager == null ||
+                !SemiFunc.IsMasterClientOrSingleplayer())
+            {
+                return;
+            }
+
+            try
+            {
+                var statsManager = StatsManager.instance;
+                if (statsManager == null || statsManager.itemDictionary == null)
+                {
+                    CancelPendingConsolationMoney("StatsManager or item dictionary unavailable in destination shop.");
+                    return;
+                }
+
+                Item? crystal = null;
+                foreach (var item in statsManager.itemDictionary.Values)
+                {
+                    if (item != null && item.itemType == SemiFunc.itemType.power_crystal)
+                    {
+                        crystal = item;
+                        break;
+                    }
+                }
+
+                if (crystal == null || crystal.value == null)
+                {
+                    CancelPendingConsolationMoney("Power Crystal asset unavailable in destination shop.");
+                    return;
+                }
+
+                // Mirror ItemAttributes.GetValue(): clamp raw value, round to k,
+                // then apply the crystal-specific level multiplier.
+                var rawMaxValue = crystal.value.valueMax * shopManager.itemValueMultiplier;
+                rawMaxValue = Mathf.Max(rawMaxValue, 1000f);
+                var baseCrystalValue = Mathf.Ceil(rawMaxValue / 1000f);
+                var referenceCost = Mathf.CeilToInt(shopManager.CrystalValueGet(baseCrystalValue));
+                var bonus = CalculateConsolationBonus(referenceCost);
+                var currentCurrency = SemiFunc.StatGetRunCurrency();
+
+                SemiFunc.StatSetRunCurrency(currentCurrency + bonus);
+                s_consolationMoneyPending = false;
+
+                if (FeatureFlags.DebugLogging)
+                {
+                    Log.LogDebug(
+                        $"[LastChance] Applied crystal fallback consolation money: crystalReference={referenceCost}k " +
+                        $"percentage={Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500)}% " +
+                        $"bonus={bonus}k total={currentCurrency + bonus}k.");
+                }
+            }
+            catch (Exception ex)
+            {
+                s_consolationMoneyPending = false;
+                Log.LogWarning($"[LastChance] Failed to apply crystal fallback consolation money; bonus cancelled. {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        private static bool TryCalculatePrimaryConsolationBonus(out int bonus)
+        {
+            bonus = 0;
+            var roundDirector = RoundDirector.instance;
+
+            // Once an extraction has been completed, LastChance does not grant
+            // consolation money for this level.
+            if (roundDirector != null && roundDirector.extractionPointsCompleted > 0)
+            {
+                return true;
+            }
+
+            if (roundDirector == null ||
+                roundDirector.extractionPoints <= 0 ||
+                roundDirector.haulGoal <= 0)
+            {
+                return false;
+            }
+
+            // This is the same integer division used by ExtractionPoint when
+            // assigning the minimum goal to each extraction point.
+            var firstExtractionGoal = roundDirector.haulGoal / roundDirector.extractionPoints;
+            if (firstExtractionGoal <= 0)
+            {
+                return false;
+            }
+
+            var firstExtractionGoalK = Mathf.CeilToInt(firstExtractionGoal / 1000f);
+            bonus = CalculateConsolationBonus(firstExtractionGoalK);
+
+            if (FeatureFlags.DebugLogging)
+            {
+                Log.LogDebug(
+                    $"[LastChance] Calculated extraction consolation money: " +
+                    $"extractionGoal={firstExtractionGoal} firstExtractionReference={firstExtractionGoalK}k " +
+                    $"percentage={Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500)}% bonus={bonus}k.");
+            }
+
+            return true;
+        }
+
+        private static int CalculateConsolationBonus(int referenceCostK)
+        {
+            var percentage = Mathf.Clamp(FeatureFlags.ConsolationMoneyPercent, 0, 500);
+            return Mathf.CeilToInt(Mathf.Max(0, referenceCostK) * percentage / 100f);
+        }
+
+        private static void CancelPendingConsolationMoney(string reason)
+        {
+            s_consolationMoneyPending = false;
+            Log.LogWarning($"[LastChance] Consolation money cancelled: {reason}");
         }
 
         private static void NormalizeDirectorsBeforeShopReturn()
@@ -711,6 +829,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             s_suppressedForRoom = false;
             s_suppressedLogEmitted = false;
+            s_consolationMoneyPending = false;
         }
 
         private static void ForceStopRuntimeState()
@@ -724,6 +843,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             ClearCachedDynamicTimerInputs();
             SetLastChanceActive(false);
             s_currencyCaptured = false;
+            s_consolationMoneyPending = false;
             s_timerRemaining = 0f;
             s_timerSyncedFromHost = false;
             s_hasNetworkUiState = false;
@@ -917,6 +1037,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             LastChanceTimerUI.Hide();
             s_timerRemaining = 0f;
+            s_consolationMoneyPending = false;
             SetLastChanceActive(false);
             s_timerSyncedFromHost = false;
             StopTimerSecondAudio();
@@ -3003,7 +3124,3 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
     }
 
 }
-
-
-
-

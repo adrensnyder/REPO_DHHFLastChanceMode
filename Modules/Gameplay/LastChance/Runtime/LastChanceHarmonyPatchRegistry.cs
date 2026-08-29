@@ -27,6 +27,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChancePlayerDeathOriginPatch),
             typeof(LastChancePlayerReviveReleasePatch),
             typeof(LastChancePlayerDestroyReviveCleanupPatch),
+            typeof(LastChanceConsolationMoneyShopPatch),
             typeof(SpectateCameraLastChancePlayerSwitchPatch),
             typeof(SpectateCameraLastChanceStateNormalPatch),
             typeof(SpectateCameraLastChanceUpdateStatePatch),
