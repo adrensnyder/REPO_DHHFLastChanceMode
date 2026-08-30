@@ -12,7 +12,6 @@ using DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate;
 using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
-using UnityEngine.AI;
 using Logger = BepInEx.Logging.Logger;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
@@ -147,33 +146,124 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             internal bool IsSurrendered { get; }
         }
 
+        private enum ReturnPathSource
+        {
+            None,
+            NavMesh,
+            RoomPathFallback,
+            UnresolvedFallback
+        }
+
+        private readonly struct ReturnCostCandidate
+        {
+            internal ReturnCostCandidate(
+                PlayerAvatar? playerAvatar,
+                int actorNumber,
+                float navMeshDistance,
+                float effectiveDistanceMeters,
+                int effectiveRoomSteps,
+                float heightDelta,
+                float distanceCostSeconds,
+                float roomCostSeconds,
+                float verticalCostSeconds,
+                float returnCostSeconds,
+                ReturnPathSource pathSource)
+            {
+                PlayerAvatar = playerAvatar;
+                ActorNumber = actorNumber;
+                NavMeshDistance = navMeshDistance;
+                EffectiveDistanceMeters = effectiveDistanceMeters;
+                EffectiveRoomSteps = effectiveRoomSteps;
+                HeightDelta = heightDelta;
+                DistanceCostSeconds = distanceCostSeconds;
+                RoomCostSeconds = roomCostSeconds;
+                VerticalCostSeconds = verticalCostSeconds;
+                ReturnCostSeconds = returnCostSeconds;
+                PathSource = pathSource;
+            }
+
+            internal PlayerAvatar? PlayerAvatar { get; }
+            internal int ActorNumber { get; }
+            internal float NavMeshDistance { get; }
+            internal float EffectiveDistanceMeters { get; }
+            internal int EffectiveRoomSteps { get; }
+            internal float HeightDelta { get; }
+            internal float DistanceCostSeconds { get; }
+            internal float RoomCostSeconds { get; }
+            internal float VerticalCostSeconds { get; }
+            internal float ReturnCostSeconds { get; }
+            internal ReturnPathSource PathSource { get; }
+        }
+
+        private readonly struct RepoDifficultySnapshot
+        {
+            internal RepoDifficultySnapshot(float difficulty1, float difficulty2, float difficulty3, bool usedFallback)
+            {
+                Difficulty1 = difficulty1;
+                Difficulty2 = difficulty2;
+                Difficulty3 = difficulty3;
+                Progress = Mathf.Clamp01((difficulty1 + difficulty2 + difficulty3) / 3f);
+                UsedFallback = usedFallback;
+            }
+
+            internal float Difficulty1 { get; }
+            internal float Difficulty2 { get; }
+            internal float Difficulty3 { get; }
+            internal float Progress { get; }
+            internal bool UsedFallback { get; }
+        }
+
         private readonly struct DynamicTimerInputs
         {
             internal DynamicTimerInputs(
                 int requiredPlayers,
                 int levelNumber,
                 int aliveSearchMonsters,
-                float totalDistanceMeters,
-                int playersBelowTruckThreshold,
-                float totalBelowTruckMeters,
-                int totalShortestRoomPathSteps)
+                int candidateCount,
+                int criticalActorNumber,
+                int criticalPlayerInstanceId,
+                float criticalNavMeshDistance,
+                float criticalEffectiveDistanceMeters,
+                int criticalRoomSteps,
+                float criticalHeightDelta,
+                float criticalDistanceCostSeconds,
+                float criticalRoomCostSeconds,
+                float criticalVerticalCostSeconds,
+                float criticalReturnCostSeconds,
+                ReturnPathSource criticalPathSource)
             {
                 RequiredPlayers = requiredPlayers;
                 LevelNumber = levelNumber;
                 AliveSearchMonsters = aliveSearchMonsters;
-                TotalDistanceMeters = totalDistanceMeters;
-                PlayersBelowTruckThreshold = playersBelowTruckThreshold;
-                TotalBelowTruckMeters = totalBelowTruckMeters;
-                TotalShortestRoomPathSteps = totalShortestRoomPathSteps;
+                CandidateCount = candidateCount;
+                CriticalActorNumber = criticalActorNumber;
+                CriticalPlayerInstanceId = criticalPlayerInstanceId;
+                CriticalNavMeshDistance = criticalNavMeshDistance;
+                CriticalEffectiveDistanceMeters = criticalEffectiveDistanceMeters;
+                CriticalRoomSteps = criticalRoomSteps;
+                CriticalHeightDelta = criticalHeightDelta;
+                CriticalDistanceCostSeconds = criticalDistanceCostSeconds;
+                CriticalRoomCostSeconds = criticalRoomCostSeconds;
+                CriticalVerticalCostSeconds = criticalVerticalCostSeconds;
+                CriticalReturnCostSeconds = criticalReturnCostSeconds;
+                CriticalPathSource = criticalPathSource;
             }
 
             internal int RequiredPlayers { get; }
             internal int LevelNumber { get; }
             internal int AliveSearchMonsters { get; }
-            internal float TotalDistanceMeters { get; }
-            internal int PlayersBelowTruckThreshold { get; }
-            internal float TotalBelowTruckMeters { get; }
-            internal int TotalShortestRoomPathSteps { get; }
+            internal int CandidateCount { get; }
+            internal int CriticalActorNumber { get; }
+            internal int CriticalPlayerInstanceId { get; }
+            internal float CriticalNavMeshDistance { get; }
+            internal float CriticalEffectiveDistanceMeters { get; }
+            internal int CriticalRoomSteps { get; }
+            internal float CriticalHeightDelta { get; }
+            internal float CriticalDistanceCostSeconds { get; }
+            internal float CriticalRoomCostSeconds { get; }
+            internal float CriticalVerticalCostSeconds { get; }
+            internal float CriticalReturnCostSeconds { get; }
+            internal ReturnPathSource CriticalPathSource { get; }
         }
 
         private readonly struct DynamicTimerProfileSnapshot
@@ -182,11 +272,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 float totalMs,
                 float monstersMs,
                 float recordsMs,
-                float selectMs,
-                float heightRefreshMs,
+                float candidateBuildMs,
+                float criticalSelectMs,
                 float aggregateMs,
                 int recordsCount,
-                int selectedCount,
+                int candidateCount,
                 int requiredPlayers,
                 int levelNumber,
                 int aliveMonsters)
@@ -194,11 +284,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 TotalMs = totalMs;
                 MonstersMs = monstersMs;
                 RecordsMs = recordsMs;
-                SelectMs = selectMs;
-                HeightRefreshMs = heightRefreshMs;
+                CandidateBuildMs = candidateBuildMs;
+                CriticalSelectMs = criticalSelectMs;
                 AggregateMs = aggregateMs;
                 RecordsCount = recordsCount;
-                SelectedCount = selectedCount;
+                CandidateCount = candidateCount;
                 RequiredPlayers = requiredPlayers;
                 LevelNumber = levelNumber;
                 AliveMonsters = aliveMonsters;
@@ -207,11 +297,11 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             internal float TotalMs { get; }
             internal float MonstersMs { get; }
             internal float RecordsMs { get; }
-            internal float SelectMs { get; }
-            internal float HeightRefreshMs { get; }
+            internal float CandidateBuildMs { get; }
+            internal float CriticalSelectMs { get; }
             internal float AggregateMs { get; }
             internal int RecordsCount { get; }
-            internal int SelectedCount { get; }
+            internal int CandidateCount { get; }
             internal int RequiredPlayers { get; }
             internal int LevelNumber { get; }
             internal int AliveMonsters { get; }
@@ -262,6 +352,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         {
             // Keep runtime caches/states coherent when host-controlled flags are changed live.
             ClearCachedDynamicTimerInputs();
+            ClearDirectionPenaltyCache();
             LastChanceMonstersNoiseAggroModule.ResetRuntimeState();
             LastChanceMonstersSearchModule.ResetRuntimeState();
             LastChanceMonstersVoiceEnemyOnlyModule.ResetRuntimeState();
@@ -2077,16 +2168,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 (minPenalty, maxPenalty) = (maxPenalty, minPenalty);
             }
 
-            // Static timer mode: always use maximum penalty.
+            // Static timer mode: always use the low-difficulty / maximum configured penalty.
             if (!FeatureFlags.LastChanceDynamicTimerEnabled)
             {
                 return Mathf.Round(maxPenalty);
             }
 
-            var level = GetCurrentLevelNumber();
-            var maxAtLevel = Mathf.Max(2, FeatureFlags.LastChanceDynamicMaxMinutesAtLevel);
-            var normalized = Mathf.Clamp01((Mathf.Max(1, level) - 1f) / (maxAtLevel - 1f));
-            return Mathf.Round(Mathf.Lerp(maxPenalty, minPenalty, normalized));
+            var difficulty = GetRepoDifficultySnapshot();
+            return Mathf.Round(Mathf.Lerp(maxPenalty, minPenalty, difficulty.Progress));
         }
 
         private static float GetOrComputeDirectionPenaltySeconds()
@@ -2306,34 +2395,23 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             points = new List<Vector3>(2);
             navFrom = Vector3.zero;
             navTo = Vector3.zero;
-            var localAvatar = PlayerAvatar.instance;
-            if (localAvatar == null)
+            if (!PlayerTruckDistanceHelper.TryGetLocalPlayerTruckRouteAssessment(
+                    includePathCorners: true,
+                    assessment: out var routeAssessment))
             {
                 return false;
             }
 
-            var localPosBase = GetLocalHeadOrPlayerPosition(localAvatar);
-            if (!TryGetTruckPosition(out var truckPosBase))
-            {
-                return false;
-            }
+            var localPosBase = routeAssessment.PlayerWorldPosition;
+            var truckPosBase = routeAssessment.TruckWorldPosition;
             var localPos = localPosBase + Vector3.up * DirectionLineHeightOffset;
             var truckPos = truckPosBase + Vector3.up * DirectionLineHeightOffset;
 
-            if (!TrySampleNavMeshPosition(localPosBase, 12f, out var from))
-            {
-                from = localPosBase;
-            }
+            navFrom = routeAssessment.NavMeshFrom;
+            navTo = routeAssessment.NavMeshTo;
 
-            if (!TrySampleNavMeshPosition(truckPosBase, 8f, out var to))
-            {
-                to = truckPosBase;
-            }
-
-            navFrom = from;
-            navTo = to;
-
-            if (!TryCalculateNavMeshPathCorners(from, to, out var corners) || corners.Length == 0)
+            var corners = routeAssessment.PathCorners;
+            if (!routeAssessment.HasValidPath || corners.Length == 0)
             {
                 points.Add(localPos);
                 points.Add(truckPos);
@@ -2347,135 +2425,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
 
             return points.Count >= 2;
-        }
-
-        private static Vector3 GetLocalHeadOrPlayerPosition(PlayerAvatar avatar)
-        {
-            if (avatar.playerDeathHead != null)
-            {
-                return avatar.playerDeathHead.transform.position;
-            }
-
-            if (avatar.playerTransform != null)
-            {
-                return avatar.playerTransform.position;
-            }
-
-            return avatar.transform.position;
-        }
-
-        private static bool TryGetTruckPosition(out Vector3 truckPosition)
-        {
-            truckPosition = Vector3.zero;
-            try
-            {
-                var levelGenerator = LevelGenerator.Instance;
-                if (levelGenerator == null)
-                {
-                    return false;
-                }
-
-                if (levelGenerator.LevelPathTruck != null)
-                {
-                    var candidate = levelGenerator.LevelPathTruck;
-                    if (TryGetTransformPosition(candidate, out truckPosition))
-                    {
-                        return true;
-                    }
-                }
-
-                if (levelGenerator.LevelPathPoints == null)
-                {
-                    return false;
-                }
-
-                foreach (var point in levelGenerator.LevelPathPoints)
-                {
-                    if (point == null)
-                    {
-                        continue;
-                    }
-
-                    if (point.Truck && TryGetTransformPosition(point, out truckPosition))
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogRuntimeHotPathException("TryGetTruckPosition", ex);
-            }
-
-            return false;
-        }
-
-        private static bool TryGetTransformPosition(object obj, out Vector3 position)
-        {
-            position = Vector3.zero;
-            try
-            {
-                if (obj == null)
-                {
-                    return false;
-                }
-
-                if (obj is Component comp && comp != null)
-                {
-                    position = comp.transform.position;
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogRuntimeHotPathException("TryGetTransformPosition", ex);
-            }
-
-            return false;
-        }
-
-        private static bool TrySampleNavMeshPosition(Vector3 source, float maxDistance, out Vector3 sampledPosition)
-        {
-            sampledPosition = Vector3.zero;
-            try
-            {
-                if (NavMesh.SamplePosition(source, out var navHit, maxDistance, NavMesh.AllAreas))
-                {
-                    sampledPosition = navHit.position;
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogRuntimeHotPathException("TrySampleNavMeshPosition", ex);
-            }
-
-            return false;
-        }
-
-        private static bool TryCalculateNavMeshPathCorners(Vector3 from, Vector3 to, out Vector3[] corners)
-        {
-            corners = Array.Empty<Vector3>();
-            try
-            {
-                var path = new NavMeshPath();
-                if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, path))
-                {
-                    return false;
-                }
-
-                if (path.corners.Length > 0)
-                {
-                    corners = path.corners;
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogRuntimeHotPathException("TryCalculateNavMeshPathCorners", ex);
-            }
-
-            return false;
         }
 
         private static void LogRuntimeHotPathException(string context, Exception ex)
@@ -2636,27 +2585,37 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
         private static float GetInitialTimerSeconds(int maxPlayers)
         {
             var baseSeconds = GetConfiguredSeconds();
-            var maxSeconds = GetDynamicTimerCapSeconds();
             if (!FeatureFlags.LastChanceDynamicTimerEnabled)
             {
                 ClearCachedDynamicTimerInputs();
-                return Mathf.Clamp(baseSeconds, 30f, maxSeconds);
+                return baseSeconds;
             }
 
             var inputs = CollectDynamicTimerInputs(maxPlayers);
             CacheDynamicTimerInputs(inputs);
-            var rawAddedSeconds = CalculateRawAddedSeconds(inputs);
+            var difficulty = GetRepoDifficultySnapshot();
+            var rawAddedSeconds = CalculateRawAddedSeconds(inputs, difficulty, out var contributionFallback);
             var dynamicSeconds = baseSeconds + rawAddedSeconds;
-            var levelFloorSeconds = GetLevelFloorSeconds(inputs.LevelNumber, maxSeconds);
-            var finalSeconds = Mathf.Clamp(Mathf.Max(dynamicSeconds, levelFloorSeconds), 30f, maxSeconds);
+            var difficultyFloorSeconds = GetDifficultyFloorSeconds(baseSeconds, difficulty, out var floorFallback);
+            var candidateFinalSeconds = Mathf.Max(dynamicSeconds, difficultyFloorSeconds);
+            var finalFallback = contributionFallback || floorFallback || !IsFinite(candidateFinalSeconds);
+            var finalSeconds = finalFallback
+                ? Mathf.Max(30f, difficultyFloorSeconds)
+                : Mathf.Max(30f, candidateFinalSeconds);
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog("LastChance.DynamicTimer", 30))
             {
+                var criticalId = inputs.CriticalActorNumber > 0
+                    ? $"actor:{inputs.CriticalActorNumber}"
+                    : $"instance:{inputs.CriticalPlayerInstanceId}";
                 Log.LogDebug(
-                    $"[LastChance] DynamicTimer: base={baseSeconds:F1}s level={inputs.LevelNumber} required={inputs.RequiredPlayers} " +
-                    $"totalDistance={inputs.TotalDistanceMeters:F1}m belowPlayers={inputs.PlayersBelowTruckThreshold} belowMeters={inputs.TotalBelowTruckMeters:F2} " +
-                    $"aliveMonsters={inputs.AliveSearchMonsters} totalRoomSteps={inputs.TotalShortestRoomPathSteps} rawAdd={rawAddedSeconds:F1}s " +
-                    $"dynamic={dynamicSeconds:F1}s levelFloor={levelFloorSeconds:F1}s final={finalSeconds:F1}s hardCap={maxSeconds:F1}s");
+                    $"[LastChance] DynamicTimer: base={baseSeconds:F1}s level={inputs.LevelNumber} D1={difficulty.Difficulty1:F3} D2={difficulty.Difficulty2:F3} D3={difficulty.Difficulty3:F3} repoProgress={difficulty.Progress:F3} " +
+                    $"floorBonuses={FeatureFlags.LastChanceDifficulty1FloorBonusSeconds}/{FeatureFlags.LastChanceDifficulty2FloorBonusSeconds}/{FeatureFlags.LastChanceDifficulty3FloorBonusSeconds}s " +
+                    $"required={inputs.RequiredPlayers} candidates={inputs.CandidateCount} critical={criticalId} pathSource={inputs.CriticalPathSource} " +
+                    $"navDistance={inputs.CriticalNavMeshDistance:F1}m effectiveDistance={inputs.CriticalEffectiveDistanceMeters:F1}m roomSteps={inputs.CriticalRoomSteps} heightDelta={inputs.CriticalHeightDelta:F2}m " +
+                    $"distanceCost={inputs.CriticalDistanceCostSeconds:F1}s roomCost={inputs.CriticalRoomCostSeconds:F1}s verticalCost={inputs.CriticalVerticalCostSeconds:F1}s returnCost={inputs.CriticalReturnCostSeconds:F1}s " +
+                    $"aliveMonsters={inputs.AliveSearchMonsters} rawAdd={rawAddedSeconds:F1}s situationalDynamic={dynamicSeconds:F1}s difficultyFloor={difficultyFloorSeconds:F1}s final={finalSeconds:F1}s " +
+                    $"difficultyFallback={difficulty.UsedFallback} numericFallback={finalFallback}");
             }
 
             return finalSeconds;
@@ -2717,7 +2676,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             var activationMs = (Time.realtimeSinceStartup - s_activationProfileStartedAt) * 1000f;
             var helperSummary = PlayerTruckDistanceHelper.EndActivationProfilingSummary();
             var dynamicSummary = s_hasDynamicTimerProfile
-                ? $"dynamic=total={s_lastDynamicTimerProfile.TotalMs:F1}ms monsters={s_lastDynamicTimerProfile.MonstersMs:F1}ms records={s_lastDynamicTimerProfile.RecordsMs:F1}ms select={s_lastDynamicTimerProfile.SelectMs:F1}ms heightRefresh={s_lastDynamicTimerProfile.HeightRefreshMs:F1}ms aggregate={s_lastDynamicTimerProfile.AggregateMs:F1}ms records={s_lastDynamicTimerProfile.RecordsCount} selected={s_lastDynamicTimerProfile.SelectedCount} required={s_lastDynamicTimerProfile.RequiredPlayers} level={s_lastDynamicTimerProfile.LevelNumber} aliveMonsters={s_lastDynamicTimerProfile.AliveMonsters}"
+                ? $"dynamic=total={s_lastDynamicTimerProfile.TotalMs:F1}ms monsters={s_lastDynamicTimerProfile.MonstersMs:F1}ms records={s_lastDynamicTimerProfile.RecordsMs:F1}ms candidateBuild={s_lastDynamicTimerProfile.CandidateBuildMs:F1}ms criticalSelect={s_lastDynamicTimerProfile.CriticalSelectMs:F1}ms aggregate={s_lastDynamicTimerProfile.AggregateMs:F1}ms records={s_lastDynamicTimerProfile.RecordsCount} candidates={s_lastDynamicTimerProfile.CandidateCount} required={s_lastDynamicTimerProfile.RequiredPlayers} level={s_lastDynamicTimerProfile.LevelNumber} aliveMonsters={s_lastDynamicTimerProfile.AliveMonsters}"
                 : "dynamic=not-collected";
             var startPhaseSummary = s_hasActivationStartPhaseProfile
                 ? $"start=total={s_lastActivationStartPhaseProfile.TotalMs:F1}ms setActive={s_lastActivationStartPhaseProfile.SetActiveMs:F1}ms initialTimer={s_lastActivationStartPhaseProfile.InitialTimerMs:F1}ms captureCurrency={s_lastActivationStartPhaseProfile.CaptureCurrencyMs:F1}ms ensureNetwork={s_lastActivationStartPhaseProfile.EnsureNetworkMs:F1}ms showUi={s_lastActivationStartPhaseProfile.ShowUiMs:F1}ms clearState={s_lastActivationStartPhaseProfile.ClearStateMs:F1}ms broadcast={s_lastActivationStartPhaseProfile.BroadcastMs:F1}ms debugExtras={s_lastActivationStartPhaseProfile.DebugExtrasMs:F1}ms"
@@ -2736,20 +2695,14 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             s_lastActivationStartPhaseProfile = default;
         }
 
-        private static float GetDynamicTimerCapSeconds()
-        {
-            var capMinutes = Mathf.Clamp(FeatureFlags.LastChanceDynamicMaxMinutes, 5, 20);
-            return capMinutes * 60f;
-        }
-
         private static DynamicTimerInputs CollectDynamicTimerInputs(int maxPlayers)
         {
             var profileEnabled = FeatureFlags.DebugLogging;
             var profileStart = profileEnabled ? Time.realtimeSinceStartup : 0f;
             var profileAfterMonsters = profileStart;
             var profileAfterRecords = profileStart;
+            var profileAfterCandidates = profileStart;
             var profileAfterSelect = profileStart;
-            var profileAfterHeightRefresh = profileStart;
             var requiredPlayers = Mathf.Max(1, GetLastChanceNeededPlayers(maxPlayers));
             var levelNumber = GetCurrentLevelNumber();
             var aliveSearchMonsters = LastChanceMonstersSearchModule.GetAliveSearchMonsterCount();
@@ -2758,8 +2711,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 profileAfterMonsters = Time.realtimeSinceStartup;
             }
 
+            // LastChance initial allocation must use one fresh complete assessment for every candidate.
+            // Prewarm remains useful, but critical-return selection must not depend on stale route/height data.
             var records = PlayerTruckDistanceHelper.GetDistancesFromTruck(
-                PlayerTruckDistanceHelper.DistanceQueryFields.All);
+                PlayerTruckDistanceHelper.DistanceQueryFields.All,
+                players: null,
+                forceRefresh: true);
             if (profileEnabled)
             {
                 profileAfterRecords = Time.realtimeSinceStartup;
@@ -2790,70 +2747,42 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     requiredPlayers,
                     levelNumber,
                     aliveSearchMonsters,
+                    0,
+                    0,
+                    0,
+                    -1f,
                     0f,
                     0,
                     0f,
-                    0);
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    ReturnPathSource.None);
             }
 
-            var selected = SelectRequiredPlayers(records, requiredPlayers);
+            var belowThreshold = Mathf.Min(0f, FeatureFlags.LastChanceBelowTruckThresholdMeters);
+            var candidates = new List<ReturnCostCandidate>(records.Length);
+            for (var i = 0; i < records.Length; i++)
+            {
+                candidates.Add(BuildReturnCostCandidate(records[i], belowThreshold));
+            }
+            if (profileEnabled)
+            {
+                profileAfterCandidates = Time.realtimeSinceStartup;
+            }
+
+            candidates.Sort((left, right) => left.ReturnCostSeconds.CompareTo(right.ReturnCostSeconds));
+            var criticalOrdinal = Mathf.Clamp(requiredPlayers, 1, candidates.Count) - 1;
+            var critical = candidates[criticalOrdinal];
             if (profileEnabled)
             {
                 profileAfterSelect = Time.realtimeSinceStartup;
             }
 
-            // Height is the most time-sensitive variable: refresh only this field for selected players.
-            // Nav/path data stays cached unless room context changes.
-            var selectedPlayers = new List<PlayerAvatar>(selected.Count);
-            for (var i = 0; i < selected.Count; i++)
-            {
-                var player = selected[i].PlayerAvatar;
-                if (player != null)
-                {
-                    selectedPlayers.Add(player);
-                }
-            }
-
-            if (selectedPlayers.Count > 0)
-            {
-                var refreshedSelected = PlayerTruckDistanceHelper.GetDistancesFromTruck(
-                    PlayerTruckDistanceHelper.DistanceQueryFields.Height,
-                    selectedPlayers);
-                if (refreshedSelected.Length > 0)
-                {
-                    selected = SelectRequiredPlayers(refreshedSelected, requiredPlayers);
-                }
-            }
-            if (profileEnabled)
-            {
-                profileAfterHeightRefresh = Time.realtimeSinceStartup;
-            }
-
-            var belowThreshold = Mathf.Min(0f, FeatureFlags.LastChanceBelowTruckThresholdMeters);
-            var totalDistanceMeters = 0f;
-            var playersBelowTruckThreshold = 0;
-            var totalBelowTruckMeters = 0f;
-            var totalShortestRoomPathSteps = 0;
-
-            for (var i = 0; i < selected.Count; i++)
-            {
-                var record = selected[i];
-                if (record.HasValidPath && record.NavMeshDistance >= 0f)
-                {
-                    totalDistanceMeters += record.NavMeshDistance;
-                }
-
-                if (record.ShortestRoomPathToTruck >= 0)
-                {
-                    totalShortestRoomPathSteps += record.ShortestRoomPathToTruck;
-                }
-
-                if (record.HeightDelta <= belowThreshold)
-                {
-                    playersBelowTruckThreshold++;
-                    totalBelowTruckMeters += Mathf.Max(0f, belowThreshold - record.HeightDelta);
-                }
-            }
+            var criticalPlayerInstanceId = critical.PlayerAvatar != null
+                ? critical.PlayerAvatar.GetInstanceID()
+                : 0;
 
             if (profileEnabled)
             {
@@ -2861,18 +2790,18 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 var totalMs = (profileEnd - profileStart) * 1000f;
                 var monstersMs = (profileAfterMonsters - profileStart) * 1000f;
                 var recordsMs = (profileAfterRecords - profileAfterMonsters) * 1000f;
-                var selectMs = (profileAfterSelect - profileAfterRecords) * 1000f;
-                var heightRefreshMs = (profileAfterHeightRefresh - profileAfterSelect) * 1000f;
-                var aggregateMs = (profileEnd - profileAfterHeightRefresh) * 1000f;
+                var candidateBuildMs = (profileAfterCandidates - profileAfterRecords) * 1000f;
+                var criticalSelectMs = (profileAfterSelect - profileAfterCandidates) * 1000f;
+                var aggregateMs = (profileEnd - profileAfterSelect) * 1000f;
                 CacheDynamicTimerProfile(new DynamicTimerProfileSnapshot(
                     totalMs,
                     monstersMs,
                     recordsMs,
-                    selectMs,
-                    heightRefreshMs,
+                    candidateBuildMs,
+                    criticalSelectMs,
                     aggregateMs,
                     records.Length,
-                    selected.Count,
+                    candidates.Count,
                     requiredPlayers,
                     levelNumber,
                     aliveSearchMonsters));
@@ -2882,51 +2811,84 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                 requiredPlayers,
                 levelNumber,
                 aliveSearchMonsters,
-                totalDistanceMeters,
-                playersBelowTruckThreshold,
-                totalBelowTruckMeters,
-                totalShortestRoomPathSteps);
+                candidates.Count,
+                critical.ActorNumber,
+                criticalPlayerInstanceId,
+                critical.NavMeshDistance,
+                critical.EffectiveDistanceMeters,
+                critical.EffectiveRoomSteps,
+                critical.HeightDelta,
+                critical.DistanceCostSeconds,
+                critical.RoomCostSeconds,
+                critical.VerticalCostSeconds,
+                critical.ReturnCostSeconds,
+                critical.PathSource);
         }
 
-        private static List<PlayerTruckDistanceHelper.PlayerTruckDistance> SelectRequiredPlayers(
-            PlayerTruckDistanceHelper.PlayerTruckDistance[] records,
-            int requiredPlayers)
+        private static ReturnCostCandidate BuildReturnCostCandidate(
+            PlayerTruckDistanceHelper.PlayerTruckDistance record,
+            float belowThreshold)
         {
-            var sorted = new List<PlayerTruckDistanceHelper.PlayerTruckDistance>(records.Length);
-            for (var i = 0; i < records.Length; i++)
+            var pathSource = ReturnPathSource.NavMesh;
+            var navMeshDistance = record.HasValidPath && record.NavMeshDistance >= 0f
+                ? record.NavMeshDistance
+                : -1f;
+            var effectiveDistanceMeters = navMeshDistance;
+            var effectiveRoomSteps = record.ShortestRoomPathToTruck;
+
+            if (navMeshDistance < 0f)
             {
-                sorted.Add(records[i]);
+                if (record.ShortestRoomPathToTruck >= 0)
+                {
+                    pathSource = ReturnPathSource.RoomPathFallback;
+                    // Reuse the existing timer difficulty heuristic of roughly 15 path-meters per room step.
+                    // Keep at least one step so an invalid NavMesh path never becomes a zero-cost route.
+                    effectiveDistanceMeters = Mathf.Max(1, record.ShortestRoomPathToTruck) * 15f;
+                }
+                else
+                {
+                    pathSource = ReturnPathSource.UnresolvedFallback;
+                    // Current code already treats a fully unresolved route as the hardest selection case.
+                    // Convert that conservative intent into bounded route arithmetic using known map size;
+                    // when map-room count is unavailable, reuse the existing 14-step context normalization.
+                    effectiveRoomSteps = record.TotalMapRooms > 0 ? record.TotalMapRooms : 14;
+                    effectiveDistanceMeters = Mathf.Max(1, effectiveRoomSteps) * 15f;
+                }
             }
 
-            sorted.Sort((left, right) => ScoreTimerDifficulty(right).CompareTo(ScoreTimerDifficulty(left)));
-            var take = Mathf.Clamp(requiredPlayers, 1, sorted.Count);
-            if (take >= sorted.Count)
+            if (effectiveRoomSteps < 0)
             {
-                return sorted;
+                effectiveRoomSteps = 0;
             }
 
-            var trimmed = new List<PlayerTruckDistanceHelper.PlayerTruckDistance>(take);
-            for (var i = 0; i < take; i++)
+            var distanceCostSeconds = Mathf.Max(0f, effectiveDistanceMeters) *
+                                      Mathf.Max(0f, FeatureFlags.LastChanceTimerPerFarthestMeterSeconds);
+            var roomCostSeconds = Mathf.Max(0, effectiveRoomSteps) *
+                                  Mathf.Max(0f, FeatureFlags.LastChanceTimerPerRoomStepSeconds);
+
+            var verticalCostSeconds = 0f;
+            if (record.HeightDelta <= belowThreshold)
             {
-                trimmed.Add(sorted[i]);
+                var belowMeters = Mathf.Max(0f, belowThreshold - record.HeightDelta);
+                verticalCostSeconds += Mathf.Max(0f, FeatureFlags.LastChanceTimerPerBelowTruckPlayerSeconds);
+                verticalCostSeconds += belowMeters * Mathf.Max(0f, FeatureFlags.LastChanceTimerPerBelowTruckMeterSeconds);
             }
 
-            return trimmed;
-        }
+            var returnCostSeconds = Mathf.Max(0f, distanceCostSeconds + roomCostSeconds + verticalCostSeconds);
+            var actorNumber = record.PlayerAvatar?.photonView?.Owner?.ActorNumber ?? 0;
 
-        private static float ScoreTimerDifficulty(PlayerTruckDistanceHelper.PlayerTruckDistance record)
-        {
-            if (record.HasValidPath && record.NavMeshDistance >= 0f)
-            {
-                return record.NavMeshDistance;
-            }
-
-            if (record.ShortestRoomPathToTruck >= 0)
-            {
-                return record.ShortestRoomPathToTruck * 15f;
-            }
-
-            return 99999f;
+            return new ReturnCostCandidate(
+                record.PlayerAvatar,
+                actorNumber,
+                navMeshDistance,
+                Mathf.Max(0f, effectiveDistanceMeters),
+                effectiveRoomSteps,
+                record.HeightDelta,
+                distanceCostSeconds,
+                roomCostSeconds,
+                verticalCostSeconds,
+                returnCostSeconds,
+                pathSource);
         }
 
         private static int GetCurrentLevelNumber()
@@ -2939,7 +2901,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 
             try
             {
-                // Use actual run progression level (same semantic shown as LEVEL N in UI).
+                // Diagnostic/UI level only. Difficulty scaling itself comes from the vanilla SemiFunc APIs below.
                 return Mathf.Max(1, runMgr.levelsCompleted + 1);
             }
             catch
@@ -2948,52 +2910,98 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             }
         }
 
-        private static float CalculateRawAddedSeconds(DynamicTimerInputs inputs)
+        private static RepoDifficultySnapshot GetRepoDifficultySnapshot()
+        {
+            if (RunManager.instance == null)
+            {
+                return new RepoDifficultySnapshot(0f, 0f, 0f, usedFallback: true);
+            }
+
+            try
+            {
+                var usedFallback = false;
+                var difficulty1 = SanitizeDifficultyMultiplier(SemiFunc.RunGetDifficultyMultiplier1(), ref usedFallback);
+                var difficulty2 = SanitizeDifficultyMultiplier(SemiFunc.RunGetDifficultyMultiplier2(), ref usedFallback);
+                var difficulty3 = SanitizeDifficultyMultiplier(SemiFunc.RunGetDifficultyMultiplier3(), ref usedFallback);
+                return new RepoDifficultySnapshot(difficulty1, difficulty2, difficulty3, usedFallback);
+            }
+            catch
+            {
+                return new RepoDifficultySnapshot(0f, 0f, 0f, usedFallback: true);
+            }
+        }
+
+        private static float SanitizeDifficultyMultiplier(float value, ref bool usedFallback)
+        {
+            if (!IsFinite(value))
+            {
+                usedFallback = true;
+                return 0f;
+            }
+
+            return Mathf.Clamp01(value);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static float CalculateRawAddedSeconds(
+            DynamicTimerInputs inputs,
+            RepoDifficultySnapshot difficulty,
+            out bool usedFiniteFallback)
         {
             var added = 0f;
-            added += inputs.RequiredPlayers * FeatureFlags.LastChanceTimerPerRequiredPlayerSeconds;
-            added += inputs.TotalDistanceMeters * FeatureFlags.LastChanceTimerPerFarthestMeterSeconds;
-            added += inputs.PlayersBelowTruckThreshold * FeatureFlags.LastChanceTimerPerBelowTruckPlayerSeconds;
-            added += inputs.TotalBelowTruckMeters * FeatureFlags.LastChanceTimerPerBelowTruckMeterSeconds;
-            added += inputs.TotalShortestRoomPathSteps * FeatureFlags.LastChanceTimerPerRoomStepSeconds;
-            var monsterSeconds = inputs.AliveSearchMonsters * Mathf.Max(0f, FeatureFlags.LastChanceTimerPerMonsterSeconds);
-            if (FeatureFlags.LastChanceMonstersSearchEnabled)
+            added += inputs.RequiredPlayers * Mathf.Max(0f, FeatureFlags.LastChanceTimerPerRequiredPlayerSeconds);
+            added += inputs.CriticalReturnCostSeconds;
+            added += inputs.AliveSearchMonsters * Mathf.Max(0f, FeatureFlags.LastChanceTimerPerMonsterSeconds);
+            added *= CalculateDifficultyContributionMultiplier(inputs, difficulty);
+
+            if (!IsFinite(added))
             {
-                // MonstersSearch ON makes disabled players valid targets: add extra pressure on timer.
-                monsterSeconds *= 1.2f;
+                usedFiniteFallback = true;
+                return 0f;
             }
-            added += monsterSeconds;
-            added *= CalculateLevelContributionMultiplier(inputs);
+
+            usedFiniteFallback = false;
             return Mathf.Max(0f, added);
         }
 
-        private static float CalculateLevelContributionMultiplier(DynamicTimerInputs inputs)
+        private static float CalculateDifficultyContributionMultiplier(
+            DynamicTimerInputs inputs,
+            RepoDifficultySnapshot difficulty)
         {
-            var maxAtLevel = Mathf.Max(2, FeatureFlags.LastChanceDynamicMaxMinutesAtLevel);
-            var effectiveLevel = Mathf.Min(Mathf.Max(1, inputs.LevelNumber), maxAtLevel);
-            var normalized = (effectiveLevel - 1f) / (maxAtLevel - 1f);
-
-            // Keep early-level dynamic bonus small (L1 ~55% of raw), then ramp to 100% by target level.
-            var levelScale = Mathf.Lerp(0.55f, 1f, normalized);
-            var roomBase = Mathf.Max(1f, inputs.RequiredPlayers * 14f);
-            var roomFactor = Mathf.Clamp01(inputs.TotalShortestRoomPathSteps / roomBase);
+            var levelScale = Mathf.Lerp(0.55f, 1f, difficulty.Progress);
+            var roomFactor = Mathf.Clamp01(inputs.CriticalRoomSteps / 14f);
             var monsterFactor = Mathf.Clamp01(inputs.AliveSearchMonsters / 10f);
             var roomWeight = Mathf.Max(0f, FeatureFlags.LastChanceLevelContextRoomWeight);
             var monsterWeight = Mathf.Max(0f, FeatureFlags.LastChanceLevelContextMonsterWeight);
             var contextMultiplier = 1f + (roomFactor * roomWeight) + (monsterFactor * monsterWeight);
-            var contextScale = Mathf.Lerp(1f, contextMultiplier, normalized);
+            var contextScale = Mathf.Lerp(1f, contextMultiplier, difficulty.Progress);
+            var multiplier = levelScale * contextScale;
 
-            return Mathf.Max(0.1f, levelScale * contextScale);
+            return IsFinite(multiplier) ? Mathf.Max(0.1f, multiplier) : 1f;
         }
 
-        private static float GetLevelFloorSeconds(int levelNumber, float maxSeconds)
+        private static float GetDifficultyFloorSeconds(
+            float baseSeconds,
+            RepoDifficultySnapshot difficulty,
+            out bool usedFiniteFallback)
         {
-            var maxAtLevel = Mathf.Max(2, FeatureFlags.LastChanceDynamicMaxMinutesAtLevel);
-            var effectiveLevel = Mathf.Min(Mathf.Max(1, levelNumber), maxAtLevel);
-            var normalized = (effectiveLevel - 1f) / (maxAtLevel - 1f);
-            var baseSeconds = GetConfiguredSeconds();
-            var floorSeconds = Mathf.Lerp(baseSeconds, maxSeconds, normalized);
-            return Mathf.Clamp(floorSeconds, 30f, maxSeconds);
+            var floorSeconds = baseSeconds +
+                               (difficulty.Difficulty1 * Mathf.Max(0, FeatureFlags.LastChanceDifficulty1FloorBonusSeconds)) +
+                               (difficulty.Difficulty2 * Mathf.Max(0, FeatureFlags.LastChanceDifficulty2FloorBonusSeconds)) +
+                               (difficulty.Difficulty3 * Mathf.Max(0, FeatureFlags.LastChanceDifficulty3FloorBonusSeconds));
+
+            if (!IsFinite(floorSeconds))
+            {
+                usedFiniteFallback = true;
+                return Mathf.Max(30f, baseSeconds);
+            }
+
+            usedFiniteFallback = false;
+            return Mathf.Max(30f, floorSeconds);
         }
 
         private static string FormatTimerText(float secondsRemaining)

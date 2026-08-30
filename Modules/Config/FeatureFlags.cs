@@ -17,18 +17,19 @@ namespace DHHFLastChanceMode.Modules.Config
         internal static class Descriptions
         {
             public const string LastChanceMode = "When true, prevent the vanilla run manager from switching to the dump level when all players die.";
-            public const string LastChanceTimerSeconds = "LastChance timer duration in seconds (integer, 30s steps).";
-            public const string LastChanceDynamicTimerEnabled = "Enable dynamic LastChance timer scaling from base timer and run context metrics.";
+            public const string LastChanceTimerSeconds = "Static LastChance timer duration and base seconds for the dynamic difficulty floor (integer, 30s steps).";
+            public const string LastChanceDynamicTimerEnabled = "Enable dynamic LastChance timer scaling from the critical Death Head return route and R.E.P.O. run difficulty.";
             public const string LastChanceTimerPerRequiredPlayerSeconds = "Extra seconds added per required player that must reach the truck.";
-            public const string LastChanceLevelContextRoomWeight = "Extra multiplier weight applied to level contribution from room-path difficulty (0 disables room context).";
-            public const string LastChanceLevelContextMonsterWeight = "Extra multiplier weight applied to level contribution from active search monsters (0 disables monster context).";
-            public const string LastChanceTimerPerFarthestMeterSeconds = "Extra seconds added per meter of total required-player distance to truck.";
-            public const string LastChanceTimerPerBelowTruckPlayerSeconds = "Extra seconds added per required player below the truck threshold height.";
-            public const string LastChanceTimerPerBelowTruckMeterSeconds = "Extra seconds added per meter below threshold (only when height delta <= threshold).";
-            public const string LastChanceBelowTruckThresholdMeters = "Height delta threshold (playerY - truckY) below which low-altitude penalties apply. -0.5 means at least half meter below.";
-            public const string LastChanceTimerPerRoomStepSeconds = "Extra seconds added per total room-step count (sum of required players shortest paths to truck).";
-            public const string LastChanceDynamicMaxMinutesAtLevel = "Level where level-based growth stops increasing (timer still only capped by MaxMinutes).";
-            public const string LastChanceDynamicMaxMinutes = "Hard cap (minutes) for final LastChance timer after dynamic scaling.";
+            public const string LastChanceLevelContextRoomWeight = "Extra multiplier weight from the critical Death Head room-path difficulty, progressively applied by R.E.P.O. run difficulty (0 disables room context).";
+            public const string LastChanceLevelContextMonsterWeight = "Extra multiplier weight from active search monsters, progressively applied by R.E.P.O. run difficulty (0 disables monster context).";
+            public const string LastChanceTimerPerFarthestMeterSeconds = "Extra seconds added per meter of the critical Death Head effective route to the truck.";
+            public const string LastChanceTimerPerBelowTruckPlayerSeconds = "Fixed extra seconds added when the critical Death Head is below the truck threshold height.";
+            public const string LastChanceTimerPerBelowTruckMeterSeconds = "Extra seconds added per meter the critical Death Head is below the configured threshold.";
+            public const string LastChanceBelowTruckThresholdMeters = "Height delta threshold (DeathHeadY - truckY) below which the critical route receives vertical recovery time. -0.5 means at least half a meter below.";
+            public const string LastChanceTimerPerRoomStepSeconds = "Extra seconds added per room step on the critical Death Head route to the truck.";
+            public const string LastChanceDifficulty1FloorBonusSeconds = "Extra minimum timer seconds progressively granted by R.E.P.O. Difficulty 1 (levels 1-10).";
+            public const string LastChanceDifficulty2FloorBonusSeconds = "Extra minimum timer seconds progressively granted by R.E.P.O. Difficulty 2 (levels 11-20).";
+            public const string LastChanceDifficulty3FloorBonusSeconds = "Extra minimum timer seconds progressively granted by R.E.P.O. Difficulty 3 (levels 21-30).";
             public const string ConsolationMoneyPercent = "Percentage of the minimum first-extraction reward used as the minimum currency threshold when LastChance succeeds before any extraction is completed.";
             public const string LastChancePreserveExtractedCosmeticTokens = "When true, cosmetic tokens from extracted cosmetic crates are preserved for every player after a successful LastChance return.";
             public const string LastChancePreserveExtractedMoney = "When true, run currency already extracted before LastChance success is preserved; consolation money remains independent.";
@@ -44,7 +45,7 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChancePupilVisualsEnabled = "When true, LastChance keeps death-head pupils visible and unlocks eye look-at behavior for head proxy players. When false, eyes/pupils stay vanilla during LastChance.";
             public const string LastChanceMonstersSearchEnabled = "During LastChance, monsters treat disabled players as valid targets (harder return to truck).";
             public const string LastChanceMonstersVoiceEnemyOnlyEnabled = "During LastChance, disabled death-head voice keeps enemy reactions/talk animation but mutes playback to players (enemy-only voice aggro).";
-            public const string LastChanceTimerPerMonsterSeconds = "Extra seconds added per active spawned monster when LastChanceMonstersSearch is enabled.";
+            public const string LastChanceTimerPerMonsterSeconds = "Literal extra seconds added per active spawned monster when LastChanceMonstersSearch is enabled.";
             public const string SpectateDeadPlayers = "Allow SpectateCamera to cycle through disabled players (dead bodies) when toggling targets.";
             public const string SpectateDeadPlayersMode = "Dead-player spectate during active LastChance: LastChanceOnly enables cycling, Disabled forces local DeathHead spectate, Always is a legacy alias now scoped to active LastChance only.";
             public const string LastChanceSpectateDefaultFov = "Field of view enforced only during active LastChance spectate. Set 0 to disable. Replaces DeathHeadHopperFix [8. Camera] DHHSpectateDefaultFov; copy legacy values manually if needed.";
@@ -59,12 +60,6 @@ namespace DHHFLastChanceMode.Modules.Config
 
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceDynamicTimerEnabled)]
         public static bool LastChanceDynamicTimerEnabled = true;
-
-        [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceDynamicMaxMinutes, Min = 5f, Max = 20f)]
-        public static int LastChanceDynamicMaxMinutes = 10;
-
-        [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceDynamicMaxMinutesAtLevel, Min = 5f, Max = 60f)]
-        public static int LastChanceDynamicMaxMinutesAtLevel = 25;
 
         [FeatureConfigEntry(Sections.LastChanceQuick, Descriptions.LastChanceMissingPlayers, Min = 0f, Max = 32f)]
         public static int LastChanceMissingPlayers = 0;
@@ -87,28 +82,37 @@ namespace DHHFLastChanceMode.Modules.Config
         [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.LastChancePreserveExtractedMoney)]
         public static bool LastChancePreserveExtractedMoney = true;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerMonsterSeconds, Min = 0f, Max = 60f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceDifficulty1FloorBonusSeconds, Min = 0f, Max = 180f)]
+        public static int LastChanceDifficulty1FloorBonusSeconds = 60;
+
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceDifficulty2FloorBonusSeconds, Min = 0f, Max = 180f)]
+        public static int LastChanceDifficulty2FloorBonusSeconds = 45;
+
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceDifficulty3FloorBonusSeconds, Min = 0f, Max = 180f)]
+        public static int LastChanceDifficulty3FloorBonusSeconds = 45;
+
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerMonsterSeconds, Min = 0f, Max = 15f)]
         public static float LastChanceTimerPerMonsterSeconds = 3f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerRequiredPlayerSeconds, Min = 0f, Max = 120f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerRequiredPlayerSeconds, Min = 0f, Max = 30f)]
         public static float LastChanceTimerPerRequiredPlayerSeconds = 8f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceLevelContextRoomWeight, Min = 0f, Max = 3f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceLevelContextRoomWeight, Min = 0f, Max = 1f)]
         public static float LastChanceLevelContextRoomWeight = 0.5f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceLevelContextMonsterWeight, Min = 0f, Max = 3f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceLevelContextMonsterWeight, Min = 0f, Max = 1f)]
         public static float LastChanceLevelContextMonsterWeight = 0.3f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerFarthestMeterSeconds, Min = 0f, Max = 20f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerFarthestMeterSeconds, Min = 0f, Max = 3f)]
         public static float LastChanceTimerPerFarthestMeterSeconds = 0.6f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerRoomStepSeconds, Min = 0f, Max = 60f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerRoomStepSeconds, Min = 0f, Max = 15f)]
         public static float LastChanceTimerPerRoomStepSeconds = 3f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerBelowTruckPlayerSeconds, Min = 0f, Max = 120f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerBelowTruckPlayerSeconds, Min = 0f, Max = 60f)]
         public static float LastChanceTimerPerBelowTruckPlayerSeconds = 15f;
 
-        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerBelowTruckMeterSeconds, Min = 0f, Max = 30f)]
+        [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceTimerPerBelowTruckMeterSeconds, Min = 0f, Max = 60f)]
         public static float LastChanceTimerPerBelowTruckMeterSeconds = 15f;
 
         [FeatureConfigEntry(Sections.LastChanceTimer, Descriptions.LastChanceBelowTruckThresholdMeters, Min = -5f, Max = 0f)]
@@ -132,7 +136,7 @@ namespace DHHFLastChanceMode.Modules.Config
         [FeatureConfigEntry(Sections.LastChanceGameplay, Descriptions.LastChanceIndicatorDirectionPenaltyMaxSeconds, Min = 0f, Max = 30f)]
         public static float LastChanceIndicatorDirectionPenaltyMaxSeconds = 8f;
 
-        [FeatureConfigEntry(Sections.LastChanceGameplay, Descriptions.LastChanceIndicatorDirectionPenaltyMinSeconds, Min = 0f, Max = 60f)]
+        [FeatureConfigEntry(Sections.LastChanceGameplay, Descriptions.LastChanceIndicatorDirectionPenaltyMinSeconds, Min = 0f, Max = 30f)]
         public static float LastChanceIndicatorDirectionPenaltyMinSeconds = 4f;
 
         [FeatureConfigEntry(Sections.LastChanceGameplay, Descriptions.LastChancePupilVisualsEnabled)]

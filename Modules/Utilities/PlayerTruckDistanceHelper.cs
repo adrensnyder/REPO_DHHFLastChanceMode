@@ -48,6 +48,35 @@ namespace DHHFLastChanceMode.Modules.Utilities
             internal bool HasValidPath { get; }
         }
 
+        internal readonly struct PlayerTruckRouteAssessment
+        {
+            internal PlayerTruckRouteAssessment(
+                Vector3 playerWorldPosition,
+                Vector3 truckWorldPosition,
+                Vector3 navMeshFrom,
+                Vector3 navMeshTo,
+                float navMeshDistance,
+                bool hasValidPath,
+                Vector3[] pathCorners)
+            {
+                PlayerWorldPosition = playerWorldPosition;
+                TruckWorldPosition = truckWorldPosition;
+                NavMeshFrom = navMeshFrom;
+                NavMeshTo = navMeshTo;
+                NavMeshDistance = navMeshDistance;
+                HasValidPath = hasValidPath;
+                PathCorners = pathCorners;
+            }
+
+            internal Vector3 PlayerWorldPosition { get; }
+            internal Vector3 TruckWorldPosition { get; }
+            internal Vector3 NavMeshFrom { get; }
+            internal Vector3 NavMeshTo { get; }
+            internal float NavMeshDistance { get; }
+            internal bool HasValidPath { get; }
+            internal Vector3[] PathCorners { get; }
+        }
+
         private sealed class CachedPlayerDistance
         {
             internal float NavMeshDistance = -1f;
@@ -267,11 +296,18 @@ namespace DHHFLastChanceMode.Modules.Utilities
 
                 if (needsNavPath && (forceRefresh || levelChanged || roomChanged))
                 {
-                    var navDistance = -1f;
-                    var hasPath = TryGetPlayerNavMeshPosition(player, worldPosition, out var navMeshStart) &&
-                                  TryCalculatePathDistance(navMeshStart, truckPosition, out navDistance);
-                    cached.NavMeshDistance = hasPath ? navDistance : -1f;
-                    cached.HasValidPath = hasPath;
+                    var hasAssessment = TryAssessPlayerTruckRoute(
+                        player,
+                        worldPosition,
+                        truckPosition,
+                        sampleTruckTarget: false,
+                        allowUnsampledPlayerFallback: false,
+                        includePathCorners: false,
+                        assessment: out var routeAssessment);
+                    cached.NavMeshDistance = hasAssessment && routeAssessment.HasValidPath
+                        ? routeAssessment.NavMeshDistance
+                        : -1f;
+                    cached.HasValidPath = hasAssessment && routeAssessment.HasValidPath;
                     navRefreshCount++;
                 }
 
@@ -323,6 +359,47 @@ namespace DHHFLastChanceMode.Modules.Utilities
             {
                 LogRuntimeHotPathException("GetDistancesFromTruck", ex);
                 return Array.Empty<PlayerTruckDistance>();
+            }
+        }
+
+        internal static bool TryGetLocalPlayerTruckRouteAssessment(
+            bool includePathCorners,
+            out PlayerTruckRouteAssessment assessment)
+        {
+            assessment = default;
+            try
+            {
+                var player = PlayerAvatar.instance;
+                if (player == null)
+                {
+                    return false;
+                }
+
+                var levelGenerator = LevelGenerator.Instance;
+                if (levelGenerator == null)
+                {
+                    return false;
+                }
+
+                var allLevelPoints = GetAllLevelPoints(levelGenerator);
+                if (!TryGetTruckTarget(levelGenerator, allLevelPoints, out var truckPosition, out _))
+                {
+                    return false;
+                }
+
+                return TryAssessPlayerTruckRoute(
+                    player,
+                    GetPlayerWorldPosition(player),
+                    truckPosition,
+                    sampleTruckTarget: true,
+                    allowUnsampledPlayerFallback: true,
+                    includePathCorners: includePathCorners,
+                    assessment: out assessment);
+            }
+            catch (Exception ex)
+            {
+                LogRuntimeHotPathException("TryGetLocalPlayerTruckRouteAssessment", ex);
+                return false;
             }
         }
 
@@ -806,6 +883,64 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return false;
         }
 
+        private static bool TryAssessPlayerTruckRoute(
+            PlayerAvatar player,
+            Vector3 playerWorldPosition,
+            Vector3 truckWorldPosition,
+            bool sampleTruckTarget,
+            bool allowUnsampledPlayerFallback,
+            bool includePathCorners,
+            out PlayerTruckRouteAssessment assessment)
+        {
+            assessment = default;
+            if (player == null)
+            {
+                return false;
+            }
+
+            var hasPlayerNavMeshPosition = TryGetPlayerNavMeshPosition(player, playerWorldPosition, out var navMeshFrom);
+            if (!hasPlayerNavMeshPosition)
+            {
+                if (!allowUnsampledPlayerFallback)
+                {
+                    assessment = new PlayerTruckRouteAssessment(
+                        playerWorldPosition,
+                        truckWorldPosition,
+                        playerWorldPosition,
+                        truckWorldPosition,
+                        -1f,
+                        false,
+                        Array.Empty<Vector3>());
+                    return true;
+                }
+
+                navMeshFrom = playerWorldPosition;
+            }
+
+            var navMeshTo = truckWorldPosition;
+            if (sampleTruckTarget && TrySamplePosition(truckWorldPosition, 8f, out var sampledTruckPosition))
+            {
+                navMeshTo = sampledTruckPosition;
+            }
+
+            var hasPath = TryCalculatePath(
+                navMeshFrom,
+                navMeshTo,
+                includePathCorners,
+                out var navMeshDistance,
+                out var pathCorners);
+
+            assessment = new PlayerTruckRouteAssessment(
+                playerWorldPosition,
+                truckWorldPosition,
+                navMeshFrom,
+                navMeshTo,
+                hasPath ? navMeshDistance : -1f,
+                hasPath,
+                pathCorners);
+            return true;
+        }
+
         private static bool TrySamplePosition(Vector3 worldPosition, float maxDistance, out Vector3 navMeshPosition)
         {
             navMeshPosition = Vector3.zero;
@@ -818,9 +953,15 @@ namespace DHHFLastChanceMode.Modules.Utilities
             return true;
         }
 
-        private static bool TryCalculatePathDistance(Vector3 from, Vector3 to, out float navMeshDistance)
+        private static bool TryCalculatePath(
+            Vector3 from,
+            Vector3 to,
+            bool includePathCorners,
+            out float navMeshDistance,
+            out Vector3[] pathCorners)
         {
             navMeshDistance = 0f;
+            pathCorners = Array.Empty<Vector3>();
             var path = new NavMeshPath();
             if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, path))
             {
@@ -843,6 +984,10 @@ namespace DHHFLastChanceMode.Modules.Utilities
             }
 
             navMeshDistance = totalDistance;
+            if (includePathCorners)
+            {
+                pathCorners = corners;
+            }
             return true;
         }
     }
