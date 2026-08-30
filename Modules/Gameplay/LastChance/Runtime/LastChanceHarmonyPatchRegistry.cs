@@ -8,7 +8,6 @@ using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Adapters;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Interactions;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Monsters.Pipeline;
 using DHHFLastChanceMode.Modules.Gameplay.LastChance.Spectate;
-using DHHFLastChanceMode.Modules.Gameplay.LastChance.UI;
 using HarmonyLib;
 
 namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
@@ -29,7 +28,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
             typeof(LastChancePlayerReviveReleasePatch),
             typeof(LastChancePlayerDestroyReviveCleanupPatch),
             typeof(LastChanceConsolationMoneyShopPatch),
-            typeof(CosmeticTokenUIRefreshPatch),
             typeof(SpectateCameraLastChancePlayerSwitchPatch),
             typeof(SpectateCameraLastChanceStateNormalPatch),
             typeof(SpectateCameraLastChanceUpdateStatePatch),
