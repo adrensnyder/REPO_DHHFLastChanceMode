@@ -31,7 +31,6 @@ namespace DHHFLastChanceMode.Modules.Config
             public const string LastChanceDifficulty2FloorBonusSeconds = "Extra minimum timer seconds progressively granted by R.E.P.O. Difficulty 2 (levels 11-20).";
             public const string LastChanceDifficulty3FloorBonusSeconds = "Extra minimum timer seconds progressively granted by R.E.P.O. Difficulty 3 (levels 21-30).";
             public const string ConsolationMoneyPercent = "Percentage of the minimum first-extraction reward used as the minimum currency threshold when LastChance succeeds before any extraction is completed.";
-            public const string LastChancePreserveExtractedCosmeticTokens = "When true, cosmetic tokens from extracted cosmetic crates are preserved for every player after a successful LastChance return.";
             public const string LastChancePreserveExtractedMoney = "When true, run currency already extracted before LastChance success is preserved; consolation money remains independent.";
             public const string LastChanceMissingPlayers = "Number of players allowed to stay outside the truck before LastChance success triggers (0 = all players required).";
             public const string LastChanceTimerBonusPerMonsterDeathSeconds = "Seconds added to LastChance timer whenever a monster dies during active LastChance.";
@@ -75,9 +74,6 @@ namespace DHHFLastChanceMode.Modules.Config
 
         [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.ConsolationMoneyPercent, Min = 0f, Max = 500f)]
         public static int ConsolationMoneyPercent = 100;
-
-        [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.LastChancePreserveExtractedCosmeticTokens)]
-        public static bool LastChancePreserveExtractedCosmeticTokens = true;
 
         [FeatureConfigEntry(Sections.LastChanceExtraction, Descriptions.LastChancePreserveExtractedMoney)]
         public static bool LastChancePreserveExtractedMoney = true;

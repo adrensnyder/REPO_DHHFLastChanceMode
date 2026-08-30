@@ -18,7 +18,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
 {
     // RunManager.Update postfix drives LastChance runtime/timer state every frame.
     // Vanilla all-dead suppression is handled separately by AllPlayersDeadGuard:
-    // Update postfix guards allPlayersDead assignment and ChangeLevel prefix blocks fail transition.
+    // AllPlayersDeadSet prefix blocks the replicated flag and ChangeLevel prefix blocks fail transition.
     [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
     internal static class RunManagerUpdateLastChanceTimerPatch
     {
@@ -710,7 +710,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Runtime
                     $"primaryApplied={primaryTargetAvailable && newCurrency > preservedCurrency}.");
             }
 
-            LastChanceSurrenderNetwork.BroadcastExtractionReward();
             SemiFunc.StatSetRunCurrency(newCurrency);
             NormalizeDirectorsBeforeShopReturn();
 

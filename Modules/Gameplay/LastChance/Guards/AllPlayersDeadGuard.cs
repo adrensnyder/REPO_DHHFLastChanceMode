@@ -12,7 +12,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
     {
         private const string ModuleTag = "[DHHFLastChanceMode] [Gameplay]";
         private const string LogKey = "SuppressAllDeadTransition";
-        private const string UpdateGuardLogKey = "SuppressAllDeadFlag";
+        private const string SetGuardLogKey = "SuppressAllDeadFlag";
         private static readonly ManualLogSource Log = Logger.CreateLogSource("DHHFLastChanceMode.Gameplay");
         private static bool s_enabledLogged;
         private static bool s_suppressedLogged;
@@ -29,7 +29,7 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
             if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(LogKey))
             {
-                Log.LogInfo($"{ModuleTag} Guard enabled via typed ChangeLevel prefix patch.");
+                Log.LogInfo($"{ModuleTag} Guard enabled via typed all-dead prefix patches.");
             }
         }
 
@@ -42,6 +42,12 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
 
         internal static void AllowVanillaAllPlayersDead()
         {
+            if (!SemiFunc.IsMasterClientOrSingleplayer())
+            {
+                s_allowAllPlayersDead = false;
+                return;
+            }
+
             s_allowAllPlayersDead = true;
         }
 
@@ -62,7 +68,6 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             if (s_allowAllPlayersDead)
             {
                 s_suppressedLogged = false;
-                s_allowAllPlayersDead = false;
                 return true;
             }
 
@@ -86,24 +91,33 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             return false;
         }
 
-        private static void UpdatePostfix(RunManager __instance)
+        private static bool AllPlayersDeadSetPrefix(bool _set)
         {
-            if (__instance == null || !__instance.allPlayersDead)
+            if (!_set)
             {
-                return;
+                // Any vanilla reset/new-scene initialization also clears a stale one-shot allowance.
+                s_allowAllPlayersDead = false;
+                return true;
             }
 
-            if (!ShouldSuppressAllPlayersDeadFlow() || s_allowAllPlayersDead)
+            if (!ShouldSuppressAllPlayersDeadFlow())
             {
-                return;
+                s_allowAllPlayersDead = false;
+                return true;
             }
 
-            __instance.allPlayersDead = false;
-
-            if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(UpdateGuardLogKey, 120))
+            if (s_allowAllPlayersDead)
             {
-                Log.LogDebug($"{ModuleTag} Suppressed RunManager.allPlayersDead assignment during LastChance flow.");
+                s_allowAllPlayersDead = false;
+                return true;
             }
+
+            if (FeatureFlags.DebugLogging && LogLimiter.ShouldLog(SetGuardLogKey, 120))
+            {
+                Log.LogDebug($"{ModuleTag} Suppressed RunManager.AllPlayersDeadSet(true) during LastChance flow.");
+            }
+
+            return false;
         }
 
         private static bool ShouldSuppressAllPlayersDeadFlow()
@@ -181,13 +195,13 @@ namespace DHHFLastChanceMode.Modules.Gameplay.LastChance.Guards
             }
         }
 
-        [HarmonyPatch(typeof(RunManager), nameof(RunManager.Update))]
-        internal static class RunManagerUpdateAllPlayersDeadPatch
+        [HarmonyPatch(typeof(RunManager), nameof(RunManager.AllPlayersDeadSet), new[] { typeof(bool) })]
+        internal static class RunManagerAllPlayersDeadSetPatch
         {
-            [HarmonyPostfix]
-            private static void Postfix(RunManager __instance)
+            [HarmonyPrefix]
+            private static bool Prefix(bool _set)
             {
-                UpdatePostfix(__instance);
+                return AllPlayersDeadSetPrefix(_set);
             }
         }
     }
